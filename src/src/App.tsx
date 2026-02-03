@@ -21,7 +21,7 @@ import { TurnosProvider } from './app/components/TurnosContext';
 import { ClientesProvider } from './app/components/ClientesContext';
 import { VideosProvider } from './app/components/VideosContext';
 import { Toaster } from './app/components/ui/sonner';
-import supabase from '../lib/supabaseClient';
+import { supabase } from '../lib/supabaseClient';
 import { Button } from './app/components/ui/button';
 import { ErrorBoundary } from './ErrorBoundary';
 
@@ -140,7 +140,9 @@ export default function App() {
                                         )}
                                         {currentUser.role === 'programador' && (
                                           <ProgramadorDashboard
-                                            user={currentUser}
+                                            accessToken={currentUser.accessToken}
+                                            userId={currentUser.userId}
+                                            userEmail={currentUser.email}
                                             onLogout={handleLogout}
                                           />
                                         )}

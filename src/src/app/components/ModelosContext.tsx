@@ -75,7 +75,19 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
 
   // Cargar modelos desde Supabase al inicializar
   useEffect(() => {
-    cargarModelos();
+    let isMounted = true;
+    
+    const loadData = async () => {
+      if (isMounted) {
+        await cargarModelos();
+      }
+    };
+    
+    loadData();
+    
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const cargarModelos = async () => {
@@ -109,7 +121,11 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
             .order('id', { ascending: true });
 
           if (errorPoliticas) {
-            console.warn('⚠️ Error cargando políticas tarifarias:', errorPoliticas.message);
+            // ✅ Manejo seguro del error - puede ser AbortError u otro tipo
+            const errorMsg = errorPoliticas instanceof Error 
+              ? errorPoliticas.message 
+              : String(errorPoliticas);
+            console.warn('⚠️ Error cargando políticas tarifarias:', errorMsg);
           } else {
             console.log(`📋 Políticas tarifarias encontradas: ${politicas?.length || 0}`);
             
