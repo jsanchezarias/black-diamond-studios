@@ -1,0 +1,224 @@
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --font-size: 16px;
+  
+  /* Paleta Premium Oscura - Black Diamond */
+  --background: #0d0d0d;
+  --foreground: #e8e6e3;
+  --card: #1a1a1a;
+  --card-foreground: #e8e6e3;
+  --popover: #1a1a1a;
+  --popover-foreground: #e8e6e3;
+  
+  /* Dorado champagne elegante */
+  --primary: #c9a961;
+  --primary-foreground: #0d0d0d;
+  --primary-glow: rgba(201, 169, 97, 0.15);
+  
+  /* Grises cálidos premium */
+  --secondary: #2a2826;
+  --secondary-foreground: #e8e6e3;
+  --muted: #252321;
+  --muted-foreground: #a09c97;
+  
+  /* Acento dorado */
+  --accent: #d4af37;
+  --accent-foreground: #0d0d0d;
+  --accent-glow: rgba(212, 175, 55, 0.2);
+  
+  --destructive: #c41e3a;
+  --destructive-foreground: #e8e6e3;
+  
+  /* Bordes y inputs elegantes */
+  --border: rgba(201, 169, 97, 0.15);
+  --border-hover: rgba(201, 169, 97, 0.3);
+  --input: rgba(201, 169, 97, 0.1);
+  --input-background: #1a1a1a;
+  --switch-background: #2a2826;
+  
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+  
+  --ring: #c9a961;
+  
+  /* Charts con tonos dorados */
+  --chart-1: #c9a961;
+  --chart-2: #d4af37;
+  --chart-3: #b8941f;
+  --chart-4: #f5d977;
+  --chart-5: #a8884d;
+  
+  --radius: 0.5rem;
+  
+  /* Sidebar premium */
+  --sidebar: #0d0d0d;
+  --sidebar-foreground: #e8e6e3;
+  --sidebar-primary: #c9a961;
+  --sidebar-primary-foreground: #0d0d0d;
+  --sidebar-accent: #1a1a1a;
+  --sidebar-accent-foreground: #e8e6e3;
+  --sidebar-border: rgba(201, 169, 97, 0.15);
+  --sidebar-ring: #c9a961;
+  
+  /* Efectos de lujo */
+  --glow-gold: 0 0 20px rgba(201, 169, 97, 0.1);
+  --glow-gold-strong: 0 0 30px rgba(201, 169, 97, 0.2);
+  --shadow-premium: 0 4px 24px rgba(0, 0, 0, 0.4);
+  --shadow-card: 0 2px 16px rgba(0, 0, 0, 0.3);
+}
+
+/* Custom Scrollbar Premium */
+.scrollbar-thin {
+  scrollbar-width: thin;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: rgba(42, 40, 38, 0.3);
+  border-radius: 4px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(201, 169, 97, 0.3);
+  border-radius: 4px;
+  transition: background 0.3s ease;
+}
+
+.scrollbar-thin:hover::-webkit-scrollbar-thumb {
+  background: rgba(201, 169, 97, 0.5);
+}
+
+.scrollbar-thumb-primary\/30::-webkit-scrollbar-thumb {
+  background: rgba(201, 169, 97, 0.3);
+}
+
+.scrollbar-thumb-primary\/50::-webkit-scrollbar-thumb {
+  background: rgba(201, 169, 97, 0.5);
+}
+
+.scrollbar-track-transparent::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Smooth scroll behavior */
+.overflow-x-auto {
+  scroll-behavior: smooth;
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+    outline-color: var(--ring);
+    outline-width: 0;
+  }
+
+  html {
+    font-size: var(--font-size);
+    background-color: var(--background);
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-smooth: always;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /**
+  * Default typography styles for HTML elements (h1-h4, p, label, button, input).
+  * These are in @layer base, so Tailwind utility classes (like text-sm, text-lg) automatically override them.
+  */
+
+  h1 {
+    font-size: var(--text-2xl);
+    font-weight: var(--font-weight-medium);
+    line-height: 1.3;
+    letter-spacing: 0.01em;
+  }
+
+  h2 {
+    font-size: var(--text-xl);
+    font-weight: var(--font-weight-medium);
+    line-height: 1.4;
+    letter-spacing: 0.01em;
+  }
+
+  h3 {
+    font-size: var(--text-lg);
+    font-weight: var(--font-weight-medium);
+    line-height: 1.4;
+    letter-spacing: 0.01em;
+  }
+
+  h4 {
+    font-size: var(--text-base);
+    font-weight: var(--font-weight-medium);
+    line-height: 1.5;
+    letter-spacing: 0.01em;
+  }
+
+  label {
+    font-size: var(--text-base);
+    font-weight: var(--font-weight-medium);
+    line-height: 1.5;
+  }
+
+  button {
+    font-size: var(--text-base);
+    font-weight: var(--font-weight-medium);
+    line-height: 1.5;
+    letter-spacing: 0.02em;
+  }
+
+  input {
+    font-size: var(--text-base);
+    font-weight: var(--font-weight-normal);
+    line-height: 1.5;
+  }
+}
+
+/* Utility classes para efectos premium */
+@layer utilities {
+  .text-gradient-gold {
+    background: linear-gradient(135deg, #c9a961 0%, #d4af37 50%, #f5d977 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  
+  .glow-gold {
+    box-shadow: var(--glow-gold);
+  }
+  
+  .glow-gold-strong {
+    box-shadow: var(--glow-gold-strong);
+  }
+  
+  .shadow-premium {
+    box-shadow: var(--shadow-premium);
+  }
+  
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+  
+  .border-gradient-gold {
+    border: 1px solid transparent;
+    background: linear-gradient(var(--background), var(--background)) padding-box,
+                linear-gradient(135deg, rgba(201, 169, 97, 0.3), rgba(212, 175, 55, 0.1)) border-box;
+  }
+  
+  .bg-gradient-dark {
+    background: linear-gradient(135deg, #0d0d0d 0%, #1a1a1a 100%);
+  }
+  
+  .bg-gradient-card {
+    background: linear-gradient(135deg, rgba(26, 26, 26, 0.8) 0%, rgba(42, 40, 38, 0.6) 100%);
+  }
+}

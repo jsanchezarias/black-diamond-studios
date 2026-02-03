@@ -1,0 +1,197 @@
+/* Animaciones premium para Black Diamond Studios */
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+@keyframes glow-pulse {
+  0%, 100% {
+    opacity: 0.4;
+    filter: blur(30px);
+  }
+  50% {
+    opacity: 0.7;
+    filter: blur(45px);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+@keyframes diamond-shine {
+  0%, 100% {
+    opacity: 0;
+    transform: translateX(-100%) rotate(-45deg);
+  }
+  50% {
+    opacity: 0.6;
+    transform: translateX(100%) rotate(-45deg);
+  }
+}
+
+@keyframes gold-pulse {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(201, 169, 97, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(201, 169, 97, 0.4);
+  }
+}
+
+@keyframes luxury-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes elegant-scale {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+}
+
+/* Clases de utilidad */
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.animate-glow-pulse {
+  animation: glow-pulse 4s ease-in-out infinite;
+}
+
+.animate-gold-pulse {
+  animation: gold-pulse 3s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  animation: shimmer 3s linear infinite;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(201, 169, 97, 0.15) 50%,
+    transparent 100%
+  );
+  background-size: 1000px 100%;
+}
+
+.animate-diamond-shine {
+  animation: diamond-shine 8s ease-in-out infinite;
+}
+
+.animate-luxury-fade-in {
+  animation: luxury-fade-in 0.8s ease-out;
+}
+
+.animate-elegant-scale {
+  animation: elegant-scale 8s ease-in-out infinite;
+}
+
+/* Gradientes radiales personalizados */
+.bg-gradient-radial {
+  background: radial-gradient(circle, var(--tw-gradient-stops));
+}
+
+/* Efecto de diamante brillante */
+.diamond-glow {
+  position: relative;
+  overflow: hidden;
+}
+
+.diamond-glow::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    45deg,
+    transparent 30%,
+    rgba(201, 169, 97, 0.2) 50%,
+    transparent 70%
+  );
+  animation: diamond-shine 8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Texto con efecto de brillo premium */
+.text-glow {
+  text-shadow: 
+    0 0 10px rgba(232, 230, 227, 0.3),
+    0 0 20px rgba(232, 230, 227, 0.2),
+    0 0 30px rgba(232, 230, 227, 0.1);
+}
+
+.text-gold-glow {
+  text-shadow: 
+    0 0 15px rgba(201, 169, 97, 0.5),
+    0 0 30px rgba(201, 169, 97, 0.3),
+    0 0 45px rgba(201, 169, 97, 0.2);
+}
+
+/* Bordes brillantes premium */
+.border-glow {
+  box-shadow: 
+    0 0 15px rgba(201, 169, 97, 0.2),
+    0 0 30px rgba(201, 169, 97, 0.1),
+    inset 0 0 15px rgba(201, 169, 97, 0.05);
+}
+
+.border-glow-strong {
+  box-shadow: 
+    0 0 20px rgba(201, 169, 97, 0.3),
+    0 0 40px rgba(201, 169, 97, 0.15),
+    inset 0 0 20px rgba(201, 169, 97, 0.08);
+}
+
+/* Backdrop blur premium */
+.backdrop-blur-premium {
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+
+/* Overlay oscuro elegante */
+.overlay-dark {
+  background: linear-gradient(
+    135deg,
+    rgba(13, 13, 13, 0.95) 0%,
+    rgba(26, 26, 26, 0.9) 100%
+  );
+}
+
+/* Hover effects premium */
+.hover-glow {
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hover-glow:hover {
+  box-shadow: 0 0 30px rgba(201, 169, 97, 0.3);
+  transform: translateY(-2px);
+}
+
+.hover-scale-elegant {
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hover-scale-elegant:hover {
+  transform: scale(1.02);
+}
