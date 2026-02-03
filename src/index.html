@@ -1,12 +1,25 @@
 <!doctype html>
-<html lang="es" class="dark">
+<html lang="es">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Black Diamond App</title>
+    <style>
+      /* Asegurar fondo negro inmediatamente */
+      html, body {
+        margin: 0;
+        padding: 0;
+        background-color: #0d0d0d;
+        color: #e8e6e3;
+      }
+      #root {
+        min-height: 100vh;
+        background-color: #0d0d0d;
+      }
+    </style>
   </head>
-  <body class="bg-black text-foreground">
+  <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
