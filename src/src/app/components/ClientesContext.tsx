@@ -109,9 +109,21 @@ export function ClientesProvider({ children }: { children: ReactNode }) {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // ✅ CORREGIDO: useEffect mejorado para evitar loops
   useEffect(() => {
-    cargarClientes();
-  }, []);
+    let isMounted = true;
+    
+    const cargarInicial = async () => {
+      if (!isMounted) return;
+      await cargarClientes();
+    };
+    
+    cargarInicial();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, []); // ✅ Array vacío - solo ejecutar una vez al montar
 
   const cargarClientes = async () => {
     try {

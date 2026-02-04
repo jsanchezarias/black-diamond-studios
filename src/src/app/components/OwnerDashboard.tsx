@@ -25,7 +25,7 @@ import { useModelos, Modelo } from './ModelosContext';
 import { useServicios } from './ServiciosContext';
 import { usePagos } from './PagosContext';
 import { AsistenciaPanel } from './AsistenciaPanel';
-import { RendimientoModelosPanel } from './RendimientoModelosPanel';
+import { RendimientoModelosPanel } from '../../../components/RendimientoModelosPanel';
 import { ModelosArchivadasPanel } from '../../../components/ModelosArchivadasPanel';
 import { HistorialClientesPanel } from '../../../components/HistorialClientesPanel';
 import { LiquidacionPanel } from '../../../components/LiquidacionPanel';

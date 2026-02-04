@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
 import { supabase, supabaseConfig } from '../../../lib/supabaseClient';
 
 // ============================================
@@ -34,7 +34,7 @@ interface ChatMessage {
 
 interface PublicUsersContextType {
   currentUser: PublicUser | null;
-  logout: () => void;
+  logout: () => Promise<void>; // ✅ Cambiar a async
   sendMessage: (message: string, receiverId?: string) => Promise<void>;
   messages: ChatMessage[];
   onlineUsers?: number;
@@ -49,6 +49,100 @@ export function PublicUsersProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<PublicUser | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [onlineUsers, setOnlineUsers] = useState(0);
+
+  // ============================================
+  // 🆕 TIMER DE INACTIVIDAD (10 MINUTOS)
+  // ============================================
+  const TIMEOUT_INACTIVIDAD = 10 * 60 * 1000; // 10 minutos en milisegundos
+  const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastActivityRef = useRef<number>(Date.now());
+  const currentUserRef = useRef<PublicUser | null>(null);
+  const logoutRef = useRef<() => Promise<void>>();
+
+  // Mantener refs sincronizadas
+  useEffect(() => {
+    currentUserRef.current = currentUser;
+  }, [currentUser]);
+
+  // Efecto para detectar actividad del usuario
+  useEffect(() => {
+    if (!currentUser) {
+      // Limpiar timer si no hay usuario
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+        inactivityTimerRef.current = null;
+      }
+      return;
+    }
+
+    // Función para resetear el timer de inactividad
+    const resetInactivityTimer = () => {
+      lastActivityRef.current = Date.now();
+      
+      // Limpiar timer existente
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+      }
+
+      // Solo crear nuevo timer si hay usuario logueado
+      if (currentUserRef.current) {
+        console.log('⏱️ Timer de inactividad reseteado');
+        
+        inactivityTimerRef.current = setTimeout(() => {
+          console.log('⏰ 10 minutos de inactividad, cerrando sesión automáticamente...');
+          // Usar la función logout actual
+          if (logoutRef.current) {
+            logoutRef.current();
+          }
+        }, TIMEOUT_INACTIVIDAD);
+      }
+    };
+
+    // Iniciar timer cuando el usuario se loguea
+    resetInactivityTimer();
+
+    // Eventos que cuentan como "actividad"
+    const activityEvents = [
+      'mousedown',
+      'mousemove',
+      'keypress',
+      'scroll',
+      'touchstart',
+      'click'
+    ];
+
+    // Throttle para evitar resetear el timer demasiado frecuentemente
+    let throttleTimeout: NodeJS.Timeout | null = null;
+    
+    const handleActivity = () => {
+      if (!throttleTimeout) {
+        throttleTimeout = setTimeout(() => {
+          resetInactivityTimer();
+          throttleTimeout = null;
+        }, 1000); // Solo resetear cada 1 segundo máximo
+      }
+    };
+
+    // Agregar listeners de actividad
+    activityEvents.forEach(event => {
+      window.addEventListener(event, handleActivity, { passive: true });
+    });
+
+    // Cleanup
+    return () => {
+      activityEvents.forEach(event => {
+        window.removeEventListener(event, handleActivity);
+      });
+      
+      if (throttleTimeout) {
+        clearTimeout(throttleTimeout);
+      }
+      
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+      }
+    };
+  }, [currentUser]); // Dependencia en currentUser
 
   // ============================================
   // CARGAR SESIÓN ACTIVA DESDE TABLA CLIENTES
@@ -398,39 +492,75 @@ export function PublicUsersProvider({ children }: { children: ReactNode }) {
   // ============================================
   const logout = async () => {
     if (!currentUser) {
+      console.log('⚠️ No hay sesión activa para cerrar');
       return;
     }
 
     try {
-      console.log('🚪 Cerrando sesión...');
+      console.log('🚪 Cerrando sesión del cliente:', currentUser.id);
       
       // 🆕 ARCHIVAR CONVERSACIÓN ANTES DE CERRAR SESIÓN
       await archivarConversacion(currentUser.id);
       
-      // Marcar sesión como inactiva en tabla clientes
-      await supabase
+      // ✅ Marcar sesión como inactiva y expirada en tabla clientes
+      const { error: logoutError } = await supabase
         .from('clientes')
         .update({ 
           sesion_activa: false,
-          sesion_token: null
+          sesion_token: null,
+          sesion_expires_at: new Date(Date.now() - 1000).toISOString(), // ✅ Fecha pasada para forzar expiración
+          sesion_ultimo_acceso: new Date(Date.now() - 1000).toISOString() // ✅ Último acceso en el pasado
         })
         .eq('id', currentUser.id);
 
+      if (logoutError) {
+        console.error('❌ Error actualizando estado de sesión:', logoutError);
+      }
+
+      // ✅ Limpiar estado local INMEDIATAMENTE
       setCurrentUser(null);
+      setMessages([{
+        id: '1',
+        username: 'Sistema',
+        message: '¡Bienvenidos al chat de Black Diamond! 💬 Regístrate para conversar',
+        timestamp: new Date(),
+        color: '#d4af37',
+        role: 'system'
+      }]);
+      
       console.log('✅ Sesión cerrada exitosamente');
     } catch (error) {
       console.error('❌ Error cerrando sesión:', error);
-      // Cerrar sesión localmente de todos modos
+      // ✅ Cerrar sesión localmente de todos modos
       setCurrentUser(null);
+      setMessages([{
+        id: '1',
+        username: 'Sistema',
+        message: '¡Bienvenidos al chat de Black Diamond! 💬 Regístrate para conversar',
+        timestamp: new Date(),
+        color: '#d4af37',
+        role: 'system'
+      }]);
     }
   };
+
+  // Guardar referencia a la función logout
+  useEffect(() => {
+    logoutRef.current = logout;
+  }, [logout]);
 
   // ============================================
   // 🆕 ARCHIVAR CONVERSACIÓN EN HISTORIAL DEL CLIENTE
   // ============================================
-  const archivarConversacion = async (clienteId: string) => {
+  const archivarConversacion = async (clienteId: string, signal?: AbortSignal) => {
     try {
       console.log('📦 Archivando conversación del cliente:', clienteId);
+
+      // ✅ Verificar si la operación fue cancelada
+      if (signal?.aborted) {
+        console.log('⚠️ Operación de archivo cancelada');
+        return;
+      }
 
       // 1. Obtener todos los mensajes del cliente
       const { data: mensajes, error: mensajesError } = await supabase
@@ -446,15 +576,32 @@ export function PublicUsersProvider({ children }: { children: ReactNode }) {
           receiver:receiver_id(nombre)
         `)
         .or(`sender_id.eq.${clienteId},receiver_id.eq.${clienteId}`)
-        .order('created_at', { ascending: true });
+        .order('created_at', { ascending: true })
+        .abortSignal(signal || new AbortController().signal);
 
       if (mensajesError) {
-        console.error('❌ Error obteniendo mensajes para archivar:', mensajesError);
+        // ✅ Ignorar errores de abort/cancelación
+        if (mensajesError.message?.includes('abort') || mensajesError.message?.includes('cancel')) {
+          console.log('⚠️ Petición cancelada - ignorando error');
+          return;
+        }
+        console.error('❌ Error obteniendo mensajes para archivar:', {
+          message: mensajesError.message,
+          details: mensajesError.details || 'Sin detalles adicionales',
+          hint: mensajesError.hint || 'Verificar conexión y permisos',
+          code: mensajesError.code || ''
+        });
         return;
       }
 
       if (!mensajes || mensajes.length === 0) {
         console.log('ℹ️ No hay mensajes para archivar');
+        return;
+      }
+
+      // ✅ Verificar nuevamente antes de continuar
+      if (signal?.aborted) {
+        console.log('⚠️ Operación cancelada después de obtener mensajes');
         return;
       }
 
@@ -472,28 +619,51 @@ export function PublicUsersProvider({ children }: { children: ReactNode }) {
           ultima_conversacion: conversacionTexto,
           ultima_conversacion_fecha: new Date().toISOString()
         })
-        .eq('id', clienteId);
+        .eq('id', clienteId)
+        .abortSignal(signal || new AbortController().signal);
 
       if (historialError) {
+        // ✅ Ignorar errores de abort/cancelación
+        if (historialError.message?.includes('abort') || historialError.message?.includes('cancel')) {
+          console.log('⚠️ Actualización cancelada - ignorando error');
+          return;
+        }
         console.error('❌ Error guardando historial:', historialError);
         return;
       }
 
       console.log('✅ Conversación archivada exitosamente');
 
+      // ✅ Verificar antes de eliminar
+      if (signal?.aborted) {
+        console.log('⚠️ Operación cancelada antes de eliminar mensajes');
+        return;
+      }
+
       // 4. Eliminar mensajes de la tabla activa (limpiar chat)
       const { error: deleteError } = await supabase
         .from('chat_mensajes_publicos')
         .delete()
-        .or(`sender_id.eq.${clienteId},receiver_id.eq.${clienteId}`);
+        .or(`sender_id.eq.${clienteId},receiver_id.eq.${clienteId}`)
+        .abortSignal(signal || new AbortController().signal);
 
       if (deleteError) {
+        // ✅ Ignorar errores de abort/cancelación
+        if (deleteError.message?.includes('abort') || deleteError.message?.includes('cancel')) {
+          console.log('⚠️ Eliminación cancelada - ignorando error');
+          return;
+        }
         console.error('❌ Error eliminando mensajes:', deleteError);
         return;
       }
 
       console.log('✅ Mensajes eliminados de chat activo');
-    } catch (error) {
+    } catch (error: any) {
+      // ✅ Ignorar errores de abort/cancelación
+      if (error?.name === 'AbortError' || error?.message?.includes('abort') || error?.message?.includes('cancel')) {
+        console.log('⚠️ Operación de archivo cancelada o abortada');
+        return;
+      }
       console.error('❌ Error en proceso de archivo:', error);
     }
   };
@@ -656,7 +826,7 @@ export function usePublicUsers() {
         currentUser: null,
         messages: [],
         onlineUsers: 0,
-        logout: () => {},
+        logout: async () => {}, // ✅ Async
         sendMessage: async () => {},
         getVisibleMessages: () => []
       } as PublicUsersContextType;

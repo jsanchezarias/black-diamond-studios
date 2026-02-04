@@ -104,7 +104,7 @@ export function GastosProvider({ children }: { children: ReactNode }) {
     const interval = setInterval(verificarYNotificar, 3600000); // Cada hora
 
     return () => clearInterval(interval);
-  }, [serviciosPublicos]);
+  }, []); // ✅ Sin dependencias - verificarYNotificar accede a serviciosPublicos mediante closure
 
   // ========================================
   // CARGAR DATOS DESDE SUPABASE

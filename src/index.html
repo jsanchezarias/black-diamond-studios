@@ -1,25 +1,38 @@
 <!doctype html>
-<html lang="es">
+<html lang="es" class="dark" data-mode="dark" style="color-scheme: dark;">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
     <title>Black Diamond App</title>
     <style>
-      /* Asegurar fondo negro inmediatamente */
+      /* ✅ FORZAR TEMA OSCURO PERMANENTE - Black Diamond */
       html, body {
         margin: 0;
         padding: 0;
-        background-color: #0d0d0d;
-        color: #e8e6e3;
+        background-color: #0d0d0d !important;
+        color: #e8e6e3 !important;
+        color-scheme: dark !important;
       }
       #root {
         min-height: 100vh;
+        background-color: #0d0d0d !important;
+      }
+      /* Prevenir parpadeo blanco en carga */
+      body::before {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
         background-color: #0d0d0d;
+        z-index: -1;
       }
     </style>
   </head>
-  <body>
+  <body class="dark" data-mode="dark">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

@@ -1,26 +1,51 @@
 import { useState, useEffect } from 'react';
-import { Sparkles, Clock, Shield, Star, Heart, Phone, Mail, MapPin, ChevronRight, Gem, Award, User as UserIcon, Send } from 'lucide-react';
 import { Button } from './ui/button';
-import { Card, CardContent } from './ui/card';
-import { Badge } from './ui/badge';
-import { LiveVideoStream } from './LiveVideoStream';
-import { LiveChat } from './LiveChat';
-import { Logo } from './Logo';
+import { Card, CardContent } from './ui/card'; // ✅ Agregar Card y CardContent
+import { Badge } from './ui/badge'; // ✅ Agregar Badge
 import { ModelCard } from './ModelCard';
-import { LanguageSelector } from './LanguageSelector';
-import { useLanguage } from './LanguageContext';
 import { AppointmentModal } from './AppointmentModal';
-import { SedeSelector, Sede } from './SedeSelector';
-import { sedes } from './sedesData';
-import { TipModal } from './TipModal';
-import { TipNotificationsContainer, TipData } from './TipNotification';
-import { usePublicUsers } from './PublicUsersContext';
+import { VideoShowcase } from './VideoShowcase';
+import { Logo } from './Logo';
 import { TestimoniosSection } from './TestimoniosSection';
 import { AgregarTestimonioModal } from './AgregarTestimonioModal';
 import { ClienteLoginModal } from './ClienteLoginModal';
-import { VideoShowcase } from './VideoShowcase';
-import { projectId, publicAnonKey } from '../../../utils/supabase/info';
+import { LiveVideoStream } from './LiveVideoStream'; // ✅ Agregar LiveVideoStream
+import { TipNotification } from './TipNotification'; // ✅ Agregar TipNotification
+import { Gem, Calendar, Clock, MapPin, Shield, Award, Star, ChevronRight, Menu as MenuIcon, X, User as UserIcon, Phone, Mail, MessageSquare, Instagram, Twitter, Facebook, Sparkles, Crown, Globe, Heart, Send, LogOut } from 'lucide-react'; // ✅ Consolidar todos los icons
+import { useLanguage } from './LanguageContext';
+import { LanguageSelector } from './LanguageSelector';
+import { sedes } from './sedesData';
+import { LiveChat } from './LiveChat';
+import { TipModal } from './TipModal';
+import { usePublicUsers } from './PublicUsersContext';
 import { useModelos } from './ModelosContext';
+import { projectId, publicAnonKey } from '../../../utils/supabase/info';
+
+// ✅ Agregar tipos necesarios
+interface TipData {
+  id: string;
+  username: string;
+  amount: number;
+  message: string;
+  timestamp: number;
+}
+
+// ✅ Componente para mostrar notificaciones de propinas
+function TipNotificationsContainer({ tips, onRemoveTip }: { tips: TipData[], onRemoveTip: (id: string) => void }) {
+  return (
+    <div className="fixed bottom-4 right-4 z-50 space-y-2">
+      {tips.map((tip) => (
+        <TipNotification
+          key={tip.id}
+          username={tip.username}
+          amount={tip.amount}
+          message={tip.message}
+          onClose={() => onRemoveTip(tip.id)}
+        />
+      ))}
+    </div>
+  );
+}
 
 interface LandingPageProps {
   onAccessSystem: () => void;
@@ -45,7 +70,7 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
   const [showClienteLogin, setShowClienteLogin] = useState(false);
   const [clienteActual, setClienteActual] = useState<any>(null);
   
-  const { currentUser } = usePublicUsers();
+  const { currentUser, logout } = usePublicUsers(); // ✅ Agregar logout del contexto
 
   // ============================================
   // 🆕 SINCRONIZAR clienteActual con currentUser del chat
@@ -173,7 +198,7 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
     loadStreams();
   }, [sedeActual]);
 
-  // Cerrar menú al hacer scroll
+  // Cerrar men�� al hacer scroll
   useEffect(() => {
     const handleScroll = () => {
       if (menuOpen) {
@@ -374,6 +399,19 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
                     <UserIcon className="w-4 h-4 text-primary" />
                     <span className="text-sm font-medium">{clienteActual.nombre.split(' ')[0]}</span>
                   </div>
+                  {/* ✅ Botón de Logout */}
+                  <Button 
+                    onClick={() => {
+                      logout();
+                      setClienteActual(null);
+                    }}
+                    variant="ghost" 
+                    size="sm"
+                    className="text-red-400 hover:text-red-500 hover:bg-red-950/20 gap-2"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Cerrar Sesión
+                  </Button>
                   <Button onClick={onAccessSystem} variant="outline" size="sm" className="border-primary text-primary hover:bg-primary hover:text-background">
                     {t.nav.systemAccess}
                   </Button>
@@ -455,6 +493,19 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
                       <UserIcon className="w-4 h-4 text-primary" />
                       <span className="text-sm font-medium">{clienteActual.nombre}</span>
                     </div>
+                    {/* ✅ Botón de Cerrar Sesión en móvil */}
+                    <Button 
+                      onClick={() => {
+                        logout();
+                        setClienteActual(null);
+                        setMenuOpen(false);
+                      }}
+                      variant="ghost" 
+                      className="w-full text-red-400 hover:text-red-500 hover:bg-red-950/20 gap-2 justify-center"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Cerrar Sesión
+                    </Button>
                     <Button 
                       onClick={() => { onAccessSystem(); setMenuOpen(false); }} 
                       className="w-full bg-primary text-primary-foreground hover:bg-primary/90"

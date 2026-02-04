@@ -1,11 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Send, Users, MessageSquare, LogIn, LogOut, Gem, Trash2 } from 'lucide-react';
 import { usePublicUsers } from '../src/app/components/PublicUsersContext';
-import { supabase } from '../utils/supabase/client';
+import { supabase } from '../lib/supabaseClient';
 
 export function ChatModeratorPanel() {
   const { currentUser, login, logout, sendMessage, messages, onlineUsers } = usePublicUsers();

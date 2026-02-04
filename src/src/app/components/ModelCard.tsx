@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Star, MapPin, Clock, ChevronRight, Check, X, Heart, MessageCircle, ZoomIn, ChevronLeft, Send } from 'lucide-react';
+import { Star, MapPin, Clock, ChevronRight, Check, X, Heart, MessageCircle, ZoomIn, ChevronLeft, Send, Building2, Home } from 'lucide-react';
 import { Card, CardContent } from '../../../components/ui/card';
 import { Badge } from '../../../components/ui/badge';
 import { Button } from '../../../components/ui/button';
@@ -399,26 +399,38 @@ export function ModelCard({ model, onContact }: ModelCardProps) {
                 {/* Selector de Ubicación */}
                 {model.domicilio ? (
                   // ✅ Modelo PRESTA servicio a domicilio - Mostrar selector
-                  <div className="flex gap-2 mb-3 p-2 bg-gradient-to-r from-primary/5 to-transparent rounded-lg border border-primary/10">
+                  <div className="flex gap-3 mb-4 p-1 bg-gradient-to-r from-primary/10 to-primary/5 rounded-xl border border-primary/20">
                     <button
                       onClick={() => setSelectedLocation('sede')}
-                      className={`flex-1 py-2 px-3 rounded-md text-xs font-medium transition-all ${
+                      className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg text-xs font-semibold tracking-wide transition-all duration-300 ${
                         selectedLocation === 'sede'
-                          ? 'bg-primary text-background shadow-md'
-                          : 'bg-transparent text-muted-foreground hover:bg-primary/10'
+                          ? 'bg-primary text-background shadow-lg shadow-primary/30 scale-[1.02] border-2 border-primary'
+                          : 'bg-transparent text-muted-foreground hover:bg-primary/10 hover:text-foreground border-2 border-transparent'
                       }`}
                     >
-                      🏢 En Sede
+                      <Building2 className={`w-4 h-4 transition-all ${
+                        selectedLocation === 'sede' ? 'text-background' : 'text-primary'
+                      }`} />
+                      <span>En Sede</span>
+                      {selectedLocation === 'sede' && (
+                        <Check className="w-3 h-3 ml-1 text-background" />
+                      )}
                     </button>
                     <button
                       onClick={() => setSelectedLocation('domicilio')}
-                      className={`flex-1 py-2 px-3 rounded-md text-xs font-medium transition-all ${
+                      className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg text-xs font-semibold tracking-wide transition-all duration-300 ${
                         selectedLocation === 'domicilio'
-                          ? 'bg-primary text-background shadow-md'
-                          : 'bg-transparent text-muted-foreground hover:bg-primary/10'
+                          ? 'bg-primary text-background shadow-lg shadow-primary/30 scale-[1.02] border-2 border-primary'
+                          : 'bg-transparent text-muted-foreground hover:bg-primary/10 hover:text-foreground border-2 border-transparent'
                       }`}
                     >
-                      🏠 A Domicilio
+                      <Home className={`w-4 h-4 transition-all ${
+                        selectedLocation === 'domicilio' ? 'text-background' : 'text-primary'
+                      }`} />
+                      <span>A Domicilio</span>
+                      {selectedLocation === 'domicilio' && (
+                        <Check className="w-3 h-3 ml-1 text-background" />
+                      )}
                     </button>
                   </div>
                 ) : (
@@ -509,8 +521,12 @@ export function ModelCard({ model, onContact }: ModelCardProps) {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="font-bold text-sm text-primary">{selectedService.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {selectedLocation === 'sede' ? '🏢 En Sede' : '🏠 A Domicilio'}
+                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                          {selectedLocation === 'sede' ? (
+                            <><Building2 className="w-3 h-3 text-primary" /> En Sede</>
+                          ) : (
+                            <><Home className="w-3 h-3 text-primary" /> A Domicilio</>
+                          )}
                         </p>
                       </div>
                       <p className="text-xl font-bold text-primary" style={{ fontFamily: 'Montserrat, sans-serif' }}>

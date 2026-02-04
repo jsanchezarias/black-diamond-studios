@@ -182,7 +182,7 @@ export function ServiciosProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const interval = setInterval(actualizarTiempoRestante, 1000);
     return () => clearInterval(interval);
-  }, [serviciosActivos]);
+  }, []); // ✅ Sin dependencias - el interval se ejecuta siempre y actualizarTiempoRestante usa prevState
 
   useEffect(() => {
     if ('Notification' in window && Notification.permission === 'default') {

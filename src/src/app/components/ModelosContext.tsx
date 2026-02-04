@@ -73,22 +73,21 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
   const [modelosArchivadas, setModelosArchivadas] = useState<Modelo[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Cargar modelos desde Supabase al inicializar
+  // ✅ CORREGIDO: useEffect simplificado sin función anidada
   useEffect(() => {
     let isMounted = true;
     
-    const loadData = async () => {
-      if (isMounted) {
-        await cargarModelos();
-      }
+    const cargarModelosInicial = async () => {
+      if (!isMounted) return;
+      await cargarModelos();
     };
     
-    loadData();
+    cargarModelosInicial();
     
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, []); // ✅ Array vacío - solo ejecutar una vez al montar
 
   const cargarModelos = async () => {
     try {

@@ -88,8 +88,8 @@ export default function App() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-amber-400 text-xl">Cargando...</div>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-primary text-xl font-medium">Cargando Black Diamond...</div>
       </div>
     );
   }
@@ -116,7 +116,7 @@ export default function App() {
                                 <TurnosProvider>
                                   <VideosProvider>
                                     <ErrorBoundary>
-                                      <div className="min-h-screen bg-black">
+                                      <div className="min-h-screen bg-background">
                                         {currentUser.role === 'owner' && (
                                           <OwnerDashboard
                                             accessToken={currentUser.accessToken}
@@ -184,7 +184,7 @@ export default function App() {
           <ClientesProvider>
             <TestimoniosProvider>
               <VideosProvider>
-                <div className="min-h-screen bg-black">
+                <div className="min-h-screen bg-background">
                   {showLogin ? (
                     <LoginForm
                       onLogin={handleLogin}
