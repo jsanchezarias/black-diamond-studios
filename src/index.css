@@ -4142,6 +4142,10 @@
     color: oklch(.145 0 0);
   }
 
+  .text-foreground\/80 {
+    color: color-mix(in oklab, oklch(.145 0 0) 80%, transparent);
+  }
+
   .text-gray-300 {
     color: var(--color-gray-300);
   }
@@ -6658,7 +6662,7 @@ h1, h2, h3, h4, h5, h6 {
   --secondary: 20 8% 16%;
   --secondary-foreground: 40 10% 91%;
   --muted: 30 7% 14%;
-  --muted-foreground: 30 5% 61%;
+  --muted-foreground: 40 15% 85%;
   --accent: 45 74% 53%;
   --accent-foreground: 0 0% 5%;
   --accent-glow: #d4af3733;

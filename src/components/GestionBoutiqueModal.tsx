@@ -133,14 +133,14 @@ export function GestionBoutiqueModal({ open, onClose, producto, modo }: GestionB
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-gradient-to-br from-gray-900 to-black border border-white/10 rounded-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+      <div className="bg-card border border-primary/20 rounded-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="sticky top-0 bg-gradient-to-r from-gray-900 to-black border-b border-white/10 p-6 flex items-center justify-between">
+        <div className="sticky top-0 bg-card border-b border-primary/20 p-6 flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-white">
+            <h2 className="text-2xl font-bold text-foreground">
               {modo === 'crear' ? 'Agregar Producto' : 'Editar Producto'}
             </h2>
-            <p className="text-sm text-gray-400 mt-1">
+            <p className="text-sm text-foreground/80 mt-1">
               {modo === 'crear' 
                 ? 'Completa la información del nuevo producto'
                 : 'Actualiza la información del producto'}

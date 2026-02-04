@@ -21,7 +21,7 @@
   --secondary: 20 8% 16%;
   --secondary-foreground: 40 10% 91%;
   --muted: 30 7% 14%;
-  --muted-foreground: 30 5% 61%;
+  --muted-foreground: 40 15% 85%; /* ✨ Mejorado: texto más claro y visible */
   
   /* Acento dorado */
   --accent: 45 74% 53%;
