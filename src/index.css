@@ -6695,6 +6695,74 @@ h1, h2, h3, h4, h5, h6 {
   color-scheme: dark !important;
 }
 
+* {
+  background-color: inherit !important;
+}
+
+:root {
+  background-color: #0d0d0d !important;
+}
+
+html {
+  font-size: 16px;
+  background: #0d0d0d !important;
+}
+
+body {
+  font-smooth: always;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+  color: #e8e6e3 !important;
+  background: #0d0d0d !important;
+}
+
+#root {
+  min-height: 100vh;
+  background: #0d0d0d !important;
+}
+
+#root > div {
+  background-color: #0d0d0d !important;
+}
+
+@media (prefers-color-scheme: light) {
+  :root, html, body, #root, * {
+    color: #e8e6e3 !important;
+    --lightningcss-light:  !important;
+    --lightningcss-dark: initial !important;
+    color-scheme: dark !important;
+    background-color: #0d0d0d !important;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root, html, body, #root {
+    color: #e8e6e3 !important;
+    --lightningcss-light:  !important;
+    --lightningcss-dark: initial !important;
+    color-scheme: dark !important;
+    background-color: #0d0d0d !important;
+  }
+}
+
+@media screen {
+  html, body, #root {
+    background-color: #0d0d0d !important;
+  }
+}
+
+body:before {
+  content: "";
+  z-index: -9999;
+  pointer-events: none;
+  width: 100vw;
+  height: 100vh;
+  position: fixed;
+  inset: 0;
+  background-color: #0d0d0d !important;
+}
+
 .scrollbar-thin {
   scrollbar-width: thin;
 }
@@ -6733,26 +6801,6 @@ h1, h2, h3, h4, h5, h6 {
 
 .overflow-x-auto {
   scroll-behavior: smooth;
-}
-
-@media (prefers-color-scheme: light) {
-  :root, html, body, #root {
-    color: #e8e6e3 !important;
-    --lightningcss-light:  !important;
-    --lightningcss-dark: initial !important;
-    color-scheme: dark !important;
-    background-color: #0d0d0d !important;
-  }
-}
-
-@media (prefers-color-scheme: dark) {
-  :root, html, body, #root {
-    color: #e8e6e3 !important;
-    --lightningcss-light:  !important;
-    --lightningcss-dark: initial !important;
-    color-scheme: dark !important;
-    background-color: #0d0d0d !important;
-  }
 }
 
 @property --tw-translate-x {

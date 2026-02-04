@@ -69,6 +69,97 @@
   --shadow-card: 0 2px 16px rgba(0, 0, 0, 0.3);
 }
 
+/* ⚡ PROTECCIÓN MÁXIMA CONTRA FONDO BLANCO - 10 CAPAS */
+
+/* Capa 1: Sobrescribir TODOS los elementos posibles */
+* {
+  background-color: inherit !important;
+}
+
+/* Capa 2: Root elements con máxima prioridad */
+:root {
+  background-color: #0d0d0d !important;
+}
+
+/* Capa 3: HTML siempre negro */
+html {
+  font-size: 16px;
+  background-color: #0d0d0d !important;
+  background: #0d0d0d !important;
+}
+
+/* Capa 4: Body siempre negro */
+body {
+  background-color: #0d0d0d !important;
+  background: #0d0d0d !important;
+  color: #e8e6e3 !important;
+  font-smooth: always;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+}
+
+/* Capa 5: Root del React app */
+#root {
+  background-color: #0d0d0d !important;
+  background: #0d0d0d !important;
+  min-height: 100vh;
+}
+
+/* Capa 6: Cualquier div principal */
+#root > div {
+  background-color: #0d0d0d !important;
+}
+
+/* Capa 7: Prevenir fondos blancos en media queries */
+@media (prefers-color-scheme: light) {
+  :root,
+  html,
+  body,
+  #root,
+  * {
+    background-color: #0d0d0d !important;
+    color: #e8e6e3 !important;
+    color-scheme: dark !important;
+  }
+}
+
+/* Capa 8: Forzar en modo oscuro también */
+@media (prefers-color-scheme: dark) {
+  :root,
+  html,
+  body,
+  #root {
+    background-color: #0d0d0d !important;
+    color: #e8e6e3 !important;
+    color-scheme: dark !important;
+  }
+}
+
+/* Capa 9: Prevenir fondos blancos en cualquier pantalla */
+@media screen {
+  html,
+  body,
+  #root {
+    background-color: #0d0d0d !important;
+  }
+}
+
+/* Capa 10: Fondo negro antes de que cargue todo */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: #0d0d0d !important;
+  z-index: -9999;
+  pointer-events: none;
+}
+
 /* Custom Scrollbar Premium */
 .scrollbar-thin {
   scrollbar-width: thin;
@@ -242,29 +333,5 @@
   
   .text-gold-accent {
     color: #d4af37;
-  }
-}
-
-/* ✅ PREVENIR MODO CLARO - Sobrescribir cualquier media query */
-@media (prefers-color-scheme: light) {
-  :root,
-  html,
-  body,
-  #root {
-    background-color: #0d0d0d !important;
-    color: #e8e6e3 !important;
-    color-scheme: dark !important;
-  }
-}
-
-/* ✅ Asegurar que el modo oscuro se mantenga siempre */
-@media (prefers-color-scheme: dark) {
-  :root,
-  html,
-  body,
-  #root {
-    background-color: #0d0d0d !important;
-    color: #e8e6e3 !important;
-    color-scheme: dark !important;
   }
 }
