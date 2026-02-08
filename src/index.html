@@ -1,175 +1,88 @@
 <!doctype html>
-<html lang="es" class="dark" data-mode="dark" style="color-scheme: dark !important; background-color: #0d0d0d !important; background: #0d0d0d !important;">
+<html lang="es" class="dark">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="dark" />
-    <meta name="theme-color" content="#0d0d0d" />
-    <title>Black Diamond App</title>
+    <title>Black Diamond - Agencia Premium</title>
+    <meta name="description" content="Black Diamond - Agencia premium de entretenimiento para caballeros distinguidos">
     
-    <!-- ✅ PRELOAD: Fuentes críticas ANTES que todo -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800;900&family=Montserrat:wght@300;400;500;600;700;800;900&display=swap">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800;900&family=Montserrat:wght@300;400;500;600;700;800;900&display=swap" media="print" onload="this.media='all'">
-    <noscript>
-      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800;900&family=Montserrat:wght@300;400;500;600;700;800;900&display=swap">
-    </noscript>
-    
+    <!-- Forzar dark mode desde el inicio -->
     <style>
-      /* ✅ PROTECCIÓN ULTRA AGRESIVA - Black Diamond */
-      * {
-        box-sizing: border-box;
-      }
-      
-      html {
-        margin: 0 !important;
-        padding: 0 !important;
-        background-color: #0d0d0d !important;
-        background: #0d0d0d !important;
-        color: #e8e6e3 !important;
-        color-scheme: dark !important;
-        font-family: 'Montserrat', system-ui, -apple-system, sans-serif !important;
-      }
-      
-      body {
-        margin: 0 !important;
-        padding: 0 !important;
-        background-color: #0d0d0d !important;
-        background: #0d0d0d !important;
-        color: #e8e6e3 !important;
-        color-scheme: dark !important;
-        min-height: 100vh;
-        font-family: 'Montserrat', system-ui, -apple-system, sans-serif !important;
+      html, body {
+        background-color: #000000;
+        color: #a0a0a0;
+        margin: 0;
+        padding: 0;
       }
       
       #root {
+        background-color: #000000;
         min-height: 100vh;
-        background-color: #0d0d0d !important;
-        background: #0d0d0d !important;
-        color: #e8e6e3 !important;
+        width: 100%;
       }
       
-      /* Capa de fondo de emergencia - Siempre visible */
-      body::before {
-        content: '';
+      /* Loading screen */
+      .loading-screen {
         position: fixed;
         top: 0;
         left: 0;
-        width: 100vw;
-        height: 100vh;
-        background-color: #0d0d0d !important;
-        background: #0d0d0d !important;
-        z-index: -9999;
-        pointer-events: none;
-      }
-
-      /* Forzar en todos los media queries */
-      @media (prefers-color-scheme: light) {
-        html, body, #root {
-          background-color: #0d0d0d !important;
-          background: #0d0d0d !important;
-          color: #e8e6e3 !important;
-          color-scheme: dark !important;
-        }
-      }
-
-      @media (prefers-color-scheme: dark) {
-        html, body, #root {
-          background-color: #0d0d0d !important;
-          background: #0d0d0d !important;
-          color: #e8e6e3 !important;
-          color-scheme: dark !important;
-        }
-      }
-
-      /* Prevenir cualquier texto negro */
-      * {
-        color: inherit;
+        right: 0;
+        bottom: 0;
+        background-color: #000000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        opacity: 1;
+        transition: opacity 0.3s ease-out;
       }
       
-      /* ✅ Definir fuentes para headings ANTES de cargar CSS */
-      h1, h2, h3, h4, h5, h6 {
-        font-family: 'Playfair Display', serif !important;
+      .loading-screen.fade-out {
+        opacity: 0;
+        pointer-events: none;
       }
-
-      /* Loader inicial */
-      .initial-loader {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        color: #c9a961;
-        font-size: 1.2rem;
-        font-weight: 500;
-        font-family: 'Montserrat', system-ui, sans-serif;
-        z-index: 100000;
+      
+      .loading-spinner {
+        width: 48px;
+        height: 48px;
+        border: 4px solid #2a2a2a;
+        border-top-color: #d4af37;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+      
+      @keyframes spin {
+        to { transform: rotate(360deg); }
       }
     </style>
   </head>
-  <body class="dark" data-mode="dark" style="background-color: #0d0d0d !important; color: #e8e6e3 !important;">
+  
+  <body>
+    <!-- Loading screen -->
+    <div id="loading-screen" class="loading-screen">
+      <div class="loading-spinner"></div>
+    </div>
     
-    <!-- ✅ DEBUGGING: Capturar errores ANTES de React -->
+    <!-- App container -->
+    <div id="root"></div>
+    
+    <!-- Ocultar loading screen cuando React monte -->
     <script>
-      console.log('🚀 index.html: Iniciando...');
-      
-      // Mostrar loader inicial
-      const loader = document.createElement('div');
-      loader.className = 'initial-loader';
-      loader.textContent = 'Cargando Black Diamond App...';
-      document.body.appendChild(loader);
-      
-      // Capturar todos los errores
-      window.addEventListener('error', function(event) {
-        console.error('❌ ERROR CAPTURADO EN INDEX.HTML:', {
-          message: event.message,
-          filename: event.filename,
-          lineno: event.lineno,
-          colno: event.colno,
-          error: event.error
-        });
-        
-        // Mostrar error en pantalla
-        loader.innerHTML = `
-          <div style="text-align: center; max-width: 600px; padding: 2rem; background: #1a1a24; border: 2px solid #ff4444; border-radius: 12px;">
-            <h1 style="color: #ff4444; margin-bottom: 1rem;">❌ Error Detectado</h1>
-            <p style="margin-bottom: 1rem; color: #e8e6e3;">Error en: ${event.filename}</p>
-            <p style="margin-bottom: 1rem; color: #e8e6e3;">Línea: ${event.lineno}:${event.colno}</p>
-            <p style="margin-bottom: 1rem; color: #e8e6e3; font-size: 0.875rem;">${event.message}</p>
-            <button onclick="location.reload()" style="padding: 0.75rem 1.5rem; background: #c9a961; color: #0a0a0f; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-family: Montserrat, sans-serif;">
-              Recargar Página
-            </button>
-          </div>
-        `;
+      window.addEventListener('load', () => {
+        setTimeout(() => {
+          const loadingScreen = document.getElementById('loading-screen');
+          if (loadingScreen) {
+            loadingScreen.classList.add('fade-out');
+            setTimeout(() => {
+              loadingScreen.remove();
+            }, 300);
+          }
+        }, 500);
       });
-      
-      window.addEventListener('unhandledrejection', function(event) {
-        console.error('❌ PROMISE REJECTION EN INDEX.HTML:', event.reason);
-        
-        loader.innerHTML = `
-          <div style="text-align: center; max-width: 600px; padding: 2rem; background: #1a1a24; border: 2px solid #ff4444; border-radius: 12px;">
-            <h1 style="color: #ff4444; margin-bottom: 1rem;">❌ Error Async</h1>
-            <p style="margin-bottom: 1rem; color: #e8e6e3; font-size: 0.875rem;">${event.reason}</p>
-            <button onclick="location.reload()" style="padding: 0.75rem 1.5rem; background: #c9a961; color: #0a0a0f; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-family: Montserrat, sans-serif;">
-              Recargar Página
-            </button>
-          </div>
-        `;
-      });
-      
-      // Remover loader después de 5 segundos (si React no lo hace antes)
-      setTimeout(function() {
-        if (loader.parentNode) {
-          console.log('⚠️ Loader aún visible después de 5s - posible problema de carga');
-          loader.textContent = 'Cargando... (tomando más tiempo de lo esperado)';
-        }
-      }, 5000);
-      
-      console.log('✅ index.html: Event listeners configurados');
     </script>
     
-    <div id="root" style="background-color: #0d0d0d !important; color: #e8e6e3 !important;"></div>
+    <!-- React app -->
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

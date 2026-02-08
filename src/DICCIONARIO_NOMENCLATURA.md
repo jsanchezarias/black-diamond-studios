@@ -3,7 +3,7 @@
 Este documento establece la nomenclatura oficial del sistema para mantener consistencia en todo el código, base de datos y documentación.
 
 **Fecha de creación**: 2026-02-08  
-**Última actualización**: 2026-02-08 (Analytics Avanzado agregado)
+**Última actualización**: 2026-02-08 (Tema Simplificado)
 
 ---
 
@@ -14,6 +14,214 @@ Este documento establece la nomenclatura oficial del sistema para mantener consi
 3. **Estandarización**: Seguir convenciones de camelCase para variables, PascalCase para componentes
 4. **Español en BD**: Campos de base de datos en español para facilitar lectura
 5. **Inglés en código**: Nombres de componentes y funciones en español si son del dominio del negocio
+
+---
+
+## 🎨 TEMA DE COLORES SIMPLIFICADO
+
+### **Filosofía: Simple y Elegante**
+
+Solo 4 tipos de colores:
+1. **Fondos**: Negro → Gris oscuro (4 tonos)
+2. **Textos**: Blanco → Gris (3 tonos)
+3. **Dorado**: Un tono principal + hover (2 tonos)
+4. **Estados**: Verde, Rojo, Amarillo, Azul
+
+### Colores Base
+
+```css
+/* FONDOS - Del más oscuro al más claro */
+--bg-black: #000000;           /* Negro puro - Fondo principal */
+--bg-dark: #0f0f0f;            /* Negro carbón - Sidebars */
+--bg-card: #1a1a1a;            /* Gris muy oscuro - Cards */
+--bg-hover: #242424;           /* Gris oscuro - Hover states */
+
+/* BORDES */
+--border-color: #2a2a2a;       /* Gris medio - Bordes sutiles */
+--border-hover: #d4af37;       /* Dorado - Bordes activos */
+
+/* TEXTOS - De más claro a más oscuro */
+--text-white: #ffffff;         /* Blanco - Títulos importantes */
+--text-gray: #a0a0a0;          /* Gris claro - Texto normal */
+--text-muted: #666666;         /* Gris oscuro - Texto secundario */
+
+/* DORADO - Un solo tono principal */
+--gold: #d4af37;               /* Dorado único - Acentos */
+--gold-hover: #e5c158;         /* Dorado claro - Hover */
+--gold-dark: #b8941f;          /* Dorado oscuro - Active */
+
+/* ESTADOS */
+--success: #10b981;            /* Verde éxito */
+--error: #ef4444;              /* Rojo error */
+--warning: #f59e0b;            /* Amarillo advertencia */
+--info: #3b82f6;               /* Azul información */
+```
+
+### Uso en Código
+
+```typescript
+// ✅ FONDOS
+className="bg-black"           // Negro puro - Fondo principal
+className="bg-dark"            // Negro carbón - Sidebars
+className="bg-card"            // Gris muy oscuro - Cards
+className="bg-hover"           // Gris oscuro - Hover
+
+// ✅ TEXTOS
+className="text-white"         // Blanco - Títulos importantes
+className="text-gray"          // Gris claro - Texto normal
+className="text-muted"         // Gris oscuro - Secundario
+
+// ✅ DORADO
+className="bg-gold"            // Fondo dorado
+className="text-gold"          // Texto dorado
+className="border-gold"        // Borde dorado
+
+// ✅ ESTADOS
+className="text-success"       // Verde
+className="text-error"         // Rojo
+className="text-warning"       // Amarillo
+className="text-info"          // Azul
+
+// ❌ NO USAR nombres confusos
+className="bg-obsidian"        // Demasiado específico
+className="text-platinum"      // Innecesario, usar text-white
+className="bg-charcoal"        // Innecesario, usar bg-dark
+```
+
+### Tipografías
+
+```typescript
+// ✅ FUENTES OFICIALES
+--font-main: 'Inter'           // Fuente principal para todo
+--font-display: 'Playfair Display'  // Solo títulos hero
+
+// Uso:
+className="font-main"          // Texto general (Inter)
+className="font-display"       // Títulos hero (Playfair)
+
+// ❌ NO USAR
+// Cinzel, Montserrat, JetBrains Mono (simplificado a 2 fuentes)
+```
+
+### Espaciado
+
+#### Sistema de Espaciado (4px base)
+```typescript
+// ✅ ESCALA OFICIAL
+spacing: {
+  xs: '0.25rem',  // 4px
+  sm: '0.5rem',   // 8px
+  md: '1rem',     // 16px
+  lg: '1.5rem',   // 24px
+  xl: '2rem',     // 32px
+  '2xl': '3rem',  // 48px
+  '3xl': '4rem',  // 64px
+  '4xl': '6rem',  // 96px
+}
+
+// ❌ NO USAR valores arbitrarios
+className="p-[13px]"              // Usar p-3 (12px) o p-4 (16px)
+className="gap-[22px]"            // Usar gap-5 (20px) o gap-6 (24px)
+```
+
+### Sombras
+
+#### Sombras Premium
+```typescript
+// ✅ NOMBRES OFICIALES
+boxShadow: {
+  'premium-sm': '0 2px 8px rgba(0, 0, 0, 0.4)',
+  'premium': '0 4px 16px rgba(0, 0, 0, 0.5)',
+  'premium-lg': '0 8px 32px rgba(0, 0, 0, 0.6)',
+  'glow-gold': '0 0 20px rgba(212, 175, 55, 0.3)',
+  'glow-gold-strong': '0 0 40px rgba(212, 175, 55, 0.5)',
+  'inner-dark': 'inset 0 2px 4px rgba(0, 0, 0, 0.6)',
+}
+
+// Uso en Tailwind
+className="shadow-premium"           // Sombra estándar
+className="shadow-premium-lg"        // Sombra grande
+className="shadow-glow-gold"         // Glow dorado sutil
+className="hover:shadow-glow-gold-strong"  // Glow fuerte en hover
+
+// ❌ NO USAR
+className="shadow-md"                // Muy genérico
+className="shadow-xl"                // No tiene el look premium
+```
+
+### Bordes y Radios
+
+#### Radios de Borde
+```typescript
+// ✅ RADIOS OFICIALES
+borderRadius: {
+  none: '0',
+  xs: '0.25rem',    // 4px - Inputs pequeños
+  sm: '0.375rem',   // 6px - Botones pequeños
+  md: '0.5rem',     // 8px - Botones estándar
+  lg: '0.75rem',    // 12px - Cards
+  xl: '1rem',       // 16px - Modales
+  '2xl': '1.5rem',  // 24px - Heros
+  full: '9999px',   // Circular
+}
+
+// ❌ NO USAR
+rounded            // Usar rounded-md
+rounded-3xl        // Demasiado redondeado para el estilo
+```
+
+#### Bordes
+```typescript
+// ✅ COLORES DE BORDE
+className="border-graphite"          // Borde estándar oscuro
+className="border-gold-primary"      // Borde dorado
+className="border-slate"             // Borde muy sutil
+
+// ✅ ANCHOS DE BORDE
+className="border"                   // 1px - Estándar
+className="border-2"                 // 2px - Destacado
+
+// ❌ NO USAR
+className="border-gray-700"          // No está en el sistema
+className="border-4"                 // Demasiado grueso
+```
+
+### Efectos y Transiciones
+
+#### Transiciones Estándar
+```typescript
+// ✅ DURACIONES OFICIALES
+transition: {
+  fast: '150ms ease-in-out',         // Micro-interacciones
+  base: '200ms ease-in-out',         // Transición estándar
+  slow: '300ms ease-in-out',         // Transiciones complejas
+  slower: '500ms ease-in-out',       // Animaciones grandes
+}
+
+// Uso en Tailwind
+className="transition-fast"
+className="transition-base"
+className="transition-slow"
+
+// ❌ NO USAR
+className="transition-all duration-1000"  // Demasiado lento
+className="ease-linear"                   // Muy robótico
+```
+
+#### Opacidades
+```typescript
+// ✅ OPACIDADES OFICIALES
+opacity: {
+  disabled: 0.4,     // Elementos deshabilitados
+  muted: 0.6,        // Elementos secundarios
+  hover: 0.8,        // Hover sobre elementos
+  full: 1.0,         // Completamente visible
+}
+
+// ❌ NO USAR
+className="opacity-45"   // Usar opacity-40 o opacity-50
+className="opacity-85"   // Usar opacity-80 o opacity-90
+```
 
 ---
 

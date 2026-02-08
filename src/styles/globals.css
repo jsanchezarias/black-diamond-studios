@@ -1,4 +1,336 @@
-@import './theme.css';
-@import './fonts.css';
-@import './animations.css';
-@import './color-fix.css';
+/* =================================================================
+   BLACK DIAMOND - TEMA PREMIUM SIMPLIFICADO
+   Colores con sentido: Negro, Gris, Dorado, Blanco
+   ================================================================= */
+
+@import 'tailwindcss';
+
+/* Fuentes */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&display=swap');
+
+/* =================================================================
+   TEMA SIMPLE Y ELEGANTE
+   ================================================================= */
+
+:root {
+  /* FONDOS - Del más oscuro al más claro */
+  --bg-black: #000000;           /* Negro puro - Fondo principal */
+  --bg-dark: #0f0f0f;            /* Negro carbón - Sidebars */
+  --bg-card: #1a1a1a;            /* Gris muy oscuro - Cards */
+  --bg-hover: #242424;           /* Gris oscuro - Hover states */
+  
+  /* BORDES */
+  --border-color: #2a2a2a;       /* Gris medio - Bordes sutiles */
+  --border-hover: #d4af37;       /* Dorado - Bordes activos */
+  
+  /* TEXTOS - De más claro a más oscuro */
+  --text-white: #ffffff;         /* Blanco - Títulos importantes */
+  --text-gray: #a0a0a0;          /* Gris claro - Texto normal */
+  --text-muted: #666666;         /* Gris oscuro - Texto secundario */
+  
+  /* DORADO - Un solo tono principal */
+  --gold: #d4af37;               /* Dorado único - Acentos */
+  --gold-hover: #e5c158;         /* Dorado claro - Hover */
+  --gold-dark: #b8941f;          /* Dorado oscuro - Active */
+  
+  /* ESTADOS */
+  --success: #10b981;
+  --error: #ef4444;
+  --warning: #f59e0b;
+  --info: #3b82f6;
+  
+  /* FUENTES */
+  --font-main: 'Inter', sans-serif;
+  --font-display: 'Playfair Display', serif;
+  
+  /* SOMBRAS */
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.7);
+  --shadow-gold: 0 0 20px rgba(212, 175, 55, 0.3);
+}
+
+/* =================================================================
+   RESET BASE
+   ================================================================= */
+
+@layer base {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+  
+  html, body {
+    background-color: var(--bg-black);
+    color: var(--text-gray);
+    font-family: var(--font-main);
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  
+  #root {
+    background-color: var(--bg-black);
+    min-height: 100vh;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    color: var(--text-white);
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 1rem;
+  }
+  
+  h1 { font-size: 2.5rem; font-family: var(--font-display); }
+  h2 { font-size: 2rem; }
+  h3 { font-size: 1.5rem; }
+  h4 { font-size: 1.25rem; }
+  
+  a {
+    color: var(--gold);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  
+  a:hover {
+    color: var(--gold-hover);
+  }
+  
+  input, textarea, select {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    color: var(--text-white);
+    padding: 0.75rem 1rem;
+    font-family: var(--font-main);
+    transition: all 0.2s;
+  }
+  
+  input:focus, textarea:focus, select:focus {
+    outline: none;
+    border-color: var(--gold);
+    box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.1);
+  }
+  
+  input::placeholder, textarea::placeholder {
+    color: var(--text-muted);
+  }
+  
+  button {
+    font-family: var(--font-main);
+    font-weight: 600;
+    border-radius: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+  }
+  
+  button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+/* =================================================================
+   COMPONENTES
+   ================================================================= */
+
+@layer components {
+  /* BOTONES */
+  .btn-primary {
+    background-color: var(--gold);
+    color: var(--bg-black);
+    font-weight: 700;
+  }
+  
+  .btn-primary:hover:not(:disabled) {
+    background-color: var(--gold-hover);
+    box-shadow: var(--shadow-gold);
+    transform: translateY(-1px);
+  }
+  
+  .btn-secondary {
+    background-color: transparent;
+    color: var(--text-white);
+    border: 1px solid var(--border-color);
+  }
+  
+  .btn-secondary:hover:not(:disabled) {
+    background-color: var(--bg-hover);
+    border-color: var(--gold);
+  }
+  
+  .btn-ghost {
+    background-color: transparent;
+    color: var(--text-gray);
+  }
+  
+  .btn-ghost:hover:not(:disabled) {
+    background-color: var(--bg-hover);
+    color: var(--text-white);
+  }
+  
+  /* CARDS */
+  .card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    box-shadow: var(--shadow);
+    transition: all 0.2s;
+  }
+  
+  .card:hover {
+    border-color: var(--border-hover);
+    box-shadow: var(--shadow-lg);
+  }
+  
+  /* BADGES */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-radius: 9999px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  .badge-success {
+    background-color: rgba(16, 185, 129, 0.2);
+    color: var(--success);
+  }
+  
+  .badge-error {
+    background-color: rgba(239, 68, 68, 0.2);
+    color: var(--error);
+  }
+  
+  .badge-warning {
+    background-color: rgba(245, 158, 11, 0.2);
+    color: var(--warning);
+  }
+  
+  .badge-gold {
+    background-color: rgba(212, 175, 55, 0.2);
+    color: var(--gold);
+  }
+  
+  /* UTILIDADES DE COLOR */
+  .bg-black { background-color: var(--bg-black); }
+  .bg-dark { background-color: var(--bg-dark); }
+  .bg-card { background-color: var(--bg-card); }
+  .bg-hover { background-color: var(--bg-hover); }
+  .bg-gold { background-color: var(--gold); }
+  
+  .text-white { color: var(--text-white); }
+  .text-gray { color: var(--text-gray); }
+  .text-muted { color: var(--text-muted); }
+  .text-gold { color: var(--gold); }
+  
+  .text-success { color: var(--success); }
+  .text-error { color: var(--error); }
+  .text-warning { color: var(--warning); }
+  .text-info { color: var(--info); }
+  
+  .border-base { border-color: var(--border-color); }
+  .border-gold { border-color: var(--gold); }
+  
+  .shadow-base { box-shadow: var(--shadow); }
+  .shadow-lg { box-shadow: var(--shadow-lg); }
+  .shadow-gold { box-shadow: var(--shadow-gold); }
+}
+
+/* =================================================================
+   UTILIDADES
+   ================================================================= */
+
+@layer utilities {
+  .text-gradient-gold {
+    background: linear-gradient(135deg, var(--gold) 0%, var(--gold-hover) 100%);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* =================================================================
+   SCROLLBAR
+   ================================================================= */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-dark);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--gold);
+}
+
+/* =================================================================
+   OTROS
+   ================================================================= */
+
+*:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+::selection {
+  background-color: var(--gold);
+  color: var(--bg-black);
+}
+
+/* Toasts */
+[data-sonner-toast] {
+  background-color: var(--bg-card) !important;
+  border: 1px solid var(--border-color) !important;
+  color: var(--text-white) !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+
+/* Radix UI */
+[role="dialog"],
+[role="alertdialog"],
+[role="menu"],
+[role="listbox"] {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-white);
+}
+
+/* Dark mode lock */
+@media (prefers-color-scheme: light) {
+  html, body, #root {
+    background-color: var(--bg-black) !important;
+    color: var(--text-gray) !important;
+  }
+}
+
+/* Mobile */
+@media (max-width: 640px) {
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+}

@@ -1,4 +1,4 @@
-import { LogOut, User, Sparkles } from 'lucide-react';
+import Icons from '../../../components/icons/PremiumIcons';
 import { Button } from '../../../components/ui/button';
 import { Badge } from '../../../components/ui/badge';
 import { LogoIsotipo } from './LogoIsotipo';
@@ -36,7 +36,7 @@ export function Header({ userEmail, role, onLogout }: HeaderProps) {
               </h1>
               {isDemo && (
                 <Badge variant="outline" className="border-primary/50 bg-primary/10 text-primary">
-                  <Sparkles className="w-3 h-3 mr-1" />
+                  <Icons.Premium size={12} className="mr-1" />
                   Demo
                 </Badge>
               )}
@@ -53,7 +53,7 @@ export function Header({ userEmail, role, onLogout }: HeaderProps) {
             onClick={onLogout}
             className="border-primary/20 hover:bg-destructive/90 hover:text-foreground hover:border-destructive/50 hover:shadow-lg hover:shadow-destructive/20"
           >
-            <LogOut className="w-4 h-4 mr-2" />
+            <Icons.Logout size={16} className="mr-2" />
             Cerrar Sesión
           </Button>
         </div>

@@ -18,7 +18,7 @@ import { NotificacionesProvider } from './app/components/NotificacionesContext';
 import { AnalyticsProvider } from './app/components/AnalyticsContext';
 import { ErrorBoundary } from './app/components/ErrorBoundary';
 import { LoginForm } from './app/components/LoginForm';
-import { Toaster } from 'sonner@2.0.3';
+import { Toaster } from 'sonner';
 
 // 🚀 OPTIMIZACIÓN: Lazy loading de componentes pesados
 // Solo se cargan cuando el usuario los necesita, reduciendo el bundle inicial
@@ -356,7 +356,17 @@ export default function App() {
                 </button>
               </div>
             )}
-            <Toaster />
+            <Toaster 
+              theme="dark"
+              position="top-right"
+              toastOptions={{
+                style: {
+                  background: '#1a1a1a',
+                  color: '#ffffff',
+                  border: '1px solid #2a2a2a',
+                },
+              }}
+            />
           </div>
         </AllProvidersWrapper>
       </ErrorBoundary>
@@ -378,7 +388,17 @@ export default function App() {
               <LandingPage onAccessSystem={() => setShowLogin(true)} />
             </Suspense>
           )}
-          <Toaster />
+          <Toaster 
+            theme="dark"
+            position="top-right"
+            toastOptions={{
+              style: {
+                background: '#1a1a1a',
+                color: '#ffffff',
+                border: '1px solid #2a2a2a',
+              },
+            }}
+          />
         </div>
       </AllProvidersWrapper>
     </ErrorBoundary>

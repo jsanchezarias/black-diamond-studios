@@ -17,10 +17,11 @@ app.use(
   "/*",
   cors({
     origin: "*",
-    allowHeaders: ["Content-Type", "Authorization"],
-    allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    exposeHeaders: ["Content-Length"],
+    allowHeaders: ["Content-Type", "Authorization", "apikey", "x-client-info"],
+    allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    exposeHeaders: ["Content-Length", "Content-Type"],
     maxAge: 600,
+    credentials: true,
   }),
 );
 

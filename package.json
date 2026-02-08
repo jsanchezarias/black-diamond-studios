@@ -38,6 +38,7 @@
           "cmdk": "^1.1.1",
           "date-fns": "*",
           "embla-carousel-react": "^8.6.0",
+          "fs": "*",
           "hono": "*",
           "input-otp": "^1.4.2",
           "jspdf": "*",
@@ -55,6 +56,7 @@
           "recharts": "^2.15.2",
           "sonner": "^2.0.3",
           "tailwind-merge": "*",
+          "tailwindcss": "*",
           "vaul": "^1.1.2",
           "vite": "*"
       },
