@@ -1,4 +1,5 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800;900&family=Montserrat:wght@300;400;500;600;700;800;900&display=swap');
+/* ✅ NOTA: Las fuentes principales (Playfair Display y Montserrat) se cargan desde index.html con preload para evitar FOUC */
+/* Solo cargamos las fuentes secundarias aquí */
 @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 :root {
@@ -9,13 +10,4 @@
   --font-accent: 'Playfair Display', serif;
 }
 
-body {
-  font-family: var(--font-body);
-  font-weight: 400;
-  letter-spacing: 0.01em;
-}
-
-h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-heading);
-  letter-spacing: 0.02em;
-}
+/* ✅ Ya no necesitamos definir body y headings aquí porque están en index.html con !important */

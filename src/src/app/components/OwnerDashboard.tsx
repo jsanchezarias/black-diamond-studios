@@ -15,7 +15,9 @@ import {
   ChevronDown,
   Eye,
   Archive,
-  CreditCard
+  CreditCard,
+  Bell,
+  PieChart
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../../components/ui/card';
 import { Badge } from '../../../components/ui/badge';
@@ -36,8 +38,10 @@ import { GestionUsuariosPanel } from '../../../components/GestionUsuariosPanel';
 import { StreamConfigPanel } from '../../../components/StreamConfigPanel';
 import { DetalleModeloPanel } from '../../../components/DetalleModeloPanel';
 import { EditarModeloModal } from './EditarModeloModal';
+import { NotificacionesPanel } from './NotificacionesPanel';
+import { AnalyticsPanel } from './AnalyticsPanel';
 
-type ModuloType = 'general' | 'modelos' | 'clientes' | 'pagos' | 'habitaciones' | 'finanzas' | 'operaciones' | 'boutique' | 'usuarios' | 'streams';
+type ModuloType = 'general' | 'modelos' | 'clientes' | 'pagos' | 'habitaciones' | 'finanzas' | 'operaciones' | 'boutique' | 'usuarios' | 'streams' | 'notificaciones' | 'analytics';
 
 interface Modulo {
   id: ModuloType;
@@ -56,9 +60,32 @@ export function OwnerDashboard({ accessToken, userId, onLogout }: OwnerDashboard
   const [moduloActivo, setModuloActivo] = useState<ModuloType>('general');
   const [modeloDetalle, setModeloDetalle] = useState<Modelo | null>(null);
   const [modeloEditar, setModeloEditar] = useState<Modelo | null>(null);
-  const { obtenerAdelantosPendientes } = usePagos();
-  const { modelos, modelosArchivadas, obtenerModeloPorId } = useModelos();
-  const { serviciosFinalizados, serviciosHoy, serviciosMes, ingresosHoy, ingresosMes, productosVendidos, ventasBoutique } = useServicios();
+  
+  // ✅ MANEJO DEFENSIVO DE CONTEXTOS
+  try {
+    var pagosCtx = usePagos();
+    var modelosCtx = useModelos();
+    var serviciosCtx = useServicios();
+  } catch (error) {
+    console.error('❌ ERROR AL CARGAR CONTEXTOS EN OWNER DASHBOARD:', error);
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center bg-[#0f1014]">
+        <div className="text-center space-y-4">
+          <h1 className="text-2xl font-bold text-red-500">Error al cargar OwnerDashboard</h1>
+          <p className="text-gray-400">{error instanceof Error ? error.message : 'Error desconocido'}</p>
+          {onLogout && (
+            <Button onClick={onLogout} className="mt-4">
+              Volver al inicio
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  const { obtenerAdelantosPendientes } = pagosCtx;
+  const { modelos = [], modelosArchivadas = [], obtenerModeloPorId } = modelosCtx;
+  const { serviciosFinalizados = [], serviciosHoy = [], serviciosMes = [], ingresosHoy = 0, ingresosMes = 0, productosVendidos = 0, ventasBoutique = 0 } = serviciosCtx;
 
   const modulos: Modulo[] = [
     {
@@ -120,6 +147,18 @@ export function OwnerDashboard({ accessToken, userId, onLogout }: OwnerDashboard
       nombre: 'Streams',
       icono: <Video className="w-5 h-5" />,
       descripcion: 'Configuración de streams'
+    },
+    {
+      id: 'notificaciones',
+      nombre: 'Notificaciones',
+      icono: <Bell className="w-5 h-5" />,
+      descripcion: 'Alertas y notificaciones'
+    },
+    {
+      id: 'analytics',
+      nombre: 'Analytics',
+      icono: <PieChart className="w-5 h-5" />,
+      descripcion: 'Análisis detallados y gráficos'
     }
   ];
 
@@ -564,6 +603,14 @@ export function OwnerDashboard({ accessToken, userId, onLogout }: OwnerDashboard
 
         {moduloActivo === 'streams' && (
           <StreamConfigPanel accessToken={accessToken} />
+        )}
+
+        {moduloActivo === 'notificaciones' && (
+          <NotificacionesPanel />
+        )}
+
+        {moduloActivo === 'analytics' && (
+          <AnalyticsPanel />
         )}
       </div>
 

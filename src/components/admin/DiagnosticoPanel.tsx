@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { projectId, publicAnonKey } from '../../utils/supabase/info';
+import { useState, useEffect } from 'react';
+import { projectId, publicAnonKey } from '../../../src/utils/supabase/info';
 import { GeneradorDatosDemo } from './GeneradorDatosDemo';
-import { supabase } from '../../lib/supabaseClient';
+import { supabase } from '../../src/utils/supabase/info'; // ✅ Corregido: ruta correcta
 import { Archive } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 

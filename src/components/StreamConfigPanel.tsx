@@ -42,7 +42,7 @@ export function StreamConfigPanel({ accessToken }: StreamConfigPanelProps) {
       
       // Supabase Edge Functions requiere AMBOS headers: apikey Y Authorization
       const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-ae3a00e9/streams`,
+        `https://${projectId}.supabase.co/functions/v1/make-server-9dadc017/streams`,
         {
           headers: {
             'apikey': publicAnonKey,
@@ -86,7 +86,7 @@ export function StreamConfigPanel({ accessToken }: StreamConfigPanelProps) {
       }
       
       const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-ae3a00e9/streams/${sedeId}`,
+        `https://${projectId}.supabase.co/functions/v1/make-server-9dadc017/streams/${sedeId}`,
         {
           method: 'PUT',
           headers,
@@ -119,7 +119,7 @@ export function StreamConfigPanel({ accessToken }: StreamConfigPanelProps) {
       }
       
       const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-ae3a00e9/streams/${sedeId}/live`,
+        `https://${projectId}.supabase.co/functions/v1/make-server-9dadc017/streams/${sedeId}/live`,
         {
           method: 'PUT',
           headers,
@@ -207,15 +207,17 @@ export function StreamConfigPanel({ accessToken }: StreamConfigPanelProps) {
           <div>
             <h4 className="font-semibold mb-2">📹 Paso 1: Obtener URL del Stream</h4>
             <p className="text-sm text-muted-foreground mb-2">
-              Para transmitir desde OBS necesitas un servicio de streaming como:
+              Para transmitir desde OBS necesitas un servicio de streaming:
             </p>
             <ul className="text-sm text-muted-foreground space-y-1 ml-4">
-              <li>• <strong>Cloudflare Stream</strong> - Recomendado para producción</li>
-              <li>• <strong>Mux</strong> - Fácil de usar, API excelente</li>
-              <li>• <strong>YouTube Live</strong> - Gratis, genera HLS automático</li>
-              <li>• <strong>Twitch</strong> - También genera HLS automático</li>
-              <li>• <strong>Servidor RTMP propio</strong> - Mayor control</li>
+              <li>• <strong>🔥 Ant Media Server</strong> - ⭐ RECOMENDADO: Control total, sin censura (~$25/mes)</li>
+              <li>• <strong>AWS IVS</strong> - Sin restricciones de contenido, escalable (~$150/mes)</li>
+              <li>• <strong>Castr.io</strong> - Permite contenido adulto explícitamente ($49/mes)</li>
+              <li>• <strong>Wowza Cloud</strong> - Profesional, neutral con contenido ($49/mes)</li>
             </ul>
+            <p className="text-xs text-primary mt-2">
+              📚 Ver guía completa en: <code>/GUIA-ANT-MEDIA-SERVER.md</code>
+            </p>
           </div>
 
           <div>
@@ -240,8 +242,8 @@ export function StreamConfigPanel({ accessToken }: StreamConfigPanelProps) {
 
           <div className="bg-background/60 p-3 rounded-lg border border-primary/20">
             <p className="text-xs text-muted-foreground">
-              💡 <strong>Ejemplo:</strong> Si usas Cloudflare Stream, la URL HLS será algo como:
-              <code className="ml-2 text-primary">https://customer-xxxxx.cloudflarestream.com/xxxxx/manifest/video.m3u8</code>
+              💡 <strong>Ejemplo con Ant Media Server:</strong> La URL HLS será algo como:
+              <code className="ml-2 text-primary">https://stream.tudominio.com:5443/LiveApp/streams/sede-norte-live.m3u8</code>
             </p>
           </div>
         </CardContent>
@@ -416,36 +418,45 @@ export function StreamConfigPanel({ accessToken }: StreamConfigPanelProps) {
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
           <p>
-            <strong>Cloudflare Stream:</strong>{' '}
+            <strong>🔥 Ant Media Server (RECOMENDADO):</strong>{' '}
             <a 
-              href="https://developers.cloudflare.com/stream/" 
+              href="https://github.com/ant-media/Ant-Media-Server/wiki" 
               target="_blank" 
               rel="noopener noreferrer"
               className="text-primary hover:underline"
             >
               Documentación oficial
             </a>
-          </p>
-          <p>
-            <strong>Mux:</strong>{' '}
+            {' | '}
             <a 
-              href="https://docs.mux.com/guides/video/stream-live-to-mux" 
+              href="https://antmedia.io" 
               target="_blank" 
               rel="noopener noreferrer"
               className="text-primary hover:underline"
             >
-              Guía de streaming en vivo
+              Sitio web
             </a>
           </p>
           <p>
-            <strong>YouTube Live:</strong>{' '}
+            <strong>AWS IVS:</strong>{' '}
             <a 
-              href="https://support.google.com/youtube/answer/2474026" 
+              href="https://docs.aws.amazon.com/ivs/" 
               target="_blank" 
               rel="noopener noreferrer"
               className="text-primary hover:underline"
             >
-              Transmitir en vivo con OBS
+              Documentación
+            </a>
+          </p>
+          <p>
+            <strong>OBS Studio:</strong>{' '}
+            <a 
+              href="https://obsproject.com/wiki/" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-primary hover:underline"
+            >
+              Guía completa
             </a>
           </p>
         </CardContent>

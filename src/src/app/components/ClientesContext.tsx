@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { projectId, publicAnonKey } from '../../../utils/supabase/info';
+import { projectId, publicAnonKey } from '../../utils/supabase/info';
+import { notificarClienteBloqueado } from './NotificacionesHelpers';
 
 export interface ServicioCliente {
   id: string;
@@ -77,6 +78,13 @@ export interface Cliente {
   // Estadísticas adicionales
   modelosFrecuentes?: Array<{ modeloNombre: string; cantidad: number }>; // Modelos que más visita
   serviciosFrecuentes?: Array<{ tipoServicio: string; cantidad: number }>; // Tipos de servicio más frecuentes
+  // 🆕 Sistema de bloqueo y multas
+  bloqueado?: boolean;
+  motivoBloqueo?: string;
+  fechaBloqueo?: string;
+  bloqueadoPor?: string; // Admin que bloqueó
+  multasPendientes?: number; // Total de multas pendientes
+  totalNoShows?: number; // Contador de no-shows
 }
 
 interface ClientesContextType {
@@ -264,9 +272,20 @@ export function ClientesProvider({ children }: { children: ReactNode }) {
         throw new Error(`Error al actualizar cliente: ${error}`);
       }
 
+      // Obtener cliente antes de actualizar para comparar
+      const clienteAnterior = clientes.find(c => c.id === id);
+
       setClientes(prev => prev.map(c => 
         c.id === id ? { ...c, ...clienteData } : c
       ));
+
+      // 🔔 NOTIFICACIÓN: Cliente bloqueado (si cambió de no bloqueado a bloqueado)
+      if (clienteData.bloqueado && clienteAnterior && !clienteAnterior.bloqueado && clienteAnterior.email) {
+        notificarClienteBloqueado({
+          clienteEmail: clienteAnterior.email,
+          motivo: clienteData.motivoBloqueo || 'Violación de políticas del establecimiento'
+        }).catch(err => console.error('Error notificando cliente bloqueado:', err));
+      }
     } catch (error) {
       console.error('Error actualizando cliente:', error);
       throw error;
@@ -464,7 +483,35 @@ export function ClientesProvider({ children }: { children: ReactNode }) {
 export function useClientes() {
   const context = useContext(ClientesContext);
   if (context === undefined) {
-    throw new Error('useClientes must be used within a ClientesProvider');
+    console.warn('⚠️ useClientes debe usarse dentro de ClientesProvider');
+    // Retornar un objeto con valores por defecto en lugar de undefined
+    return {
+      clientes: [],
+      agregarCliente: async () => { 
+        console.warn('ClientesProvider no disponible'); 
+        throw new Error('ClientesProvider no disponible');
+      },
+      actualizarCliente: async () => { console.warn('ClientesProvider no disponible'); },
+      buscarPorTelefono: () => undefined,
+      buscarPorEmail: () => undefined,
+      buscarClientes: () => [],
+      obtenerOCrearCliente: async () => { 
+        console.warn('ClientesProvider no disponible'); 
+        throw new Error('ClientesProvider no disponible');
+      },
+      registrarServicio: async () => { console.warn('ClientesProvider no disponible'); },
+      agregarServicioACliente: async () => { console.warn('ClientesProvider no disponible'); },
+      agregarObservacionModelo: async () => { console.warn('ClientesProvider no disponible'); },
+      obtenerHistorialCliente: () => [],
+      obtenerObservacionesCliente: () => [],
+      obtenerNotasServiciosPrevios: () => [],
+      obtenerEstadisticasCliente: () => ({
+        totalServicios: 0,
+        totalGastado: 0,
+        promedioGasto: 0,
+      }),
+      isLoading: false,
+    };
   }
   return context;
 }

@@ -1,7 +1,6 @@
-import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Send, Users, MessageSquare, Gem, Trash2, AlertCircle, CheckCircle } from 'lucide-react';
-import { supabase } from '../lib/supabaseClient';
+import { supabase } from '../src/utils/supabase/info'; // ✅ Corregido: ruta correcta
 
 interface Message {
   id: string;

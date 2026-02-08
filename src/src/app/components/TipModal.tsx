@@ -1,7 +1,7 @@
 import { X, DollarSign, Gem, Heart, Star, Zap, Crown, Sparkles, CreditCard, Building2 } from 'lucide-react';
-import { Button } from './ui/button';
-import { Card, CardContent } from './ui/card';
-import { Badge } from './ui/badge';
+import { Button } from '../../../components/ui/button';
+import { Card, CardContent } from '../../../components/ui/card';
+import { Badge } from '../../../components/ui/badge';
 import { useState } from 'react';
 
 interface TipModalProps {

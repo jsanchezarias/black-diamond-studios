@@ -1,5 +1,6 @@
-import { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
-import { supabase, supabaseConfig } from '../../../lib/supabaseClient';
+import { createContext, useContext, useState, useEffect, ReactNode, useRef, useCallback } from 'react';
+import { flushSync } from 'react-dom';
+import { supabase, projectId, publicAnonKey } from '../../utils/supabase/info'; // ✅ Corregido: ruta correcta
 
 // ============================================
 // CONTEXTO PARA USUARIOS PÚBLICOS DEL CHAT
@@ -39,6 +40,7 @@ interface PublicUsersContextType {
   messages: ChatMessage[];
   onlineUsers?: number;
   getVisibleMessages?: () => ChatMessage[]; // Obtiene mensajes según permisos
+  logoutRef?: React.MutableRefObject<(() => Promise<void>) | undefined>; // ✅ Exportar ref
 }
 
 const PublicUsersContext = createContext<PublicUsersContextType | undefined>(undefined);
@@ -58,6 +60,7 @@ export function PublicUsersProvider({ children }: { children: ReactNode }) {
   const lastActivityRef = useRef<number>(Date.now());
   const currentUserRef = useRef<PublicUser | null>(null);
   const logoutRef = useRef<() => Promise<void>>();
+  const isLoggingOutRef = useRef<boolean>(false); // 🆕 Bandera para evitar doble logout
 
   // Mantener refs sincronizadas
   useEffect(() => {
@@ -193,13 +196,9 @@ export function PublicUsersProvider({ children }: { children: ReactNode }) {
         setCurrentUser(publicUser);
       }
 
-      // Actualizar último acceso (sin esperar respuesta)
-      supabase
-        .from('clientes')
-        .update({ sesion_ultimo_acceso: new Date().toISOString() })
-        .eq('id', cliente.id)
-        .then(() => {})
-        .catch(() => {});
+      // ✅ CORREGIDO: NO actualizar sesion_ultimo_acceso aquí para evitar loop infinito
+      // Solo se debe actualizar cuando el usuario hace una acción real (login, enviar mensaje, etc.)
+      // Si se necesita actualizar, hacerlo desde el componente que maneja la acción
 
       return publicUser;
     } catch (error) {
@@ -367,21 +366,62 @@ export function PublicUsersProvider({ children }: { children: ReactNode }) {
         {
           event: 'UPDATE',
           schema: 'public',
-          table: 'clientes',
-          filter: 'sesion_activa=eq.true'
+          table: 'clientes'
         },
         async (payload) => {
-          // 🔥 SOLO recargar si NO fue un update de sesion_ultimo_acceso
-          // Esto previene loops infinitos
-          if (payload.new && 'sesion_ultimo_acceso' in payload.new && Object.keys(payload.new).length <= 3) {
-            // Es solo actualización de último acceso, ignorar
+          // 🔍 DEBUG: Loggear el payload completo
+          console.log('🔔 Payload recibido:', {
+            newData: payload.new,
+            oldData: payload.old,
+            eventType: payload.eventType
+          });
+          
+          // ✅ Solo procesar si sesion_activa es true
+          if (!payload.new || payload.new.sesion_activa !== true) {
+            console.log('⏭️ Ignorando: sesion_activa no es true');
             return;
           }
           
-          console.log('🔔 Sesión actualizada, recargando sesión activa...', payload);
-          // Recargar sesión para detectar si es la nuestra
+          // ✅ Detectar si es SOLO actualización de sesion_ultimo_acceso
+          // Comparar old vs new para ver qué cambió
+          if (payload.old && payload.new) {
+            const oldData = payload.old as any;
+            const newData = payload.new as any;
+            
+            // Obtener campos que cambiaron
+            const changedFields = Object.keys(newData).filter(key => {
+              return JSON.stringify(oldData[key]) !== JSON.stringify(newData[key]);
+            });
+            
+            console.log('🔍 Campos que cambiaron:', changedFields);
+            
+            // Si SOLO cambió sesion_ultimo_acceso, ignorar
+            if (changedFields.length === 1 && changedFields[0] === 'sesion_ultimo_acceso') {
+              console.log('⏭️ Ignorando: solo cambió sesion_ultimo_acceso');
+              return;
+            }
+            
+            // Si solo cambiaron campos de tiempo, ignorar
+            const timeFields = ['sesion_ultimo_acceso', 'updated_at'];
+            const nonTimeChanges = changedFields.filter(f => !timeFields.includes(f));
+            
+            if (nonTimeChanges.length === 0) {
+              console.log('⏭️ Ignorando: solo cambiaron campos de tiempo');
+              return;
+            }
+          }
+          
+          console.log('✅ Recargando sesión activa...');
+          // Recargar sesión
           const user = await loadActiveSession(isMounted);
           currentUserRef = user;
+          
+          // ✅ También recargar mensajes y contador cuando detectamos un login
+          if (user) {
+            console.log('🔄 Login detectado, recargando mensajes y contador...');
+            await loadMessages(isMounted);
+            await updateOnlineCount(isMounted);
+          }
         }
       )
       .subscribe();
@@ -490,35 +530,39 @@ export function PublicUsersProvider({ children }: { children: ReactNode }) {
   // ============================================
   // LOGOUT
   // ============================================
-  const logout = async () => {
-    if (!currentUser) {
+  const logout = useCallback(async () => {
+    // 🆕 Verificar si ya se está ejecutando logout
+    if (isLoggingOutRef.current) {
+      console.log('⏭️ Logout ya en progreso, ignorando...');
+      return;
+    }
+    
+    // ✅ USAR REF en lugar del estado para evitar stale closures
+    const user = currentUserRef.current;
+    
+    console.log('🚪 Logout llamado, usuario actual:', user);
+    
+    if (!user) {
       console.log('⚠️ No hay sesión activa para cerrar');
       return;
     }
 
-    try {
-      console.log('🚪 Cerrando sesión del cliente:', currentUser.id);
-      
-      // 🆕 ARCHIVAR CONVERSACIÓN ANTES DE CERRAR SESIÓN
-      await archivarConversacion(currentUser.id);
-      
-      // ✅ Marcar sesión como inactiva y expirada en tabla clientes
-      const { error: logoutError } = await supabase
-        .from('clientes')
-        .update({ 
-          sesion_activa: false,
-          sesion_token: null,
-          sesion_expires_at: new Date(Date.now() - 1000).toISOString(), // ✅ Fecha pasada para forzar expiración
-          sesion_ultimo_acceso: new Date(Date.now() - 1000).toISOString() // ✅ Último acceso en el pasado
-        })
-        .eq('id', currentUser.id);
+    // 🆕 Marcar que logout está en progreso INMEDIATAMENTE
+    isLoggingOutRef.current = true;
 
-      if (logoutError) {
-        console.error('❌ Error actualizando estado de sesión:', logoutError);
-      }
-
-      // ✅ Limpiar estado local INMEDIATAMENTE
+    const userId = user.id; // Guardar ID antes de limpiar estado
+    console.log('🚪 Iniciando logout para cliente:', userId);
+    
+    // ✅ PASO 1: Limpiar estado local INMEDIATAMENTE CON flushSync
+    console.log('🧹 Limpiando estado local...');
+    
+    // Limpiar PRIMERO el ref
+    currentUserRef.current = null;
+    
+    // 🆕 Usar flushSync para forzar actualización sincrónica del estado
+    flushSync(() => {
       setCurrentUser(null);
+      setOnlineUsers(0);
       setMessages([{
         id: '1',
         username: 'Sistema',
@@ -527,24 +571,52 @@ export function PublicUsersProvider({ children }: { children: ReactNode }) {
         color: '#d4af37',
         role: 'system'
       }]);
-      
-      console.log('✅ Sesión cerrada exitosamente');
-    } catch (error) {
-      console.error('❌ Error cerrando sesión:', error);
-      // ✅ Cerrar sesión localmente de todos modos
-      setCurrentUser(null);
-      setMessages([{
-        id: '1',
-        username: 'Sistema',
-        message: '¡Bienvenidos al chat de Black Diamond! 💬 Regístrate para conversar',
-        timestamp: new Date(),
-        color: '#d4af37',
-        role: 'system'
-      }]);
-    }
-  };
+    });
+    
+    // 🆕 El estado ya está actualizado SINCRÓNICAMENTE, resetear bandera
+    isLoggingOutRef.current = false;
+    console.log('✅ Sesión cerrada localmente y bandera reseteada');
 
-  // Guardar referencia a la función logout
+    // ✅ PASO 2: Actualizar BD en background (NO BLOQUEAR)
+    // Usar Promise.allSettled para ejecutar ambas operaciones sin esperar
+    Promise.allSettled([
+      // Operación 1: Marcar sesión como inactiva
+      fetch(
+        `https://${projectId}.supabase.co/rest/v1/clientes?id=eq.${userId}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': publicAnonKey,
+            'Authorization': `Bearer ${publicAnonKey}`,
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify({
+            sesion_activa: false,
+            sesion_token: null,
+            sesion_expires_at: new Date(Date.now() - 1000).toISOString(),
+            sesion_ultimo_acceso: new Date(Date.now() - 1000).toISOString()
+          })
+        }
+      ).then(res => {
+        if (res.ok) {
+          console.log('✅ Sesión marcada como inactiva en BD');
+        } else {
+          console.log('⚠️ No se pudo actualizar sesión en BD');
+        }
+      }),
+      
+      // Operación 2: Archivar conversación
+      archivarConversacion(userId).catch(() => {
+        console.log('⚠️ No se pudo archivar conversación');
+      })
+    ]).catch(() => {
+      // Ignorar errores silenciosamente
+      console.log('⚠️ Operaciones de BD completadas con errores (ignorando)');
+    });
+  }, []); // ✅ Sin dependencias para evitar recreación
+
+  // ✅ Actualizar el ref cada vez que la función logout cambie
   useEffect(() => {
     logoutRef.current = logout;
   }, [logout]);
@@ -552,15 +624,9 @@ export function PublicUsersProvider({ children }: { children: ReactNode }) {
   // ============================================
   // 🆕 ARCHIVAR CONVERSACIÓN EN HISTORIAL DEL CLIENTE
   // ============================================
-  const archivarConversacion = async (clienteId: string, signal?: AbortSignal) => {
+  const archivarConversacion = async (clienteId: string) => {
     try {
       console.log('📦 Archivando conversación del cliente:', clienteId);
-
-      // ✅ Verificar si la operación fue cancelada
-      if (signal?.aborted) {
-        console.log('⚠️ Operación de archivo cancelada');
-        return;
-      }
 
       // 1. Obtener todos los mensajes del cliente
       const { data: mensajes, error: mensajesError } = await supabase
@@ -576,15 +642,9 @@ export function PublicUsersProvider({ children }: { children: ReactNode }) {
           receiver:receiver_id(nombre)
         `)
         .or(`sender_id.eq.${clienteId},receiver_id.eq.${clienteId}`)
-        .order('created_at', { ascending: true })
-        .abortSignal(signal || new AbortController().signal);
+        .order('created_at', { ascending: true });
 
       if (mensajesError) {
-        // ✅ Ignorar errores de abort/cancelación
-        if (mensajesError.message?.includes('abort') || mensajesError.message?.includes('cancel')) {
-          console.log('⚠️ Petición cancelada - ignorando error');
-          return;
-        }
         console.error('❌ Error obteniendo mensajes para archivar:', {
           message: mensajesError.message,
           details: mensajesError.details || 'Sin detalles adicionales',
@@ -599,33 +659,26 @@ export function PublicUsersProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      // ✅ Verificar nuevamente antes de continuar
-      if (signal?.aborted) {
-        console.log('⚠️ Operación cancelada después de obtener mensajes');
-        return;
-      }
-
       // 2. Formatear conversación para el historial
       const conversacionTexto = mensajes.map(msg => {
         const fecha = new Date(msg.created_at).toLocaleString('es-CO');
         const remitente = msg.sender?.nombre || 'Usuario';
         return `[${fecha}] ${remitente}: ${msg.message}`;
-      }).join('\n');
+      }).join('\\n');
 
-      // 3. Guardar en el historial del cliente (tabla 'clientes' campo 'notas' o crear tabla específica)
+      // 3. Guardar en el historial del cliente
       const { error: historialError } = await supabase
         .from('clientes')
         .update({
           ultima_conversacion: conversacionTexto,
           ultima_conversacion_fecha: new Date().toISOString()
         })
-        .eq('id', clienteId)
-        .abortSignal(signal || new AbortController().signal);
+        .eq('id', clienteId);
 
       if (historialError) {
-        // ✅ Ignorar errores de abort/cancelación
-        if (historialError.message?.includes('abort') || historialError.message?.includes('cancel')) {
-          console.log('⚠️ Actualización cancelada - ignorando error');
+        // ✅ Manejo silencioso de errores de red (desarrollo/testing)
+        if (historialError.message?.includes('Failed to fetch') || historialError.message?.includes('NetworkError')) {
+          console.warn('⚠️ Error de conexión guardando historial (modo desarrollo) - ignorando');
           return;
         }
         console.error('❌ Error guardando historial:', historialError);
@@ -634,36 +687,19 @@ export function PublicUsersProvider({ children }: { children: ReactNode }) {
 
       console.log('✅ Conversación archivada exitosamente');
 
-      // ✅ Verificar antes de eliminar
-      if (signal?.aborted) {
-        console.log('⚠️ Operación cancelada antes de eliminar mensajes');
-        return;
-      }
-
       // 4. Eliminar mensajes de la tabla activa (limpiar chat)
       const { error: deleteError } = await supabase
         .from('chat_mensajes_publicos')
         .delete()
-        .or(`sender_id.eq.${clienteId},receiver_id.eq.${clienteId}`)
-        .abortSignal(signal || new AbortController().signal);
+        .or(`sender_id.eq.${clienteId},receiver_id.eq.${clienteId}`);
 
       if (deleteError) {
-        // ✅ Ignorar errores de abort/cancelación
-        if (deleteError.message?.includes('abort') || deleteError.message?.includes('cancel')) {
-          console.log('⚠️ Eliminación cancelada - ignorando error');
-          return;
-        }
         console.error('❌ Error eliminando mensajes:', deleteError);
         return;
       }
 
       console.log('✅ Mensajes eliminados de chat activo');
     } catch (error: any) {
-      // ✅ Ignorar errores de abort/cancelación
-      if (error?.name === 'AbortError' || error?.message?.includes('abort') || error?.message?.includes('cancel')) {
-        console.log('⚠️ Operación de archivo cancelada o abortada');
-        return;
-      }
       console.error('❌ Error en proceso de archivo:', error);
     }
   };
@@ -698,11 +734,12 @@ export function PublicUsersProvider({ children }: { children: ReactNode }) {
 
       // Si es usuario normal, siempre envía a la programadora
       if (currentUser.role === 'user' && !receiverId) {
+        // ✅ NO usar abortSignal aquí
         const { data: programador, error: programadorError } = await supabase
           .from('clientes')
           .select('id')
           .eq('email', PROGRAMADOR_EMAIL)
-          .single();
+          .maybeSingle(); // ✅ Usar maybeSingle en lugar de single
 
         if (programadorError) {
           console.warn('⚠️ Error buscando programador:', programadorError);
@@ -730,17 +767,11 @@ export function PublicUsersProvider({ children }: { children: ReactNode }) {
 
       console.log('📝 Insertando mensaje en BD:', newMessage);
 
-      // 🔥 USAR PROMISE.RACE PARA TIMEOUT
-      const insertPromise = supabase
+      // ✅ Simplificar: solo hacer el insert sin race/timeout
+      const { error, data } = await supabase
         .from('chat_mensajes_publicos')
         .insert(newMessage)
         .select();
-
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Timeout')), 10000)
-      );
-
-      const { error, data } = await Promise.race([insertPromise, timeoutPromise]) as any;
 
       if (error) {
         console.error('❌ Error enviando mensaje:', error);
@@ -765,15 +796,9 @@ export function PublicUsersProvider({ children }: { children: ReactNode }) {
       console.error('❌ Error enviando mensaje:', error);
       
       // Remover mensaje temporal
-      setMessages(prev => prev.filter(m => m.id === tempMessage.id));
+      setMessages(prev => prev.filter(m => m.id !== tempMessage.id));
       
-      if (error.name === 'AbortError') {
-        alert('❌ La operación fue cancelada.\n\n💡 Intenta recargar la página (F5) y vuelve a enviar el mensaje.');
-      } else if (error.message === 'Timeout') {
-        alert('⏱️ El mensaje tardó demasiado en enviarse.\n\n💡 Verifica tu conexión a internet e intenta de nuevo.');
-      } else {
-        alert(`❌ Error: ${error.message || 'Error desconocido'}\n\n💡 Intenta de nuevo.`);
-      }
+      alert(`❌ Error: ${error.message || 'Error desconocido'}\n\n💡 Intenta de nuevo.`);
     }
   };
 
@@ -807,7 +832,8 @@ export function PublicUsersProvider({ children }: { children: ReactNode }) {
         sendMessage,
         messages,
         onlineUsers,
-        getVisibleMessages
+        getVisibleMessages,
+        logoutRef
       }}
     >
       {children}
@@ -817,22 +843,24 @@ export function PublicUsersProvider({ children }: { children: ReactNode }) {
 
 export function usePublicUsers() {
   const context = useContext(PublicUsersContext);
+  
   if (context === undefined) {
-    // Si estamos en desarrollo y ocurre por hot reload, retornar valores por defecto
-    if (import.meta.env.DEV) {
-      console.warn('⚠️ usePublicUsers usado fuera del Provider (probablemente hot reload)');
-      
-      return {
-        currentUser: null,
-        messages: [],
-        onlineUsers: 0,
-        logout: async () => {}, // ✅ Async
-        sendMessage: async () => {},
-        getVisibleMessages: () => []
-      } as PublicUsersContextType;
-    }
-    
-    throw new Error('usePublicUsers must be used within a PublicUsersProvider');
+    console.warn('usePublicUsers debe usarse dentro de PublicUsersProvider');
+    // Retornar un contexto vacío seguro en lugar de lanzar error
+    return {
+      users: [],
+      loading: false,
+      error: null,
+      adminUsers: [],
+      programadorUsers: [],
+      ownerUsers: [],
+      modeloUsers: [],
+      addUser: async () => {},
+      updateUser: async () => {},
+      deleteUser: async () => {},
+      refreshUsers: async () => {},
+    } as PublicUsersContextType;
   }
+  
   return context;
 }

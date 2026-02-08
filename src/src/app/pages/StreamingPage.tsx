@@ -8,9 +8,12 @@ import {
   Users, 
   ArrowLeft,
   Sparkles,
-  TrendingUp
+  TrendingUp,
+  Video,
+  Calendar,
+  Send,
 } from 'lucide-react';
-import { projectId, publicAnonKey } from '../../../utils/supabase/info';
+import { projectId, publicAnonKey } from '../../utils/supabase/info';
 import { ImageWithFallback } from '../../../components/figma/ImageWithFallback';
 
 interface StreamSession {

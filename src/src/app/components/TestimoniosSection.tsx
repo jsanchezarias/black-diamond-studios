@@ -1,6 +1,6 @@
-import { Star, MessageSquare, Quote, ChevronLeft, ChevronRight } from 'lucide-react';
-import { Button } from './ui/button';
-import { Card, CardContent } from './ui/card';
+import { Star, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Button } from '../../../components/ui/button';
+import { Card, CardContent } from '../../../components/ui/card';
 import { useTestimonios } from './TestimoniosContext';
 import { useState } from 'react';
 
@@ -57,7 +57,7 @@ export function TestimoniosSection({ onAddTestimonio }: TestimoniosSectionProps)
         {/* Header */}
         <div className="text-center mb-12">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-primary to-amber-400 rounded-full mb-4">
-            <MessageSquare className="w-8 h-8 text-background" />
+            <Star className="w-8 h-8 text-background" />
           </div>
           <h2 className="text-4xl md:text-5xl font-bold mb-4" style={{ fontFamily: 'Montserrat, sans-serif' }}>
             Experiencias de <span className="text-primary">Nuestros Clientes</span>
@@ -79,7 +79,7 @@ export function TestimoniosSection({ onAddTestimonio }: TestimoniosSectionProps)
                   <CardContent className="p-6">
                     {/* Quote Icon */}
                     <div className="mb-4">
-                      <Quote className="w-10 h-10 text-primary/30" />
+                      <Star className="w-10 h-10 text-primary/30" />
                     </div>
 
                     {/* Calificación */}
@@ -177,7 +177,7 @@ export function TestimoniosSection({ onAddTestimonio }: TestimoniosSectionProps)
             size="lg"
             className="bg-gradient-to-r from-primary to-amber-400 hover:from-primary/90 hover:to-amber-400/90 text-background font-bold px-8 py-6 text-lg shadow-lg shadow-primary/30 hover:shadow-xl hover:shadow-primary/40 transition-all"
           >
-            <MessageSquare className="w-5 h-5 mr-2" />
+            <Star className="w-5 h-5 mr-2" />
             Comparte tu Experiencia
           </Button>
           <p className="text-sm text-muted-foreground mt-3">

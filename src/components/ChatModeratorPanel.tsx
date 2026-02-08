@@ -1,7 +1,7 @@
-import { Badge } from './ui/badge';
+import { useState, useEffect, useRef } from 'react';
 import { Send, Users, MessageSquare, LogIn, LogOut, Gem, Trash2 } from 'lucide-react';
 import { usePublicUsers } from '../src/app/components/PublicUsersContext';
-import { supabase } from '../lib/supabaseClient';
+import { supabase } from '../src/utils/supabase/info'; // ✅ Corregido: ruta correcta
 
 export function ChatModeratorPanel() {
   const { currentUser, login, logout, sendMessage, messages, onlineUsers } = usePublicUsers();

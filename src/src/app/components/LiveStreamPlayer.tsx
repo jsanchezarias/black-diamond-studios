@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Button } from './ui/button';
-import { Badge } from './ui/badge';
-import { Card, CardContent } from './ui/card';
+import { Button } from '../../../components/ui/button';
+import { Badge } from '../../../components/ui/badge';
+import { Card, CardContent } from '../../../components/ui/card';
 import { 
   Video, 
   VideoOff, 
@@ -10,11 +10,12 @@ import {
   MessageCircle, 
   Share2,
   Maximize,
+  Minimize,
   Volume2,
   VolumeX,
   Settings
 } from 'lucide-react';
-import { projectId, publicAnonKey } from '../../../utils/supabase/info';
+import { projectId, publicAnonKey } from '../../utils/supabase/info';
 
 interface StreamSession {
   id: string;

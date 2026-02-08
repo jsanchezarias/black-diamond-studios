@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Button } from './ui/button';
-import { Card, CardContent } from './ui/card'; // ✅ Agregar Card y CardContent
-import { Badge } from './ui/badge'; // ✅ Agregar Badge
+import { Button } from '../../../components/ui/button';
+import { Card, CardContent } from '../../../components/ui/card';
+import { Badge } from '../../../components/ui/badge';
 import { ModelCard } from './ModelCard';
 import { AppointmentModal } from './AppointmentModal';
 import { VideoShowcase } from './VideoShowcase';
@@ -19,7 +19,7 @@ import { LiveChat } from './LiveChat';
 import { TipModal } from './TipModal';
 import { usePublicUsers } from './PublicUsersContext';
 import { useModelos } from './ModelosContext';
-import { projectId, publicAnonKey } from '../../../utils/supabase/info';
+import { projectId, publicAnonKey } from '../../utils/supabase/info';
 
 // ✅ Agregar tipos necesarios
 interface TipData {
@@ -33,7 +33,7 @@ interface TipData {
 // ✅ Componente para mostrar notificaciones de propinas
 function TipNotificationsContainer({ tips, onRemoveTip }: { tips: TipData[], onRemoveTip: (id: string) => void }) {
   return (
-    <div className="fixed bottom-4 right-4 z-50 space-y-2">
+    <div className="fixed bottom-4 right-4 z-50 space-y-2 max-w-[calc(100vw-2rem)] w-auto">
       {tips.map((tip) => (
         <TipNotification
           key={tip.id}
@@ -70,24 +70,28 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
   const [showClienteLogin, setShowClienteLogin] = useState(false);
   const [clienteActual, setClienteActual] = useState<any>(null);
   
-  const { currentUser, logout } = usePublicUsers(); // ✅ Agregar logout del contexto
+  const { currentUser, logout, logoutRef } = usePublicUsers(); // ✅ Agregar logoutRef del contexto
 
   // ============================================
   // 🆕 SINCRONIZAR clienteActual con currentUser del chat
   // ============================================
   useEffect(() => {
     if (currentUser) {
-      // Si hay usuario autenticado en el chat, sincronizar con clienteActual
-      setClienteActual({
-        id: currentUser.id,
-        nombre: currentUser.username,
-        telefono: currentUser.telefono
-      });
+      // Solo actualizar si el ID cambió o no hay clienteActual
+      if (!clienteActual || clienteActual.id !== currentUser.id) {
+        setClienteActual({
+          id: currentUser.id,
+          nombre: currentUser.username,
+          telefono: currentUser.telefono
+        });
+      }
     } else {
-      // Si no hay usuario en el chat, limpiar clienteActual
-      setClienteActual(null);
+      // Si no hay usuario en el chat, limpiar clienteActual solo si existe
+      if (clienteActual) {
+        setClienteActual(null);
+      }
     }
-  }, [currentUser]);
+  }, [currentUser]); // Eliminar clienteActual de las dependencias
   
   // Hook para modelos desde Supabase
   const { modelos: modelosSupabase } = useModelos();
@@ -151,7 +155,7 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
         setLoadingStream(true);
         // Supabase Edge Functions requiere AMBOS headers: apikey Y Authorization
         const response = await fetch(
-          `https://${projectId}.supabase.co/functions/v1/make-server-ae3a00e9/streams`,
+          `https://${projectId}.supabase.co/functions/v1/make-server-9dadc017/streams`,
           {
             headers: {
               'apikey': publicAnonKey,
@@ -164,14 +168,14 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
           const data = await response.json();
           const streams = data.streams || [];
           
-          // Filtrar streams válidos y buscar el de la sede actual
-          const validStreams = streams.filter((s: any) => s && s.sedeId);
-          const currentSedeStream = validStreams.find((s: any) => s.sedeId === sedeActual);
+          // Buscar el stream de Sede Norte
+          const sedeNorteStream = streams.find((s: any) => s && s.sedeId === 'sede-norte');
           
-          if (currentSedeStream && currentSedeStream.streamUrl) {
-            setStreamUrl(currentSedeStream.streamUrl);
+          if (sedeNorteStream && sedeNorteStream.streamUrl && sedeNorteStream.isLive) {
+            // Solo mostrar stream si está marcado como EN VIVO
+            setStreamUrl(sedeNorteStream.streamUrl);
           } else {
-            // Fallback a URL por defecto de sedes
+            // Si no hay stream configurado o no está en vivo, usar URL por defecto
             const sede = sedes.find(s => s.id === sedeActual);
             if (sede) {
               setStreamUrl(sede.streamUrl);
@@ -198,7 +202,7 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
     loadStreams();
   }, [sedeActual]);
 
-  // Cerrar men�� al hacer scroll
+  // Cerrar men al hacer scroll
   useEffect(() => {
     const handleScroll = () => {
       if (menuOpen) {
@@ -356,85 +360,103 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
   };
 
   return (
-    <div className="min-h-screen bg-background overflow-x-hidden" style={{ fontFamily: 'Inter, sans-serif' }}>
+    <div className="min-h-screen bg-background w-full max-w-full overflow-x-hidden box-border" style={{ fontFamily: 'Inter, sans-serif' }}>
       {/* Overlay para menú móvil */}
       {menuOpen && (
         <div 
-          className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm"
+          className="fixed inset-0 bg-black/60 z-40 lg:hidden backdrop-blur-sm"
           onClick={() => setMenuOpen(false)}
           aria-hidden="true"
         />
       )}
 
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-gradient-dark/98 backdrop-blur-premium border-b border-primary/15 shadow-premium">
-        <div className="container mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
-            {/* Logo */}
-            <div className="flex items-center">
-              <Logo variant="horizontal" size="md" className="cursor-pointer hover:scale-105 transition-transform duration-300" />
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-card/98 backdrop-blur-premium border-b border-primary/15 shadow-premium">
+        <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-2.5 sm:py-3">
+          <div className="flex items-center justify-between gap-2 sm:gap-4">
+            {/* Logo - Responsive size */}
+            <div className="flex items-center flex-shrink-0">
+              <div className="scale-75 sm:scale-90 md:scale-100 origin-left">
+                <Logo variant="horizontal" size="md" className="cursor-pointer hover:scale-105 transition-transform duration-300" />
+              </div>
             </div>
 
-            {/* Desktop Menu */}
-            <div className="hidden md:flex items-center gap-6">
-              <button onClick={() => scrollToSection('inicio')} className="text-sm hover:text-primary transition-colors font-medium">
+            {/* Desktop Menu - Mayor breakpoint para más espacio */}
+            <div className="hidden lg:flex items-center gap-3 xl:gap-5 flex-1 justify-end">
+              <button onClick={() => scrollToSection('inicio')} className="text-xs xl:text-sm hover:text-primary transition-colors font-medium whitespace-nowrap">
                 {t.nav.home}
               </button>
-              <button onClick={() => scrollToSection('servicios')} className="text-sm hover:text-primary transition-colors font-medium">
+              <button onClick={() => scrollToSection('servicios')} className="text-xs xl:text-sm hover:text-primary transition-colors font-medium whitespace-nowrap">
                 {t.nav.services}
               </button>
-              <button onClick={() => scrollToSection('modelos')} className="text-sm hover:text-primary transition-colors font-medium">
+              <button onClick={() => scrollToSection('modelos')} className="text-xs xl:text-sm hover:text-primary transition-colors font-medium whitespace-nowrap">
                 {t.nav.models}
               </button>
-              <button onClick={() => scrollToSection('sobre-nosotros')} className="text-sm hover:text-primary transition-colors font-medium">
+              <button onClick={() => scrollToSection('sobre-nosotros')} className="text-xs xl:text-sm hover:text-primary transition-colors font-medium whitespace-nowrap">
                 {t.nav.about}
               </button>
-              <button onClick={() => scrollToSection('contacto')} className="text-sm hover:text-primary transition-colors font-medium">
+              <button onClick={() => scrollToSection('contacto')} className="text-xs xl:text-sm hover:text-primary transition-colors font-medium whitespace-nowrap">
                 {t.nav.contact}
               </button>
+              
+              <div className="w-px h-6 bg-border/50 flex-shrink-0" />
+              
               <LanguageSelector />
+              
               {clienteActual ? (
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 rounded-full border border-primary/30">
-                    <UserIcon className="w-4 h-4 text-primary" />
-                    <span className="text-sm font-medium">{clienteActual.nombre.split(' ')[0]}</span>
-                  </div>
-                  {/* ✅ Botón de Logout */}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className="text-xs xl:text-sm text-primary/80 font-light hidden xl:inline">{clienteActual.nombre}</span>
                   <Button 
-                    onClick={() => {
-                      logout();
-                      setClienteActual(null);
+                    onClick={async (e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      
+                      console.log('🔴 CLICK en botón Cerrar Sesión - LandingPage Header');
+                      console.log('🔴 logoutRef:', logoutRef);
+                      try {
+                        console.log('🔴 Llamando a logoutRef.current()...');
+                        // ✅ USAR REF para evitar stale closures
+                        if (logoutRef?.current) {
+                          await logoutRef.current();
+                          console.log('🔴 logoutRef.current() completado');
+                          setClienteActual(null);
+                          console.log('🔴 clienteActual limpiado');
+                        } else {
+                          console.error('🔴 logoutRef.current no está disponible');
+                        }
+                      } catch (error) {
+                        console.error('🔴 Error en logout:', error);
+                      }
                     }}
                     variant="ghost" 
                     size="sm"
-                    className="text-red-400 hover:text-red-500 hover:bg-red-950/20 gap-2"
+                    className="text-red-400 hover:text-red-500 hover:bg-red-950/20 gap-1.5 text-xs xl:text-sm px-2 xl:px-3 h-8 xl:h-9"
                   >
-                    <LogOut className="w-4 h-4" />
-                    Cerrar Sesión
+                    <LogOut className="w-3.5 h-3.5 xl:w-4 xl:h-4" />
+                    <span className="hidden xl:inline">Cerrar</span>
                   </Button>
-                  <Button onClick={onAccessSystem} variant="outline" size="sm" className="border-primary text-primary hover:bg-primary hover:text-background">
-                    {t.nav.systemAccess}
-                  </Button>
+                  {/* NO mostrar botón Sistema para clientes normales */}
                 </div>
               ) : (
-                <>
-                  <Button onClick={() => setShowClienteLogin(true)} variant="outline" size="sm" className="border-primary/50 text-foreground hover:border-primary hover:bg-primary/5">
-                    <UserIcon className="w-4 h-4 mr-2" />
-                    {t.nav.login}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <Button onClick={() => setShowClienteLogin(true)} variant="outline" size="sm" className="border-primary/50 text-foreground hover:border-primary hover:bg-primary/5 text-xs xl:text-sm px-2 xl:px-3 h-8 xl:h-9 whitespace-nowrap">
+                    <UserIcon className="w-3.5 h-3.5 xl:w-4 xl:h-4 mr-1.5" />
+                    <span className="hidden xl:inline">{t.nav.login}</span>
+                    <span className="xl:hidden">Login</span>
                   </Button>
-                  <Button onClick={onAccessSystem} variant="outline" size="sm" className="border-primary text-primary hover:bg-primary hover:text-background">
-                    {t.nav.systemAccess}
+                  <Button onClick={onAccessSystem} variant="outline" size="sm" className="border-primary text-primary hover:bg-primary hover:text-background text-xs xl:text-sm px-2 xl:px-3 h-8 xl:h-9 whitespace-nowrap">
+                    Sistema
                   </Button>
-                </>
+                </div>
               )}
             </div>
 
-            {/* Mobile Menu - Logo | Menu Button (centered) | Language */}
-            <div className="md:hidden flex items-center justify-between w-full">
-              {/* Spacer invisible para balancear */}
-              <div className="w-10"></div>
+            {/* Mobile/Tablet Menu - Para pantallas < lg */}
+            <div className="lg:hidden flex items-center gap-2 sm:gap-3">
+              {/* Language Selector en móvil */}
+              <LanguageSelector />
               
-              {/* Menu Button - Centrado - Mismo estilo que LanguageSelector */}
+              {/* Menu Button */}
               <Button
                 variant="outline"
                 size="sm"
@@ -442,7 +464,7 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
                   console.log('🍔 Menu button clicked, current state:', menuOpen);
                   setMenuOpen(!menuOpen);
                 }}
-                className="border-primary/30 hover:bg-primary/10 gap-2"
+                className="border-primary/30 hover:bg-primary/10 h-8 sm:h-9 w-8 sm:w-9 p-0 flex-shrink-0"
                 aria-label="Toggle menu"
               >
                 <div className="w-4 h-4 flex flex-col justify-center gap-[3px]">
@@ -451,15 +473,12 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
                   <span className="block h-[2px] w-full rounded-full" style={{ backgroundColor: '#d4af37' }}></span>
                 </div>
               </Button>
-
-              {/* Language Selector */}
-              <LanguageSelector />
             </div>
           </div>
 
           {/* Mobile Menu Dropdown */}
           <div 
-            className={`md:hidden transition-all duration-300 ease-in-out ${
+            className={`lg:hidden transition-all duration-300 ease-in-out ${
               menuOpen ? 'max-h-screen opacity-100 visible' : 'max-h-0 opacity-0 invisible'
             }`}
             style={{ 
@@ -467,33 +486,48 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
               transition: 'max-height 0.3s ease-in-out, opacity 0.3s ease-in-out'
             }}
           >
-            <div className="mt-4 pb-4 space-y-3 border-t border-primary/20 pt-4"
+            <div className="mt-3 sm:mt-4 pb-3 sm:pb-4 space-y-2 sm:space-y-3 border-t border-primary/20 pt-3 sm:pt-4"
               style={{ display: menuOpen ? 'block' : 'none' }}
             >
-              <button onClick={() => scrollToSection('inicio')} className="block w-full text-left py-3 px-4 hover:text-primary hover:bg-primary/10 rounded transition-colors font-medium text-base">
+              <button 
+                onClick={() => { scrollToSection('inicio'); setMenuOpen(false); }} 
+                className="block w-full text-left py-2.5 sm:py-3 px-3 sm:px-4 hover:text-primary hover:bg-primary/10 rounded transition-colors font-medium text-sm sm:text-base"
+              >
                 {t.nav.home}
               </button>
-              <button onClick={() => scrollToSection('servicios')} className="block w-full text-left py-3 px-4 hover:text-primary hover:bg-primary/10 rounded transition-colors font-medium text-base">
+              <button 
+                onClick={() => { scrollToSection('servicios'); setMenuOpen(false); }} 
+                className="block w-full text-left py-2.5 sm:py-3 px-3 sm:px-4 hover:text-primary hover:bg-primary/10 rounded transition-colors font-medium text-sm sm:text-base"
+              >
                 {t.nav.services}
               </button>
-              <button onClick={() => scrollToSection('modelos')} className="block w-full text-left py-3 px-4 hover:text-primary hover:bg-primary/10 rounded transition-colors font-medium text-base">
+              <button 
+                onClick={() => { scrollToSection('modelos'); setMenuOpen(false); }} 
+                className="block w-full text-left py-2.5 sm:py-3 px-3 sm:px-4 hover:text-primary hover:bg-primary/10 rounded transition-colors font-medium text-sm sm:text-base"
+              >
                 {t.nav.models}
               </button>
-              <button onClick={() => scrollToSection('sobre-nosotros')} className="block w-full text-left py-3 px-4 hover:text-primary hover:bg-primary/10 rounded transition-colors font-medium text-base">
+              <button 
+                onClick={() => { scrollToSection('sobre-nosotros'); setMenuOpen(false); }} 
+                className="block w-full text-left py-2.5 sm:py-3 px-3 sm:px-4 hover:text-primary hover:bg-primary/10 rounded transition-colors font-medium text-sm sm:text-base"
+              >
                 {t.nav.about}
               </button>
-              <button onClick={() => scrollToSection('contacto')} className="block w-full text-left py-3 px-4 hover:text-primary hover:bg-primary/10 rounded transition-colors font-medium text-base">
+              <button 
+                onClick={() => { scrollToSection('contacto'); setMenuOpen(false); }} 
+                className="block w-full text-left py-2.5 sm:py-3 px-3 sm:px-4 hover:text-primary hover:bg-primary/10 rounded transition-colors font-medium text-sm sm:text-base"
+              >
                 {t.nav.contact}
               </button>
+              
               {/* Botones de sesión en móvil */}
-              <div className="space-y-2 pt-4 border-t border-primary/20">
+              <div className="space-y-2 pt-3 sm:pt-4 border-t border-primary/20">
                 {clienteActual ? (
                   <>
                     <div className="flex items-center gap-2 px-3 py-2 bg-primary/10 rounded-lg border border-primary/30">
-                      <UserIcon className="w-4 h-4 text-primary" />
-                      <span className="text-sm font-medium">{clienteActual.nombre}</span>
+                      <UserIcon className="w-4 h-4 text-primary flex-shrink-0" />
+                      <span className="text-sm font-medium truncate">{clienteActual.nombre}</span>
                     </div>
-                    {/* ✅ Botón de Cerrar Sesión en móvil */}
                     <Button 
                       onClick={() => {
                         logout();
@@ -501,31 +535,26 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
                         setMenuOpen(false);
                       }}
                       variant="ghost" 
-                      className="w-full text-red-400 hover:text-red-500 hover:bg-red-950/20 gap-2 justify-center"
+                      className="w-full text-red-400 hover:text-red-500 hover:bg-red-950/20 gap-2 justify-center h-10 sm:h-11 text-sm sm:text-base"
                     >
                       <LogOut className="w-4 h-4" />
                       Cerrar Sesión
                     </Button>
-                    <Button 
-                      onClick={() => { onAccessSystem(); setMenuOpen(false); }} 
-                      className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-                    >
-                      {t.nav.systemAccess}
-                    </Button>
+                    {/* NO mostrar botón Sistema para clientes normales */}
                   </>
                 ) : (
                   <>
                     <Button 
                       onClick={() => { setShowClienteLogin(true); setMenuOpen(false); }} 
                       variant="outline" 
-                      className="w-full border-primary/50 text-foreground hover:border-primary hover:bg-primary/5"
+                      className="w-full border-primary/50 text-foreground hover:border-primary hover:bg-primary/5 h-10 sm:h-11 text-sm sm:text-base"
                     >
                       <UserIcon className="w-4 h-4 mr-2" />
                       {t.nav.login}
                     </Button>
                     <Button 
                       onClick={() => { onAccessSystem(); setMenuOpen(false); }} 
-                      className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+                      className="w-full bg-primary text-primary-foreground hover:bg-primary/90 h-10 sm:h-11 text-sm sm:text-base"
                     >
                       {t.nav.systemAccess}
                     </Button>
@@ -543,8 +572,8 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
       {/* Live Stream Hero Section */}
       <section id="inicio" className="pt-16 relative">
         <div className="w-full h-[calc(100vh-4rem)] flex flex-col lg:flex-row">
-          {/* Video Stream - Ocupa 70% en desktop, 100% en mobile cuando está arriba */}
-          <div className="w-full lg:w-[70%] h-[60vh] lg:h-full relative">
+          {/* Video Stream - Ocupa 70% en desktop, reducido en mobile para dar más espacio al chat */}
+          <div className="w-full lg:w-[70%] h-[40vh] lg:h-full relative">
             <LiveVideoStream 
               streamUrl={streamUrl}
               title="Transmisión en Vivo Exclusiva"
@@ -554,8 +583,8 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
             />
           </div>
 
-          {/* Live Chat - Ocupa 30% en desktop, resto en mobile */}
-          <div className="w-full lg:w-[30%] h-[40vh] lg:h-full">
+          {/* Live Chat - Ocupa 30% en desktop, mayor espacio en mobile (60vh) */}
+          <div className="w-full lg:w-[30%] h-[60vh] lg:h-full">
             <LiveChat 
               onTipClick={handleTipClick}
               recentTips={recentTips}
@@ -566,7 +595,7 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
       </section>
 
       {/* Services Section */}
-      <section id="servicios" className="py-16 md:py-24 bg-gradient-to-b from-background to-primary/5">
+      <section id="servicios" className="py-16 md:py-24 bg-background">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
             <Badge className="mb-4 bg-primary/20 text-primary border-primary/30">

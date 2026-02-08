@@ -1,5 +1,5 @@
 import { Loader2, CheckCircle, Key } from 'lucide-react';
-import { supabase } from '../../../lib/supabaseClient';
+import { supabase } from '../../utils/supabase/info'; // ✅ Corregido: ruta correcta
 
 // Página temporal para resetear la contraseña del owner
 export function ResetOwnerPassword() {

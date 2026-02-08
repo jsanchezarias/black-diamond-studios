@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { supabase } from '../../../lib/supabaseClient';
+import { supabase } from '../../utils/supabase/info'; // ✅ Corregido: ruta correcta
 
 export interface GastoOperativo {
   id: string;

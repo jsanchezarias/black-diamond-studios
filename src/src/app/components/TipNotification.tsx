@@ -17,6 +17,12 @@ interface TipNotificationProps {
 export function TipNotification({ tip, onComplete }: TipNotificationProps) {
   const [isVisible, setIsVisible] = useState(false);
 
+  // ✅ Validación defensiva
+  if (!tip || typeof tip.amount !== 'number') {
+    console.error('❌ TipNotification recibió un tip inválido:', tip);
+    return null;
+  }
+
   useEffect(() => {
     // Fade in
     setTimeout(() => setIsVisible(true), 100);
@@ -86,9 +92,21 @@ interface TipNotificationsContainerProps {
 }
 
 export function TipNotificationsContainer({ tips, onRemoveTip }: TipNotificationsContainerProps) {
+  // ✅ Filtrar tips inválidos
+  const validTips = (tips || []).filter(tip => 
+    tip && 
+    typeof tip.id === 'string' && 
+    typeof tip.amount === 'number' &&
+    typeof tip.username === 'string'
+  );
+
+  if (validTips.length === 0) {
+    return null;
+  }
+
   return (
     <div className="fixed top-20 right-4 z-50 space-y-2 max-w-sm">
-      {tips.map((tip) => (
+      {validTips.map((tip) => (
         <TipNotification
           key={tip.id}
           tip={tip}

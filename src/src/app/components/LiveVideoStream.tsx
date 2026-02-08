@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Play, Volume2, VolumeX, Maximize, Radio, Clock, AlertCircle, DollarSign } from 'lucide-react';
-import { Button } from './ui/button';
-import { Badge } from './ui/badge';
+import { Button } from '../../../components/ui/button';
+import { Badge } from '../../../components/ui/badge';
 
 interface LiveVideoStreamProps {
   streamUrl?: string;

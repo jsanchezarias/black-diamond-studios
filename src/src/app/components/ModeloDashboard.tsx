@@ -20,7 +20,10 @@ import {
   ShoppingCart,
   Sparkles,
   Info,
-  ChevronDown
+  ChevronDown,
+  MapPin,
+  Bell,
+  PieChart // 📊 Icono para Analytics
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs';
@@ -41,6 +44,11 @@ import { IniciarServicioModal } from '../../../components/IniciarServicioModal';
 import { ServicioActivoCard } from '../../../components/ServicioActivoCard';
 import { CarritoBoutiqueModal } from '../../../components/CarritoBoutiqueModal';
 import { CheckoutBoutiqueModal } from '../../../components/CheckoutBoutiqueModal';
+import { CalendarioModeloView } from '../../components/CalendarioModeloView';
+import { DetalleCitaModal } from '../../components/DetalleCitaModal';
+import { LogoIsotipo } from './LogoIsotipo';
+import { NotificacionesPanel } from './NotificacionesPanel';
+import { AnalyticsPanel } from './AnalyticsPanel'; // 📊 Sistema de Analytics
 import { toast } from 'sonner@2.0.3';
 
 interface ModeloDashboardProps {
@@ -56,6 +64,7 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
   const [mostrarIniciarServicio, setMostrarIniciarServicio] = useState(false);
   const [mostrarCarritoBoutique, setMostrarCarritoBoutique] = useState(false);
   const [mostrarCheckoutBoutique, setMostrarCheckoutBoutique] = useState(false);
+  const [citaSeleccionada, setCitaSeleccionada] = useState<any>(null);
   const { modelos } = useModelos();
   const { serviciosActivos, serviciosFinalizados, obtenerServicioActivo } = useServicios();
   const { multas, obtenerTotalMultasPendientes } = useMultas();
@@ -66,7 +75,7 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
   const { carrito, agregarAlCarrito, eliminarDelCarrito } = useCarrito();
 
   // Obtener el perfil de la modelo actual basado en el email del usuario autenticado
-  const modeloActual = modelos.find(m => m.email.toLowerCase() === userEmail.toLowerCase()) || null;
+  const modeloActual = modelos.find(m => m.email?.toLowerCase() === userEmail?.toLowerCase()) || null;
 
   // Verificar estado de registro de entrada
   const registroActivo = modeloActual ? obtenerRegistroActual(modeloActual.email) : undefined;
@@ -94,6 +103,21 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
   // Obtener citas próximas usando el email de la modelo
   const citasProximas = modeloActual ? obtenerAgendamientosPendientes(modeloActual.email) : [];
   
+  // Obtener citas de hoy
+  const citasHoy = citasProximas.filter(cita => {
+    const citaDate = new Date(cita.fechaInicio);
+    const today = new Date();
+    return citaDate.toDateString() === today.toDateString();
+  }).sort((a, b) => new Date(a.fechaInicio).getTime() - new Date(b.fechaInicio).getTime());
+
+  // Obtener citas de mañana
+  const citasManana = citasProximas.filter(cita => {
+    const citaDate = new Date(cita.fechaInicio);
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return citaDate.toDateString() === tomorrow.toDateString();
+  }).sort((a, b) => new Date(a.fechaInicio).getTime() - new Date(b.fechaInicio).getTime());
+  
   // Obtener asistencia del día actual
   const asistenciaHoy = modeloActual ? obtenerRegistroActual(modeloActual.email) : undefined;
 
@@ -120,15 +144,7 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-pink-500 to-purple-500 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-xl">BD</span>
-                </div>
-                <div>
-                  <h1 className="text-xl font-bold text-white">Black Diamond Studios</h1>
-                  <p className="text-xs text-gray-400">Portal de Modelo</p>
-                </div>
-              </div>
+              <LogoIsotipo size="md" />
             </div>
 
             <div className="flex items-center gap-4">
@@ -185,6 +201,14 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
               <User className="w-4 h-4 mr-2" />
               Mi Perfil
             </TabsTrigger>
+            <TabsTrigger value="notificaciones" className="data-[state=active]:bg-primary">
+              <Bell className="w-4 h-4 mr-2" />
+              Notificaciones
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="data-[state=active]:bg-primary">
+              <PieChart className="w-4 h-4 mr-2" />
+              Analytics
+            </TabsTrigger>
           </TabsList>
 
           {/* Navegación en Móvil - Select desplegable */}
@@ -198,6 +222,8 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
                   {selectedTab === 'boutique' && <><ShoppingBag className="w-4 h-4" /> <span>Boutique</span></>}
                   {selectedTab === 'calendario' && <><Calendar className="w-4 h-4" /> <span>Calendario</span></>}
                   {selectedTab === 'perfil' && <><User className="w-4 h-4" /> <span>Mi Perfil</span></>}
+                  {selectedTab === 'notificaciones' && <><Bell className="w-4 h-4" /> <span>Notificaciones</span></>}
+                  {selectedTab === 'analytics' && <><PieChart className="w-4 h-4" /> <span>Analytics</span></>}
                 </div>
               </SelectTrigger>
               <SelectContent className="bg-black/95 border-white/10">
@@ -235,6 +261,18 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
                   <div className="flex items-center gap-2">
                     <User className="w-4 h-4" />
                     <span>Mi Perfil</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="notificaciones" className="text-white hover:bg-white/10">
+                  <div className="flex items-center gap-2">
+                    <Bell className="w-4 h-4" />
+                    <span>Notificaciones</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="analytics" className="text-white hover:bg-white/10">
+                  <div className="flex items-center gap-2">
+                    <PieChart className="w-4 h-4" />
+                    <span>Analytics</span>
                   </div>
                 </SelectItem>
               </SelectContent>
@@ -382,6 +420,117 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
                 </CardContent>
               </Card>
             </div>
+
+            {/* Citas de Hoy y Mañana */}
+            {(citasHoy.length > 0 || citasManana.length > 0) && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* Citas de Hoy */}
+                {citasHoy.length > 0 && (
+                  <Card className="bg-gradient-to-br from-purple-500/10 via-purple-600/5 to-transparent border-purple-500/30">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-purple-400">
+                        <Calendar className="w-5 h-5" />
+                        Citas de Hoy
+                      </CardTitle>
+                      <CardDescription>
+                        {citasHoy.length} {citasHoy.length === 1 ? 'cita programada' : 'citas programadas'}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {citasHoy.map((cita) => (
+                        <div 
+                          key={cita.id} 
+                          className="p-4 bg-black/40 rounded-lg border border-purple-500/20 hover:border-purple-500/40 transition-all"
+                        >
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Clock className="w-4 h-4 text-purple-400" />
+                                <p className="font-bold text-white">{cita.hora}</p>
+                              </div>
+                              <p className="text-sm font-medium text-white">{cita.clienteNombre}</p>
+                              <p className="text-xs text-muted-foreground">{cita.clienteTelefono}</p>
+                            </div>
+                            <Badge 
+                              variant="outline" 
+                              className="bg-purple-500/10 text-purple-400 border-purple-500/30"
+                            >
+                              {cita.duracion}h
+                            </Badge>
+                          </div>
+                          <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
+                            <span className="text-sm text-muted-foreground">
+                              {cita.tipoServicio === 'domicilio' ? '🏠 Domicilio' : '🏢 Sede'}
+                            </span>
+                            <span className="text-sm font-bold text-primary">
+                              ${cita.precioTotal?.toLocaleString()}
+                            </span>
+                          </div>
+                          {cita.notas && (
+                            <p className="text-xs text-muted-foreground mt-2 italic line-clamp-2">
+                              "{cita.notas}"
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Citas de Mañana */}
+                {citasManana.length > 0 && (
+                  <Card className="bg-gradient-to-br from-blue-500/10 via-blue-600/5 to-transparent border-blue-500/30">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-blue-400">
+                        <Calendar className="w-5 h-5" />
+                        Citas de Mañana
+                      </CardTitle>
+                      <CardDescription>
+                        {citasManana.length} {citasManana.length === 1 ? 'cita programada' : 'citas programadas'}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {citasManana.map((cita) => (
+                        <div 
+                          key={cita.id} 
+                          className="p-4 bg-black/40 rounded-lg border border-blue-500/20 hover:border-blue-500/40 transition-all"
+                        >
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Clock className="w-4 h-4 text-blue-400" />
+                                <p className="font-bold text-white">{cita.hora}</p>
+                              </div>
+                              <p className="text-sm font-medium text-white">{cita.clienteNombre}</p>
+                              <p className="text-xs text-muted-foreground">{cita.clienteTelefono}</p>
+                            </div>
+                            <Badge 
+                              variant="outline" 
+                              className="bg-blue-500/10 text-blue-400 border-blue-500/30"
+                            >
+                              {cita.duracion}h
+                            </Badge>
+                          </div>
+                          <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
+                            <span className="text-sm text-muted-foreground">
+                              {cita.tipoServicio === 'domicilio' ? '🏠 Domicilio' : '🏢 Sede'}
+                            </span>
+                            <span className="text-sm font-bold text-primary">
+                              ${cita.precioTotal?.toLocaleString()}
+                            </span>
+                          </div>
+                          {cita.notas && (
+                            <p className="text-xs text-muted-foreground mt-2 italic line-clamp-2">
+                              "{cita.notas}"
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            )}
 
             {/* Asistencia */}
             <Card>
@@ -794,19 +943,81 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
 
           {/* Tab: Calendario */}
           <TabsContent value="calendario" className="space-y-6">
+            {/* Configuración de Disponibilidad */}
+            <Card className="bg-gradient-to-br from-primary/10 via-purple-500/5 to-transparent border-primary/30">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-primary">
+                  <Clock className="w-5 h-5" />
+                  Mi Disponibilidad
+                </CardTitle>
+                <CardDescription>
+                  Configura tu horario de disponibilidad general
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-white">Hora de inicio</label>
+                    <input
+                      type="time"
+                      defaultValue={modeloActual.disponibilidadHoraria?.inicio || '10:00'}
+                      className="w-full px-4 py-2 bg-black/40 border border-white/10 rounded-lg text-white focus:outline-none focus:border-primary/50 transition-colors"
+                      onChange={(e) => {
+                        // Aquí podrías agregar lógica para actualizar en el contexto
+                        toast.success('Disponibilidad actualizada', {
+                          description: `Hora de inicio: ${e.target.value}`
+                        });
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-white">Hora de fin</label>
+                    <input
+                      type="time"
+                      defaultValue={modeloActual.disponibilidadHoraria?.fin || '22:00'}
+                      className="w-full px-4 py-2 bg-black/40 border border-white/10 rounded-lg text-white focus:outline-none focus:border-primary/50 transition-colors"
+                      onChange={(e) => {
+                        // Aquí podrías agregar lógica para actualizar en el contexto
+                        toast.success('Disponibilidad actualizada', {
+                          description: `Hora de fin: ${e.target.value}`
+                        });
+                      }}
+                    />
+                  </div>
+                </div>
+                <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                  <p className="text-xs text-blue-400 flex items-center gap-2">
+                    <Info className="w-4 h-4" />
+                    Este horario se muestra a los clientes cuando agendan citas contigo
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Calendario visual mensual */}
+            <CalendarioModeloView 
+              citas={citasProximas} 
+              onCitaClick={(cita) => setCitaSeleccionada(cita)}
+            />
+
+            {/* Lista de citas próximas */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Calendar className="w-5 h-5 text-primary" />
-                  Citas Próximas
+                  Próximas Citas
                 </CardTitle>
-                <CardDescription>Agendamientos confirmados</CardDescription>
+                <CardDescription>Tus agendamientos confirmados</CardDescription>
               </CardHeader>
               <CardContent>
                 {citasProximas.length > 0 ? (
                   <div className="space-y-3">
-                    {citasProximas.map((cita) => (
-                      <div key={cita.id} className="p-4 bg-secondary rounded-lg border border-primary/20">
+                    {citasProximas.slice(0, 10).map((cita) => (
+                      <div 
+                        key={cita.id} 
+                        className="p-4 bg-secondary rounded-lg border border-primary/20 hover:border-primary/40 transition-all cursor-pointer"
+                        onClick={() => setCitaSeleccionada(cita)}
+                      >
                         <div className="flex items-start justify-between mb-2">
                           <div>
                             <p className="font-medium text-white">{cita.clienteNombre}</p>
@@ -823,11 +1034,15 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
                           </span>
                           <span className="flex items-center gap-1">
                             <Clock className="w-4 h-4" />
-                            {cita.hora}
+                            {cita.hora} • {cita.duracion}h
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <MapPin className="w-4 h-4" />
+                            {cita.tipoServicio === 'domicilio' ? 'Domicilio' : 'Sede'}
                           </span>
                         </div>
                         {cita.notas && (
-                          <p className="text-sm text-muted-foreground mt-2 italic">
+                          <p className="text-sm text-muted-foreground mt-2 italic line-clamp-1">
                             "{cita.notas}"
                           </p>
                         )}
@@ -919,6 +1134,16 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* Tab: Notificaciones */}
+          <TabsContent value="notificaciones" className="space-y-6">
+            <NotificacionesPanel />
+          </TabsContent>
+
+          {/* Tab: Analytics */}
+          <TabsContent value="analytics" className="space-y-6">
+            <AnalyticsPanel modeloEmail={userEmail} />
+          </TabsContent>
         </Tabs>
       </div>
 
@@ -963,6 +1188,11 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
         onClose={() => setMostrarCheckoutBoutique(false)}
         modeloEmail={modeloActual.email}
         modeloNombre={modeloActual.nombre}
+      />
+      <DetalleCitaModal
+        isOpen={!!citaSeleccionada}
+        onClose={() => setCitaSeleccionada(null)}
+        cita={citaSeleccionada}
       />
     </div>
   );

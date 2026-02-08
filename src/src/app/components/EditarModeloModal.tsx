@@ -1,5 +1,15 @@
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import { supabase } from '../../../lib/supabaseClient';
+import { supabase } from '../../utils/supabase/info'; // ✅ Corregido: ruta correcta
+import { useModelos, Modelo } from './ModelosContext';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../../components/ui/dialog';
+import { Label } from '../../../components/ui/label';
+import { Input } from '../../../components/ui/input';
+import { Textarea } from '../../../components/ui/textarea';
+import { Button } from '../../../components/ui/button';
+import { Switch } from '../../../components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs';
+import { Upload, Edit, Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
 
 interface EditarModeloModalProps {
   open: boolean;

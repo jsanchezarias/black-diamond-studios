@@ -1,2 +1,3 @@
-// This file is kept for compatibility but redirects to the actual App component
+// ✅ REDIRECCIÓN AL APP PRINCIPAL EN /src/App.tsx
+// Este archivo solo existe por compatibilidad con el sistema de Figma Make
 export { default } from './src/App';

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Globe } from 'lucide-react';
-import { Button } from './ui/button';
+import { Button } from '../../../components/ui/button';
 import { useLanguage } from './LanguageContext';
 import { Language } from './translations';
 
@@ -35,14 +35,13 @@ export function LanguageSelector() {
   }, [isOpen]);
 
   const handleLanguageChange = (lang: Language) => {
-    console.log('🌐 LanguageSelector: Cambiando idioma a:', lang); // Debug
-    console.log('🌐 LanguageSelector: Idioma actual antes del cambio:', language); // Debug
+    console.log('🌐 LanguageSelector: Cambiando idioma a:', lang);
+    console.log('🌐 LanguageSelector: Idioma actual antes del cambio:', language);
     setLanguage(lang);
     setIsOpen(false);
     
-    // Forzar re-render después de un pequeño delay
     setTimeout(() => {
-      console.log('✅ LanguageSelector: Idioma cambiado, verificando actualización'); // Debug
+      console.log('✅ LanguageSelector: Idioma cambiado, verificando actualización');
     }, 100);
   };
 
@@ -52,27 +51,31 @@ export function LanguageSelector() {
         variant="outline"
         size="sm"
         onClick={() => setIsOpen(!isOpen)}
-        className="border-primary/30 hover:bg-primary/10 gap-2"
+        className="border-primary/30 hover:bg-primary/10 gap-1.5 sm:gap-2 h-8 sm:h-9 px-2 sm:px-3 flex-shrink-0"
       >
-        <Globe className="w-4 h-4" />
-        <span className="hidden md:inline">{currentLanguage.flag} {currentLanguage.name}</span>
-        <span className="md:hidden">{currentLanguage.flag}</span>
+        <Globe className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
+        {/* Desktop: nombre completo */}
+        <span className="hidden xl:inline text-xs xl:text-sm whitespace-nowrap">{currentLanguage.flag} {currentLanguage.name}</span>
+        {/* Tablet: solo código */}
+        <span className="hidden lg:inline xl:hidden text-xs whitespace-nowrap">{currentLanguage.flag} {currentLanguage.code.toUpperCase()}</span>
+        {/* Móvil: solo bandera */}
+        <span className="lg:hidden text-base sm:text-lg">{currentLanguage.flag}</span>
       </Button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-48 bg-card border border-primary/20 rounded-lg shadow-xl shadow-primary/10 overflow-hidden z-50">
+        <div className="absolute right-0 top-full mt-2 w-40 sm:w-48 bg-card border border-primary/20 rounded-lg shadow-xl shadow-primary/10 overflow-hidden z-[60]">
           {languages.map((lang) => (
             <button
               key={lang.code}
               onClick={() => handleLanguageChange(lang.code)}
-              className={`w-full px-4 py-3 text-left hover:bg-primary/10 transition-colors flex items-center gap-3 ${
+              className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 text-left hover:bg-primary/10 transition-colors flex items-center gap-2 sm:gap-3 ${
                 language === lang.code ? 'bg-primary/20 text-primary' : ''
               }`}
             >
-              <span className="text-2xl">{lang.flag}</span>
-              <span className="font-medium">{lang.name}</span>
+              <span className="text-xl sm:text-2xl flex-shrink-0">{lang.flag}</span>
+              <span className="font-medium text-xs sm:text-sm truncate">{lang.name}</span>
               {language === lang.code && (
-                <span className="ml-auto text-primary">✓</span>
+                <span className="ml-auto text-primary flex-shrink-0">✓</span>
               )}
             </button>
           ))}

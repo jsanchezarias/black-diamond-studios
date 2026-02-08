@@ -1,7 +1,8 @@
 import { LogOut, User, Sparkles } from 'lucide-react';
-import { Button } from './ui/button';
-import { Badge } from './ui/badge';
-import { Logo } from './Logo';
+import { Button } from '../../../components/ui/button';
+import { Badge } from '../../../components/ui/badge';
+import { LogoIsotipo } from './LogoIsotipo';
+import { NotificacionBell } from './NotificacionBell';
 
 interface HeaderProps {
   userEmail: string;
@@ -23,8 +24,8 @@ export function Header({ userEmail, role, onLogout }: HeaderProps) {
   return (
     <header className="border-b border-primary/10 bg-gradient-dark backdrop-blur-premium sticky top-0 z-50 shadow-premium">
       <div className="container mx-auto px-4 py-3 flex items-center justify-between gap-4">
-        {/* Logo horizontal de la agencia */}
-        <Logo variant="horizontal" size="md" className="flex-shrink-0" />
+        {/* Isotipo minimalista de la agencia */}
+        <LogoIsotipo size="md" className="flex-shrink-0" />
         
         {/* Información del usuario */}
         <div className="flex items-center gap-3 flex-1 justify-end">
@@ -42,6 +43,9 @@ export function Header({ userEmail, role, onLogout }: HeaderProps) {
             </div>
             <p className="text-xs text-muted-foreground">{userEmail}</p>
           </div>
+          
+          {/* Notificaciones */}
+          <NotificacionBell />
           
           <Button
             variant="outline"

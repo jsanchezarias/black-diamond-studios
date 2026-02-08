@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
-import { Send, Users, Gem, LogOut, LogIn, DollarSign, Lock, Shield } from 'lucide-react';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Badge } from './ui/badge';
+import { useState, useRef, useEffect } from 'react';
+import { Send, Users, Gem, LogOut, LogIn, DollarSign } from 'lucide-react';
+import { Button } from '../../../components/ui/button';
+import { Input } from '../../../components/ui/input';
+import { Badge } from '../../../components/ui/badge';
 import { usePublicUsers } from './PublicUsersContext';
 
 interface LiveChatProps {
@@ -12,7 +12,7 @@ interface LiveChatProps {
 }
 
 export function LiveChat({ onTipClick, recentTips = [], onLoginClick }: LiveChatProps) {
-  const { currentUser, logout, sendMessage, getVisibleMessages, onlineUsers } = usePublicUsers();
+  const { currentUser, logout, sendMessage, getVisibleMessages, onlineUsers, logoutRef } = usePublicUsers();
   const [messageInput, setMessageInput] = useState('');
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -21,7 +21,7 @@ export function LiveChat({ onTipClick, recentTips = [], onLoginClick }: LiveChat
   // Obtener mensajes visibles según el rol
   const visibleMessages = getVisibleMessages();
 
-  // ✅ CORREGIDO: Auto-scroll SOLO dentro del contenedor del chat (NO afecta la página principal)
+  // ✅ Auto-scroll al inicio de sesión o cuando cambian los mensajes
   useEffect(() => {
     const container = chatContainerRef.current;
     
@@ -37,6 +37,20 @@ export function LiveChat({ onTipClick, recentTips = [], onLoginClick }: LiveChat
     }
   }, [visibleMessages]);
 
+  // 🆕 Scroll automático cuando el usuario inicia sesión
+  useEffect(() => {
+    const container = chatContainerRef.current;
+    
+    if (!container || !currentUser) return;
+    
+    // Hacer scroll hasta el final cuando el usuario se loguea
+    // Usar setTimeout para asegurar que los mensajes ya están renderizados
+    setTimeout(() => {
+      container.scrollTop = container.scrollHeight;
+      console.log('📜 Scroll automático al final del chat tras login');
+    }, 100);
+  }, [currentUser]); // Se ejecuta cuando currentUser cambia (login)
+
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) {
@@ -50,6 +64,28 @@ export function LiveChat({ onTipClick, recentTips = [], onLoginClick }: LiveChat
     if (messageInput.trim()) {
       sendMessage(messageInput);
       setMessageInput('');
+    }
+  };
+
+  // ✅ Manejar logout correctamente (función async)
+  const handleLogout = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    console.log('🔴 CLICK en botón Cerrar Sesión - DENTRO DEL CHAT');
+    console.log('🔴 currentUser:', currentUser);
+    
+    try {
+      console.log('🔴 Llamando a logoutRef.current() desde LiveChat...');
+      // ✅ USAR REF para evitar stale closures
+      if (logoutRef?.current) {
+        await logoutRef.current();
+        console.log('🔴 logoutRef.current() completado desde LiveChat');
+      } else {
+        console.error('🔴 logoutRef.current no está disponible');
+      }
+    } catch (error) {
+      console.error('🔴 Error al cerrar sesión desde LiveChat:', error);
     }
   };
 
@@ -102,7 +138,7 @@ export function LiveChat({ onTipClick, recentTips = [], onLoginClick }: LiveChat
                 </div>
               </div>
               <Button 
-                onClick={logout} 
+                onClick={handleLogout} 
                 variant="ghost" 
                 size="sm"
                 className="text-red-400 hover:text-red-500 hover:bg-red-950/20"
@@ -110,17 +146,6 @@ export function LiveChat({ onTipClick, recentTips = [], onLoginClick }: LiveChat
                 <LogOut className="w-4 h-4" />
               </Button>
             </div>
-            
-            {/* 🆕 INDICADOR DE CHAT PRIVADO */}
-            {currentUser.role !== 'programador' && (
-              <div className="mt-2 bg-gradient-to-r from-green-900/30 to-emerald-900/30 border border-green-500/30 rounded-lg p-2 flex items-center gap-2">
-                <Shield className="w-4 h-4 text-green-400 flex-shrink-0" />
-                <div className="text-xs text-green-300">
-                  <p className="font-semibold">Chat Privado</p>
-                  <p className="text-green-400/80">Solo tú y nuestro equipo pueden ver esta conversación</p>
-                </div>
-              </div>
-            )}
           </>
         ) : (
           <Button 

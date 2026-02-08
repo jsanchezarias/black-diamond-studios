@@ -1,10 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
-import { Camera, X, CheckCircle, AlertCircle, Loader2, RefreshCw, Upload, Info } from 'lucide-react';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
-import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { useAsistencia } from '../src/app/components/AsistenciaContext';
-import { supabase } from '../lib/supabaseClient';
+import { supabase } from '../src/utils/supabase/info'; // ✅ Corregido: ruta correcta
 import { Alert, AlertDescription } from './ui/alert';
 
 interface RegistroEntradaModalProps {

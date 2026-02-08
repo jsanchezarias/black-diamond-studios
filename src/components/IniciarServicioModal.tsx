@@ -465,7 +465,13 @@ export function IniciarServicioModal({ isOpen, onClose, modeloEmail, modeloNombr
                     <button
                       key={tipo}
                       type="button"
-                      onClick={() => setFormData({ ...formData, tipoServicio: tipo })}
+                      onClick={() => {
+                        try {
+                          setFormData(prev => ({ ...prev, tipoServicio: tipo }));
+                        } catch (error) {
+                          console.error('❌ Error al seleccionar tipo de servicio:', error);
+                        }
+                      }}
                       className={`p-3 rounded-lg border-2 transition-all font-medium ${
                         formData.tipoServicio === tipo
                           ? 'border-primary bg-[#d4af37] text-[#0a0a0f] shadow-lg shadow-primary/50'
@@ -487,7 +493,13 @@ export function IniciarServicioModal({ isOpen, onClose, modeloEmail, modeloNombr
                       <button
                         key={hab}
                         type="button"
-                        onClick={() => setFormData({ ...formData, habitacion: hab })}
+                        onClick={() => {
+                          try {
+                            setFormData(prev => ({ ...prev, habitacion: hab }));
+                          } catch (error) {
+                            console.error('❌ Error al seleccionar habitación:', error);
+                          }
+                        }}
                         className={`p-3 rounded-lg border-2 font-bold transition-all ${
                           formData.habitacion === hab
                             ? 'border-primary bg-[#d4af37] text-[#0a0a0f] shadow-lg shadow-primary/50'
@@ -509,7 +521,13 @@ export function IniciarServicioModal({ isOpen, onClose, modeloEmail, modeloNombr
                     <button
                       key={tiempo}
                       type="button"
-                      onClick={() => setFormData({ ...formData, tiempoServicio: tiempo })}
+                      onClick={() => {
+                        try {
+                          setFormData(prev => ({ ...prev, tiempoServicio: tiempo }));
+                        } catch (error) {
+                          console.error('❌ Error al seleccionar tiempo de servicio:', error);
+                        }
+                      }}
                       className={`p-2.5 rounded-lg border-2 text-sm transition-all font-medium ${
                         formData.tiempoServicio === tiempo
                           ? 'border-primary bg-[#d4af37] text-[#0a0a0f] shadow-lg shadow-primary/50'

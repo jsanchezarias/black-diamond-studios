@@ -1,10 +1,6 @@
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Save, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
-import { supabase } from '../lib/supabaseClient';
+import { supabase } from '../src/utils/supabase/info'; // ✅ Corregido: ruta correcta
 import { toast } from 'sonner@2.0.3';
 
 export function ConfiguracionChatPanel() {

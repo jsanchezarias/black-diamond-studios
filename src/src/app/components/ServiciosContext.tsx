@@ -1,447 +1,409 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { supabase } from '../../../lib/supabaseClient';
+import { projectId, publicAnonKey } from '../../utils/supabase/info';
 
-// Contexto de Servicios - Black Diamond Studios
-// Sistema completo de gestión de servicios activos y finalizados
-
+// 🎯 SERVICIO: Registro inmutable de un servicio realizado (o no realizado)
 export interface Servicio {
   id: string;
+  
+  // 📅 Información temporal
+  fecha: string;
+  hora: string;
+  duracionEstimadaMinutos: number;
+  duracionRealMinutos?: number; // Duración real del servicio
+  
+  // 👤 Información del CLIENTE (snapshot del momento)
+  clienteId: string;
+  clienteNombre: string;
+  clienteTelefono: string;
+  clienteEmail?: string;
+  
+  // 💃 Información de la MODELO (snapshot del momento)
   modeloEmail: string;
   modeloNombre: string;
-  clienteId?: string;
-  clienteNombre?: string;
-  clienteTelefono?: string;
-  clienteEmail?: string;
-  agendamientoId?: number | null;
-  tipoServicio: 'Sede' | 'Domicilio';
-  habitacion?: string;
-  tiempoServicio: '30 minutos' | '1 hora' | 'rato' | 'varias horas' | 'amanecida';
-  costoServicio: number;
-  metodoPago: 'Efectivo' | 'QR' | 'Nequi' | 'Daviplata' | 'Datafono' | 'Convenio';
+  modeloId?: string;
+  
+  // 💰 Información de TARIFA y SERVICIO
+  tipoServicio: 'sede' | 'domicilio';
+  tarifaNombre: string;
+  tarifaDescripcion?: string;
+  montoPactado: number; // Monto original pactado
+  
+  // 💳 Información de PAGO
+  estadoPago: 'pendiente' | 'pagado' | 'reembolsado';
+  metodoPago?: string;
+  transaccionId?: string;
+  fechaPago?: string;
   comprobantePago?: string;
-  adicionales: string;
-  costoAdicionales: number;
-  consumo: string;
-  costoConsumo: number;
-  horaInicio: Date;
-  horaFin?: Date;
-  duracionMinutos: number;
-  tiempoRestante: number;
-  tiempoNegativo?: number;
-  multaPorTiempoGenerada?: boolean;
-  estado: 'activo' | 'finalizado';
-  notasCierre?: string;
-  notasServicio?: string;
-  tiemposAdicionales?: {
-    tiempo: string;
-    costo: number;
-    comprobante?: string;
-    timestamp: Date;
-  }[];
-  adicionalesExtra?: {
-    descripcion: string;
-    costo: number;
-    comprobante?: string;
-    timestamp: Date;
-  }[];
-  consumosDetallados?: {
-    descripcion: string;
-    costo: number;
-    cantidad: number;
-    timestamp: Date;
-  }[];
-  editadoPorAdmin?: boolean;
-  historialEdiciones?: {
-    fecha: Date;
-    tipoServicioAnterior: string;
-    tiempoServicioAnterior: string;
-    costoServicioAnterior: number;
-    costoAdicionalesAnterior: number;
-    costoConsumoAnterior: number;
-    tipoServicioNuevo: string;
-    tiempoServicioNuevo: string;
-    costoServicioNuevo: number;
-    costoAdicionalesNuevo: number;
-    costoConsumoNuevo: number;
-    motivoEdicion: string;
-  }[];
+  montoPagado?: number; // Puede ser diferente al pactado (descuentos, propinas, etc)
+  propina?: number;
+  
+  // 📊 ESTADO del servicio
+  estado: 'completado' | 'cancelado' | 'no_show';
+  
+  // 📝 Notas y detalles
+  notasPreServicio?: string; // Notas del agendamiento original
+  notasPostServicio?: string; // Notas después del servicio
+  
+  // ⭐ Calificación (opcional)
+  calificacionCliente?: number; // 1-5 estrellas
+  reviewCliente?: string;
+  calificacionModelo?: number; // La modelo califica al cliente
+  reviewModelo?: string;
+  
+  // ❌ Información de CANCELACIÓN o NO_SHOW
+  motivoCancelacion?: string;
+  canceladoPor?: string; // 'cliente' | 'modelo' | 'admin' | 'sistema'
+  fechaCancelacion?: string;
+  
+  // 💸 MULTA (si aplica por no_show)
+  multaAplicada?: boolean;
+  montoMulta?: number;
+  motivoMulta?: string;
+  multaPagada?: boolean;
+  
+  // 🕐 Metadatos
+  fechaCreacion: string; // Cuándo se creó este registro de servicio
+  creadoPor: string; // Quién lo creó (sistema, admin, etc)
+  agendamientoId: string; // Referencia al agendamiento original
+}
+
+// 📊 POLÍTICA DE PENALIZACIÓN
+export interface PoliticaPenalizacion {
+  noShowsParaMulta: number; // Número de no_shows para aplicar multa
+  noShowsParaBloqueo: number; // Número de no_shows para bloquear
+  montoMultaBase: number; // Multa base por no_show
+  porcentajeMultaSobreTarifa: number; // % de la tarifa como multa (ej: 50%)
+  diasParaPagarMulta: number; // Días para pagar antes de bloqueo
 }
 
 interface ServiciosContextType {
-  serviciosActivos: Servicio[];
-  serviciosFinalizados: Servicio[];
-  habitaciones: { numero: string; ocupada: boolean; servicio?: Servicio }[];
-  iniciarServicio: (servicio: Omit<Servicio, 'id' | 'horaInicio' | 'tiempoRestante' | 'estado'>) => void;
-  finalizarServicio: (id: string, notasCierre: string) => void;
-  obtenerServicioActivo: (modeloEmail: string) => Servicio | undefined;
-  actualizarTiempoRestante: () => void;
-  agregarTiempoAdicional: (servicioId: number | string, data: { tiempoAdicional: string; costoAdicional: number; comprobante?: string }) => void;
-  agregarAdicionalAServicio: (servicioId: number | string, data: { descripcion: string; costo: number; comprobante?: string }) => void;
-  editarServicioFinalizado: (servicioId: string, datos: {
-    tipoServicio: 'Sede' | 'Domicilio';
-    tiempoServicio: '30 minutos' | '1 hora' | 'rato' | 'varias horas' | 'amanecida';
-    costoServicio: number;
-    costoAdicionales: number;
-    costoConsumo: number;
-    motivoEdicion: string;
-  }) => void;
-  serviciosHoy: number;
-  serviciosMes: number;
-  ingresosHoy: number;
-  ingresosMes: number;
-  productosVendidos: number;
-  ventasBoutique: number;
+  servicios: Servicio[];
+  politicaPenalizacion: PoliticaPenalizacion;
+  
+  // CRUD de servicios
+  crearServicio: (servicio: Omit<Servicio, 'id' | 'fechaCreacion' | 'creadoPor'>) => Promise<{ success: boolean, error?: any, data?: any }>;
+  actualizarServicio: (id: string, servicio: Partial<Servicio>) => Promise<void>;
+  obtenerServicioPorId: (id: string) => Servicio | undefined;
+  
+  // Consultas por cliente
+  obtenerServiciosPorCliente: (clienteId: string) => Servicio[];
+  obtenerNoShowsPorCliente: (clienteId: string) => Servicio[];
+  contarNoShowsCliente: (clienteId: string) => number;
+  obtenerMultasPendientesCliente: (clienteId: string) => Servicio[];
+  calcularTotalMultasCliente: (clienteId: string) => number;
+  
+  // Consultas por modelo
+  obtenerServiciosPorModelo: (modeloEmail: string) => Servicio[];
+  obtenerIngresosModelo: (modeloEmail: string, fechaInicio?: string, fechaFin?: string) => number;
+  
+  // Conversión de agendamiento a servicio
+  crearServicioDesdeAgendamiento: (agendamientoId: string, estado: 'completado' | 'cancelado' | 'no_show', datos?: Partial<Servicio>) => Promise<{ success: boolean, error?: any, data?: any }>;
+  
+  // Sistema de multas
+  aplicarMultaPorNoShow: (servicioId: string) => Promise<void>;
+  marcarMultaComoPagada: (servicioId: string) => Promise<void>;
+  
+  // Utilidades
+  recargarServicios: () => Promise<void>;
 }
 
 const ServiciosContext = createContext<ServiciosContextType | undefined>(undefined);
 
-const DURACIONES: Record<string, number> = {
-  '30 minutos': 30,
-  '1 hora': 60,
-  'rato': 45,
-  'varias horas': 180,
-  'amanecida': 480,
+// 🎯 Política de penalización por defecto
+const POLITICA_DEFAULT: PoliticaPenalizacion = {
+  noShowsParaMulta: 2, // Al 2do no_show se aplica multa
+  noShowsParaBloqueo: 4, // Al 4to no_show se bloquea
+  montoMultaBase: 50000, // $50k multa base
+  porcentajeMultaSobreTarifa: 30, // 30% de la tarifa
+  diasParaPagarMulta: 7, // 7 días para pagar
 };
 
-const HABITACIONES_DISPONIBLES = ['101', '102', '201', '202', '203'];
-
 export function ServiciosProvider({ children }: { children: ReactNode }) {
-  // ✅ Cargar servicios desde Supabase
-  const [serviciosActivos, setServiciosActivos] = useState<Servicio[]>([]);
-  const [serviciosFinalizados, setServiciosFinalizados] = useState<Servicio[]>([]);
-  const [multasGeneradas, setMultasGeneradas] = useState<Set<string>>(new Set());
-  const [cargando, setCargando] = useState(true);
+  const [servicios, setServicios] = useState<Servicio[]>([]);
+  const [politicaPenalizacion] = useState<PoliticaPenalizacion>(POLITICA_DEFAULT);
 
-  // ✅ Cargar servicios desde Supabase al inicializar
   useEffect(() => {
-    cargarServiciosDesdeSupabase();
+    cargarServicios();
   }, []);
 
-  const cargarServiciosDesdeSupabase = async () => {
+  const cargarServicios = async () => {
     try {
-      console.log('📊 Cargando servicios desde Supabase...');
+      console.log('🔄 Cargando servicios desde servidor...');
       
-      // ✅ Cargar desde tabla 'agendamientos' con JOIN para obtener datos de modelo
-      const { data: agendamientosDB, error: errorAgendamientos } = await supabase
-        .from('agendamientos')
-        .select(`
-          *,
-          modelo:modelo_id (email, nombre, nombreArtistico),
-          cliente:cliente_id (nombre, telefono, email)
-        `)
-        .eq('estado', 'finalizado')
-        .order('created_at', { ascending: false })
-        .limit(500);
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-9dadc017/servicios`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${publicAnonKey}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
-      if (errorAgendamientos) {
-        console.error('❌ Error cargando agendamientos:', errorAgendamientos);
-        console.log('ℹ️ No hay datos disponibles. Usa el Generador de Datos Demo para poblar la base de datos.');
-        setCargando(false);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Error en respuesta del servidor:', errorText);
+        setServicios([]);
         return;
       }
 
-      if (agendamientosDB && agendamientosDB.length > 0) {
-        // Convertir de formato DB a formato Context
-        const serviciosFormateados: Servicio[] = agendamientosDB.map(a => {
-          // Calcular duración y horas
-          const fechaServicio = new Date(a.fecha);
-          const duracionMinutos = a.duracion || 60;
-          const horaFin = new Date(fechaServicio.getTime() + duracionMinutos * 60 * 1000);
-          
-          return {
-            id: a.id?.toString() || `servicio-${Date.now()}`,
-            modeloEmail: a.modelo?.email || '',
-            modeloNombre: a.modelo?.nombreArtistico || a.modelo?.nombre || '',
-            clienteId: a.cliente_id,
-            clienteNombre: a.cliente?.nombre || '',
-            clienteTelefono: a.cliente?.telefono || '',
-            clienteEmail: a.cliente?.email || '',
-            agendamientoId: a.id,
-            tipoServicio: a.ubicacion === 'domicilio' ? 'Domicilio' : 'Sede',
-            habitacion: a.habitacion || undefined,
-            tiempoServicio: a.servicio as any || '1 hora',
-            costoServicio: a.precio || 0,
-            metodoPago: 'Efectivo',
-            comprobantePago: '',
-            adicionales: '',
-            costoAdicionales: 0,
-            consumo: '',
-            costoConsumo: 0,
-            horaInicio: fechaServicio,
-            horaFin: horaFin,
-            duracionMinutos: duracionMinutos,
-            tiempoRestante: 0,
-            tiempoNegativo: 0,
-            multaPorTiempoGenerada: false,
-            estado: 'finalizado',
-            notasCierre: a.notas || '',
-            notasServicio: ''
-          };
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        const serviciosOrdenados = result.data.sort((a: Servicio, b: Servicio) => {
+          return new Date(b.fechaCreacion).getTime() - new Date(a.fechaCreacion).getTime();
         });
 
-        setServiciosFinalizados(serviciosFormateados);
-        console.log(`✅ Cargados ${serviciosFormateados.length} servicios desde Supabase (tabla: agendamientos)`);
+        setServicios(serviciosOrdenados);
+        console.log(`✅ ${serviciosOrdenados.length} servicios cargados desde servidor`);
       } else {
-        console.log('ℹ️ No hay servicios finalizados en la base de datos');
+        setServicios([]);
+        console.log('📋 No hay servicios registrados');
       }
     } catch (error) {
-      console.error('❌ Error inesperado cargando servicios:', error);
-    } finally {
-      setCargando(false);
+      console.error('❌ Error cargando servicios:', error);
+      setServicios([]);
     }
   };
 
-  const iniciarServicio = (servicioData: Omit<Servicio, 'id' | 'horaInicio' | 'tiempoRestante' | 'estado'>) => {
-    const duracionMinutos = DURACIONES[servicioData.tiempoServicio] || 60;
-    const nuevoServicio: Servicio = {
-      ...servicioData,
-      id: `servicio-${Date.now()}`,
-      horaInicio: new Date(),
-      duracionMinutos,
-      tiempoRestante: duracionMinutos * 60,
-      estado: 'activo',
-      tiempoNegativo: 0,
-      multaPorTiempoGenerada: false,
-    };
-    setServiciosActivos(prev => [...prev, nuevoServicio]);
-  };
+  const crearServicio = async (servicio: Omit<Servicio, 'id' | 'fechaCreacion' | 'creadoPor'>) => {
+    try {
+      console.log('📝 Creando servicio...');
+      
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-9dadc017/servicios`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${publicAnonKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(servicio),
+        }
+      );
 
-  const finalizarServicio = (id: string, notasCierre: string) => {
-    setServiciosActivos(prev => {
-      const servicio = prev.find(s => s.id === id);
-      if (servicio) {
-        const servicioFinalizado: Servicio = {
-          ...servicio,
-          horaFin: new Date(),
-          estado: 'finalizado',
-          notasCierre,
-          tiempoRestante: 0,
-        };
-        setServiciosFinalizados(prevFin => [...prevFin, servicioFinalizado]);
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('❌ Error guardando servicio:', errorData);
+        return { success: false, error: errorData };
       }
-      return prev.filter(s => s.id !== id);
-    });
+
+      const result = await response.json();
+
+      if (result.success) {
+        console.log('✅ Servicio creado exitosamente');
+        await cargarServicios();
+        return { success: true, data: result.data };
+      } else {
+        console.error('❌ Error en respuesta del servidor:', result);
+        return { success: false, error: result.error };
+      }
+    } catch (error) {
+      console.error('❌ Error en crearServicio:', error);
+      return { success: false, error };
+    }
   };
 
-  const obtenerServicioActivo = (modeloEmail: string): Servicio | undefined => {
-    return serviciosActivos.find(s => s.modeloEmail === modeloEmail);
-  };
-
-  const actualizarTiempoRestante = () => {
-    setServiciosActivos(prev => 
-      prev.map(servicio => {
-        const ahora = new Date();
-        const tiempoTranscurrido = Math.floor((ahora.getTime() - servicio.horaInicio.getTime()) / 1000);
-        const tiempoLimite = servicio.duracionMinutos * 60;
-        const tiempoRestante = tiempoLimite - tiempoTranscurrido;
-        const tiempoNegativo = tiempoRestante < 0 ? Math.abs(tiempoRestante) : 0;
-        
-        if (tiempoRestante === 300 && tiempoRestante > 0) {
-          const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYHGGi77eeeTRAMUKXh8LhjHAU4jtbxy34sBSh+zO/bkUALFF2z6OqnVRQKRp3e8r1sIQUrgc7y2Yk2BxhpvO3nnk0QDFA=');
-          audio.play().catch(err => console.log('No se pudo reproducir la alarma:', err));
-          
-          if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification('Servicio por terminar', {
-              body: `El servicio de ${servicio.modeloNombre} termina en 5 minutos`,
-              icon: '/icon.png'
-            });
-          }
+  const actualizarServicio = async (id: string, servicio: Partial<Servicio>) => {
+    try {
+      console.log('🔄 Actualizando servicio:', id);
+      
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-9dadc017/servicios/${id}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${publicAnonKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(servicio),
         }
-        
-        return { 
-          ...servicio, 
-          tiempoRestante: Math.max(0, tiempoRestante),
-          tiempoNegativo
-        };
-      })
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('❌ Error actualizando servicio:', errorData);
+        throw new Error(errorData.error || 'Error actualizando servicio');
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        console.log('✅ Servicio actualizado exitosamente');
+        await cargarServicios();
+      } else {
+        throw new Error(result.error || 'Error actualizando servicio');
+      }
+    } catch (error) {
+      console.error('❌ Error en actualizarServicio:', error);
+      throw error;
+    }
+  };
+
+  const obtenerServicioPorId = (id: string) => {
+    return servicios.find(s => s.id === id);
+  };
+
+  const obtenerServiciosPorCliente = (clienteId: string) => {
+    return servicios
+      .filter(s => s.clienteId === clienteId)
+      .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
+  };
+
+  const obtenerNoShowsPorCliente = (clienteId: string) => {
+    return servicios.filter(s => s.clienteId === clienteId && s.estado === 'no_show');
+  };
+
+  const contarNoShowsCliente = (clienteId: string) => {
+    return obtenerNoShowsPorCliente(clienteId).length;
+  };
+
+  const obtenerMultasPendientesCliente = (clienteId: string) => {
+    return servicios.filter(s => 
+      s.clienteId === clienteId && 
+      s.multaAplicada === true && 
+      s.multaPagada !== true
     );
   };
 
-  useEffect(() => {
-    const interval = setInterval(actualizarTiempoRestante, 1000);
-    return () => clearInterval(interval);
-  }, []); // ✅ Sin dependencias - el interval se ejecuta siempre y actualizarTiempoRestante usa prevState
-
-  useEffect(() => {
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission();
-    }
-  }, []);
-
-  const habitaciones = HABITACIONES_DISPONIBLES.map(numero => {
-    const servicio = serviciosActivos.find(s => s.habitacion === numero);
-    return {
-      numero,
-      ocupada: !!servicio,
-      servicio,
-    };
-  });
-
-  const agregarTiempoAdicional = (servicioId: number | string, data: { tiempoAdicional: string; costoAdicional: number; comprobante?: string }) => {
-    setServiciosActivos(prev => 
-      prev.map(servicio => {
-        if (servicio.id === servicioId) {
-          const nuevoTiempoAdicional = {
-            tiempo: data.tiempoAdicional,
-            costo: data.costoAdicional,
-            comprobante: data.comprobante,
-            timestamp: new Date(),
-          };
-          const tiemposAdicionales = servicio.tiemposAdicionales ? [...servicio.tiemposAdicionales, nuevoTiempoAdicional] : [nuevoTiempoAdicional];
-          
-          let minutosAdicionales = 0;
-          if (data.tiempoAdicional === '30 minutos') {
-            minutosAdicionales = 30;
-          } else if (data.tiempoAdicional === '1 hora') {
-            minutosAdicionales = 60;
-          } else if (data.tiempoAdicional === '2 horas') {
-            minutosAdicionales = 120;
-          } else if (data.tiempoAdicional === 'Otra') {
-            minutosAdicionales = 30;
-          }
-          
-          const nuevaDuracionMinutos = servicio.duracionMinutos + minutosAdicionales;
-          
-          return { 
-            ...servicio, 
-            tiemposAdicionales,
-            duracionMinutos: nuevaDuracionMinutos,
-          };
-        }
-        return servicio;
-      })
-    );
+  const calcularTotalMultasCliente = (clienteId: string) => {
+    const multasPendientes = obtenerMultasPendientesCliente(clienteId);
+    return multasPendientes.reduce((total, s) => total + (s.montoMulta || 0), 0);
   };
 
-  const agregarAdicionalAServicio = (servicioId: number | string, data: { descripcion: string; costo: number; comprobante?: string }) => {
-    setServiciosActivos(prev => 
-      prev.map(servicio => {
-        if (servicio.id === servicioId) {
-          const nuevoAdicional = {
-            descripcion: data.descripcion,
-            costo: data.costo,
-            comprobante: data.comprobante,
-            timestamp: new Date(),
-          };
-          const adicionalesExtra = servicio.adicionalesExtra ? [...servicio.adicionalesExtra, nuevoAdicional] : [nuevoAdicional];
-          return { ...servicio, adicionalesExtra };
-        }
-        return servicio;
-      })
-    );
+  const obtenerServiciosPorModelo = (modeloEmail: string) => {
+    return servicios
+      .filter(s => s.modeloEmail === modeloEmail)
+      .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
   };
 
-  const editarServicioFinalizado = (servicioId: string, datos: {
-    tipoServicio: 'Sede' | 'Domicilio';
-    tiempoServicio: '30 minutos' | '1 hora' | 'rato' | 'varias horas' | 'amanecida';
-    costoServicio: number;
-    costoAdicionales: number;
-    costoConsumo: number;
-    motivoEdicion: string;
-  }) => {
-    setServiciosFinalizados(prev => 
-      prev.map(servicio => {
-        if (servicio.id === servicioId) {
-          const nuevaEdicion = {
-            fecha: new Date(),
-            tipoServicioAnterior: servicio.tipoServicio,
-            tiempoServicioAnterior: servicio.tiempoServicio,
-            costoServicioAnterior: servicio.costoServicio,
-            costoAdicionalesAnterior: servicio.costoAdicionales,
-            costoConsumoAnterior: servicio.costoConsumo,
-            tipoServicioNuevo: datos.tipoServicio,
-            tiempoServicioNuevo: datos.tiempoServicio,
-            costoServicioNuevo: datos.costoServicio,
-            costoAdicionalesNuevo: datos.costoAdicionales,
-            costoConsumoNuevo: datos.costoConsumo,
-            motivoEdicion: datos.motivoEdicion,
-          };
-          const historialEdiciones = servicio.historialEdiciones ? [...servicio.historialEdiciones, nuevaEdicion] : [nuevaEdicion];
-          return { 
-            ...servicio, 
-            tipoServicio: datos.tipoServicio,
-            tiempoServicio: datos.tiempoServicio,
-            costoServicio: datos.costoServicio,
-            costoAdicionales: datos.costoAdicionales,
-            costoConsumo: datos.costoConsumo,
-            editadoPorAdmin: true,
-            historialEdiciones,
-          };
-        }
-        return servicio;
-      })
+  const obtenerIngresosModelo = (modeloEmail: string, fechaInicio?: string, fechaFin?: string) => {
+    let serviciosModelo = servicios.filter(s => 
+      s.modeloEmail === modeloEmail && 
+      s.estado === 'completado' &&
+      s.estadoPago === 'pagado'
     );
+
+    if (fechaInicio) {
+      serviciosModelo = serviciosModelo.filter(s => s.fecha >= fechaInicio);
+    }
+    if (fechaFin) {
+      serviciosModelo = serviciosModelo.filter(s => s.fecha <= fechaFin);
+    }
+
+    return serviciosModelo.reduce((total, s) => total + (s.montoPagado || s.montoPactado), 0);
   };
 
-  // Cálculo de estadísticas en tiempo real
-  const serviciosHoy = serviciosFinalizados.filter(s => 
-    s.horaFin && new Date(s.horaFin).toDateString() === new Date().toDateString()
-  ).length;
+  const crearServicioDesdeAgendamiento = async (
+    agendamientoId: string, 
+    estado: 'completado' | 'cancelado' | 'no_show',
+    datos?: Partial<Servicio>
+  ) => {
+    try {
+      console.log(`📝 Creando servicio desde agendamiento ${agendamientoId} con estado ${estado}`);
+      
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-9dadc017/servicios/desde-agendamiento`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${publicAnonKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            agendamientoId,
+            estado,
+            ...datos,
+          }),
+        }
+      );
 
-  const serviciosMes = serviciosFinalizados.filter(s => 
-    s.horaFin && new Date(s.horaFin).getMonth() === new Date().getMonth() && 
-    new Date(s.horaFin).getFullYear() === new Date().getFullYear()
-  ).length;
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('❌ Error creando servicio desde agendamiento:', errorData);
+        return { success: false, error: errorData };
+      }
 
-  const ingresosHoy = serviciosFinalizados.reduce((total, s) => {
-    if (s.horaFin && new Date(s.horaFin).toDateString() === new Date().toDateString()) {
-      const tiemposAd = (s.tiemposAdicionales || []).reduce((sum, t) => sum + t.costo, 0);
-      const adicionalesEx = (s.adicionalesExtra || []).reduce((sum, a) => sum + a.costo, 0);
-      const consumosDet = (s.consumosDetallados || []).reduce((sum, c) => sum + (c.costo * c.cantidad), 0);
-      return total + s.costoServicio + s.costoAdicionales + s.costoConsumo + tiemposAd + adicionalesEx + consumosDet;
+      const result = await response.json();
+
+      if (result.success) {
+        console.log('✅ Servicio creado desde agendamiento exitosamente');
+        await cargarServicios();
+        return { success: true, data: result.data };
+      } else {
+        console.error('❌ Error en respuesta del servidor:', result);
+        return { success: false, error: result.error };
+      }
+    } catch (error) {
+      console.error('❌ Error en crearServicioDesdeAgendamiento:', error);
+      return { success: false, error };
     }
-    return total;
-  }, 0);
+  };
 
-  const ingresosMes = serviciosFinalizados.reduce((total, s) => {
-    if (s.horaFin && 
-        new Date(s.horaFin).getMonth() === new Date().getMonth() && 
-        new Date(s.horaFin).getFullYear() === new Date().getFullYear()) {
-      const tiemposAd = (s.tiemposAdicionales || []).reduce((sum, t) => sum + t.costo, 0);
-      const adicionalesEx = (s.adicionalesExtra || []).reduce((sum, a) => sum + a.costo, 0);
-      const consumosDet = (s.consumosDetallados || []).reduce((sum, c) => sum + (c.costo * c.cantidad), 0);
-      return total + s.costoServicio + s.costoAdicionales + s.costoConsumo + tiemposAd + adicionalesEx + consumosDet;
-    }
-    return total;
-  }, 0);
+  const aplicarMultaPorNoShow = async (servicioId: string) => {
+    try {
+      const servicio = obtenerServicioPorId(servicioId);
+      if (!servicio) {
+        throw new Error('Servicio no encontrado');
+      }
 
-  const productosVendidos = serviciosFinalizados.reduce((total, s) => {
-    if (s.horaFin && 
-        new Date(s.horaFin).getMonth() === new Date().getMonth() && 
-        new Date(s.horaFin).getFullYear() === new Date().getFullYear()) {
-      return total + (s.adicionalesExtra ? s.adicionalesExtra.length : 0);
-    }
-    return total;
-  }, 0);
+      // Calcular multa
+      const montoMulta = Math.max(
+        politicaPenalizacion.montoMultaBase,
+        servicio.montoPactado * (politicaPenalizacion.porcentajeMultaSobreTarifa / 100)
+      );
 
-  const ventasBoutique = serviciosFinalizados.reduce((total, s) => {
-    if (s.horaFin && 
-        new Date(s.horaFin).getMonth() === new Date().getMonth() && 
-        new Date(s.horaFin).getFullYear() === new Date().getFullYear()) {
-      return total + s.costoConsumo;
+      await actualizarServicio(servicioId, {
+        multaAplicada: true,
+        montoMulta,
+        motivoMulta: `Multa por no presentarse al servicio. Política: ${politicaPenalizacion.porcentajeMultaSobreTarifa}% de la tarifa o mínimo $${politicaPenalizacion.montoMultaBase.toLocaleString()}`,
+        multaPagada: false,
+      });
+
+      console.log(`💸 Multa de $${montoMulta.toLocaleString()} aplicada al servicio ${servicioId}`);
+    } catch (error) {
+      console.error('❌ Error aplicando multa:', error);
+      throw error;
     }
-    return total;
-  }, 0);
+  };
+
+  const marcarMultaComoPagada = async (servicioId: string) => {
+    try {
+      await actualizarServicio(servicioId, {
+        multaPagada: true,
+      });
+
+      console.log(`✅ Multa del servicio ${servicioId} marcada como pagada`);
+    } catch (error) {
+      console.error('❌ Error marcando multa como pagada:', error);
+      throw error;
+    }
+  };
+
+  const recargarServicios = async () => {
+    await cargarServicios();
+  };
 
   return (
     <ServiciosContext.Provider
       value={{
-        serviciosActivos,
-        serviciosFinalizados,
-        habitaciones,
-        iniciarServicio,
-        finalizarServicio,
-        obtenerServicioActivo,
-        actualizarTiempoRestante,
-        agregarTiempoAdicional,
-        agregarAdicionalAServicio,
-        editarServicioFinalizado,
-        serviciosHoy,
-        serviciosMes,
-        ingresosHoy,
-        ingresosMes,
-        productosVendidos,
-        ventasBoutique,
+        servicios,
+        politicaPenalizacion,
+        crearServicio,
+        actualizarServicio,
+        obtenerServicioPorId,
+        obtenerServiciosPorCliente,
+        obtenerNoShowsPorCliente,
+        contarNoShowsCliente,
+        obtenerMultasPendientesCliente,
+        calcularTotalMultasCliente,
+        obtenerServiciosPorModelo,
+        obtenerIngresosModelo,
+        crearServicioDesdeAgendamiento,
+        aplicarMultaPorNoShow,
+        marcarMultaComoPagada,
+        recargarServicios,
       }}
     >
       {children}
@@ -451,7 +413,7 @@ export function ServiciosProvider({ children }: { children: ReactNode }) {
 
 export function useServicios() {
   const context = useContext(ServiciosContext);
-  if (!context) {
+  if (context === undefined) {
     throw new Error('useServicios debe usarse dentro de ServiciosProvider');
   }
   return context;

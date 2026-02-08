@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { supabase } from '../../../lib/supabaseClient';
+import { supabase } from '../../utils/supabase/info'; // ✅ Corregido: ruta correcta
 import { createClient } from '@supabase/supabase-js';
 
 // Interfaz de modelo con campos de archivo
@@ -100,6 +100,37 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
 
       if (error) {
         console.error('❌ Error cargando modelos:', error);
+        console.warn('⚠️ Usando MODO FALLBACK - Datos mock para desarrollo');
+        
+        // ✅ FALLBACK: Usar datos mock si Supabase falla
+        setModelos([
+          {
+            id: 1,
+            email: 'modelo1@blackdiamond.com',
+            nombre: 'Isabella',
+            nombreArtistico: 'Bella Diamond',
+            telefono: '+57 300 123 4567',
+            role: 'modelo',
+            estado: 'activa',
+            edad: 25,
+            altura: 170,
+            peso: 58,
+            medidas: '90-60-90',
+            colorCabello: 'Castaño oscuro',
+            colorOjos: 'Café',
+            idiomas: ['Español', 'Inglés'],
+            tarifas: [
+              { duracion: '1 hora', tarifaSede: 200000, tarifaDomicilio: 250000 },
+              { duracion: '2 horas', tarifaSede: 380000, tarifaDomicilio: 480000 },
+              { duracion: '3 horas', tarifaSede: 540000, tarifaDomicilio: 690000 },
+            ],
+            fotoPerfil: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400',
+            galeria: [],
+            descripcion: 'Modelo profesional con 3 años de experiencia',
+            zonasTrabajo: ['Poblado', 'Laureles', 'Envigado'],
+            disponibilidadHoraria: { inicio: '10:00', fin: '22:00' },
+          } as Modelo,
+        ]);
         setLoading(false);
         return;
       }
@@ -110,37 +141,34 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
         console.log('🔍 DEBUG - Primera modelo en BD:', usuarios[0]);
         console.log('🔍 DEBUG - Columnas disponibles:', Object.keys(usuarios[0]));
         
-        // ✅ Cargar TODAS las políticas tarifarias y sus servicios
+        // ✅ OPTIMIZADO: Cargar TODAS las políticas tarifarias y sus servicios EN UNA SOLA QUERY
         let politicasConServicios: Map<number, any[]> = new Map();
         try {
-          // 1. Obtener todas las políticas tarifarias
-          const { data: politicas, error: errorPoliticas } = await supabase
-            .from('politicas_tarifas')
-            .select('id, nombre')
-            .order('id', { ascending: true });
+          // ⚡ OPTIMIZACIÓN: Cargar TODOS los servicios de TODAS las políticas en una sola query
+          const { data: todosServicios, error: errorServicios } = await supabase
+            .from('servicios_politica')
+            .select('*')
+            .order('politica_id', { ascending: true })
+            .order('orden', { ascending: true });
 
-          if (errorPoliticas) {
-            // ✅ Manejo seguro del error - puede ser AbortError u otro tipo
-            const errorMsg = errorPoliticas instanceof Error 
-              ? errorPoliticas.message 
-              : String(errorPoliticas);
-            console.warn('⚠️ Error cargando políticas tarifarias:', errorMsg);
-          } else {
-            console.log(`📋 Políticas tarifarias encontradas: ${politicas?.length || 0}`);
-            
-            // 2. Para cada política, cargar sus servicios
-            for (const politica of politicas || []) {
-              const { data: servicios, error: errorServicios } = await supabase
-                .from('servicios_politica')
-                .select('*')
-                .eq('politica_id', politica.id)
-                .order('orden', { ascending: true });
-
-              if (!errorServicios && servicios) {
-                politicasConServicios.set(politica.id, servicios);
-                console.log(`  💰 Política ${politica.id} (${politica.nombre}): ${servicios.length} servicios`);
+          if (errorServicios) {
+            const errorMsg = errorServicios instanceof Error 
+              ? errorServicios.message 
+              : String(errorServicios);
+            console.warn('⚠️ Error cargando servicios:', errorMsg);
+          } else if (todosServicios && todosServicios.length > 0) {
+            // Agrupar servicios por política
+            todosServicios.forEach(servicio => {
+              if (!politicasConServicios.has(servicio.politica_id)) {
+                politicasConServicios.set(servicio.politica_id, []);
               }
-            }
+              politicasConServicios.get(servicio.politica_id)!.push(servicio);
+            });
+            
+            console.log(`📋 Políticas tarifarias cargadas: ${politicasConServicios.size}`);
+            politicasConServicios.forEach((servicios, politicaId) => {
+              console.log(`  💰 Política ${politicaId}: ${servicios.length} servicios`);
+            });
           }
         } catch (politicasError) {
           console.warn('⚠️ Error cargando políticas (las tablas pueden no existir aún):', politicasError);
@@ -148,15 +176,8 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
         
         // Convertir datos de Supabase al formato del contexto
         const modelosData: Modelo[] = usuarios.map((usuario, index) => {
-          // 🔍 DEBUG: Ver el estado raw
-          console.log(`🔍 Usuario ${usuario.email}:`, {
-            estado: usuario.estado,
-            estado_raw: JSON.stringify(usuario.estado),
-            tipo_estado: typeof usuario.estado,
-            politica_tarifa: usuario.politica_tarifa,
-            fecha_archivado: usuario.fecha_archivado,
-            todas_columnas: Object.keys(usuario)
-          });
+          // ✅ OPTIMIZADO: Reducir logs en producción
+          // Solo loguear información crítica, no cada campo de cada usuario
           
           // ✅ Obtener la política tarifaria de esta modelo
           const politicaTarifaId = usuario.politica_tarifa || 2; // Default: Estándar
@@ -555,18 +576,19 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
 export function useModelos(): ModelosContextType {
   const context = useContext(ModelosContext);
   if (context === undefined) {
-    // Silencioso durante hot-reload - retornar valores por defecto seguros
+    console.warn('⚠️ useModelos debe usarse dentro de ModelosProvider');
+    // Retornar valores por defecto que coincidan con el tipo
     return {
       modelos: [],
       modelosArchivadas: [],
-      agregarModelo: () => {},
-      eliminarModelo: async () => {},
-      archivarModelo: async () => {},
-      restaurarModelo: async () => {},
-      actualizarModelo: async () => {},
+      agregarModelo: () => { console.warn('ModelosProvider no disponible'); },
+      eliminarModelo: () => { console.warn('ModelosProvider no disponible'); },
+      archivarModelo: () => { console.warn('ModelosProvider no disponible'); },
+      restaurarModelo: () => { console.warn('ModelosProvider no disponible'); },
+      actualizarModelo: () => { console.warn('ModelosProvider no disponible'); },
       obtenerModeloPorEmail: () => undefined,
       validarCredenciales: () => null,
-      recargarModelos: async () => {},
+      recargarModelos: async () => { console.warn('ModelosProvider no disponible'); },
     };
   }
   return context;

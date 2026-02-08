@@ -4,6 +4,9 @@ import { logger } from "npm:hono/logger";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import * as kv from "./kv_store.tsx";
 import * as uploadModelos from "./upload-modelos-fotos.tsx";
+import { setupServiciosEndpoints } from "./servicios-endpoints.tsx";
+import notificacionesEndpoints from "./notificaciones-endpoints.tsx";
+import streamsEndpoints from "./streams-endpoints.tsx"; // 🎥 Endpoints de streaming
 const app = new Hono();
 
 // Enable logger
@@ -656,6 +659,188 @@ app.post("/make-server-9dadc017/diagnostico/limpiar-huerfanos", async (c) => {
     return c.json({ error: error.message }, 500);
   }
 });
+
+// ==================== AGENDAMIENTOS ENDPOINTS ====================
+
+// 📋 Obtener todos los agendamientos
+app.get("/make-server-9dadc017/agendamientos", async (c) => {
+  try {
+    console.log('📥 Recibiendo solicitud GET /agendamientos');
+    
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    );
+
+    const { data: kvData, error: kvError } = await supabase
+      .from('kv_store_9dadc017')
+      .select('key, value')
+      .like('key', 'agendamiento:%');
+
+    if (kvError) {
+      console.error('❌ Error cargando agendamientos:', kvError);
+      return c.json({ error: kvError.message }, 500);
+    }
+
+    if (!kvData || kvData.length === 0) {
+      return c.json({ success: true, data: [] });
+    }
+
+    const agendamientos = kvData
+      .map(item => {
+        try {
+          return JSON.parse(item.value);
+        } catch (e) {
+          console.error('❌ Error parseando agendamiento:', e);
+          return null;
+        }
+      })
+      .filter(a => a !== null);
+
+    console.log(`✅ ${agendamientos.length} agendamientos cargados`);
+    return c.json({ success: true, data: agendamientos });
+
+  } catch (error) {
+    console.error('❌ Error en GET /agendamientos:', error);
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// ➕ Crear un nuevo agendamiento
+app.post("/make-server-9dadc017/agendamientos", async (c) => {
+  try {
+    const body = await c.req.json();
+    console.log('📥 Recibiendo solicitud POST /agendamientos:', body);
+    
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    );
+
+    // Generar ID único
+    const id = `agendamiento_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const fechaCreacion = new Date().toISOString();
+    
+    const agendamientoCompleto = {
+      id,
+      ...body,
+      fechaCreacion,
+      creadoPor: body.creadoPor || 'sistema',
+    };
+
+    console.log('📦 Guardando en KV Store:', agendamientoCompleto);
+
+    const { error } = await supabase
+      .from('kv_store_9dadc017')
+      .insert({
+        key: `agendamiento:${id}`,
+        value: JSON.stringify(agendamientoCompleto)
+      });
+
+    if (error) {
+      console.error('❌ Error guardando agendamiento:', error);
+      return c.json({ success: false, error: error.message }, 500);
+    }
+
+    console.log('✅ Agendamiento creado exitosamente');
+    return c.json({ success: true, data: agendamientoCompleto });
+
+  } catch (error) {
+    console.error('❌ Error en POST /agendamientos:', error);
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// 🔄 Actualizar un agendamiento
+app.put("/make-server-9dadc017/agendamientos/:id", async (c) => {
+  try {
+    const id = c.req.param('id');
+    const body = await c.req.json();
+    console.log(`📥 Recibiendo solicitud PUT /agendamientos/${id}:`, body);
+    
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    );
+
+    // Obtener el agendamiento actual
+    const { data: currentData, error: fetchError } = await supabase
+      .from('kv_store_9dadc017')
+      .select('value')
+      .eq('key', `agendamiento:${id}`)
+      .single();
+
+    if (fetchError || !currentData) {
+      console.error('❌ Agendamiento no encontrado:', fetchError);
+      return c.json({ error: 'Agendamiento no encontrado' }, 404);
+    }
+
+    const currentAgendamiento = JSON.parse(currentData.value);
+    const updatedAgendamiento = {
+      ...currentAgendamiento,
+      ...body,
+    };
+
+    const { error } = await supabase
+      .from('kv_store_9dadc017')
+      .update({
+        value: JSON.stringify(updatedAgendamiento)
+      })
+      .eq('key', `agendamiento:${id}`);
+
+    if (error) {
+      console.error('❌ Error actualizando agendamiento:', error);
+      return c.json({ success: false, error: error.message }, 500);
+    }
+
+    console.log('✅ Agendamiento actualizado exitosamente');
+    return c.json({ success: true, data: updatedAgendamiento });
+
+  } catch (error) {
+    console.error('❌ Error en PUT /agendamientos:', error);
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// 🗑️ Eliminar un agendamiento
+app.delete("/make-server-9dadc017/agendamientos/:id", async (c) => {
+  try {
+    const id = c.req.param('id');
+    console.log(`📥 Recibiendo solicitud DELETE /agendamientos/${id}`);
+    
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    );
+
+    const { error } = await supabase
+      .from('kv_store_9dadc017')
+      .delete()
+      .eq('key', `agendamiento:${id}`);
+
+    if (error) {
+      console.error('❌ Error eliminando agendamiento:', error);
+      return c.json({ success: false, error: error.message }, 500);
+    }
+
+    console.log('✅ Agendamiento eliminado exitosamente');
+    return c.json({ success: true });
+
+  } catch (error) {
+    console.error('❌ Error en DELETE /agendamientos:', error);
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// ==================== SERVICIOS ENDPOINTS ====================
+setupServiciosEndpoints(app);
+
+// ==================== NOTIFICACIONES ENDPOINTS ====================
+app.route('/make-server-9dadc017/notificaciones', notificacionesEndpoints);
+
+// ==================== STREAMS ENDPOINTS ====================
+// 🎥 Sistema de configuración de streaming en vivo para sedes
+app.route('/', streamsEndpoints);
 
 // 🔍 Ver estado completo de Supabase (Auth + BD + Storage)
 app.get("/make-server-9dadc017/diagnostico/estado-completo", async (c) => {
@@ -1864,6 +2049,232 @@ app.post("/make-server-9dadc017/admin/crear-modelo", async (c) => {
       error: error.message || 'Error inesperado al crear modelo',
       errorDetails: error.toString()
     }, 500);
+  }
+});
+
+// ==================== WOMPI PAYMENT ENDPOINTS ====================
+
+// Crear una transacción de pago con Wompi
+app.post("/make-server-9dadc017/payments/create", async (c) => {
+  try {
+    const body = await c.req.json();
+    const { 
+      amount, // Monto en centavos (ej: 25000000 para $250.000)
+      currency = 'COP',
+      reference, // Referencia única del agendamiento
+      customerEmail,
+      customerName,
+      customerPhone,
+      description,
+      redirectUrl,
+      agendamientoId
+    } = body;
+
+    if (!amount || !reference || !customerEmail) {
+      return c.json({ 
+        error: "amount, reference y customerEmail son requeridos" 
+      }, 400);
+    }
+
+    // Obtener public key de Wompi desde env
+    const wompiPublicKey = Deno.env.get('WOMPI_PUBLIC_KEY');
+    const wompiPrivateKey = Deno.env.get('WOMPI_PRIVATE_KEY');
+    
+    if (!wompiPrivateKey) {
+      return c.json({ 
+        error: "WOMPI_PRIVATE_KEY no configurada en variables de entorno" 
+      }, 500);
+    }
+
+    // Crear transacción en Wompi
+    const wompiResponse = await fetch('https://production.wompi.co/v1/transactions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${wompiPrivateKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        acceptance_token: wompiPublicKey, // Token de aceptación de términos
+        amount_in_cents: amount,
+        currency: currency,
+        customer_email: customerEmail,
+        payment_method: {
+          type: 'CARD', // Puede ser CARD, PSE, NEQUI, etc.
+        },
+        reference: reference,
+        customer_data: {
+          phone_number: customerPhone,
+          full_name: customerName,
+        },
+        redirect_url: redirectUrl || `${Deno.env.get('FRONTEND_URL')}/payment-callback`,
+      })
+    });
+
+    const wompiData = await wompiResponse.json();
+
+    if (!wompiResponse.ok) {
+      console.error('❌ Error de Wompi:', wompiData);
+      return c.json({ 
+        error: wompiData.error?.reason || 'Error al crear transacción en Wompi',
+        details: wompiData 
+      }, 400);
+    }
+
+    // Guardar información de la transacción en KV Store
+    await kv.set(`payment:${reference}`, {
+      transactionId: wompiData.data.id,
+      agendamientoId: agendamientoId,
+      amount: amount,
+      currency: currency,
+      status: wompiData.data.status,
+      reference: reference,
+      customerEmail: customerEmail,
+      createdAt: new Date().toISOString(),
+      wompiData: wompiData.data,
+    });
+
+    console.log(`✅ Transacción de pago creada: ${wompiData.data.id} para referencia ${reference}`);
+    
+    return c.json({ 
+      success: true, 
+      transaction: wompiData.data,
+      paymentUrl: wompiData.data.payment_link_url || wompiData.data.payment_method.extra.async_payment_url
+    });
+  } catch (error) {
+    console.error(`❌ Error al crear transacción de pago: ${error}`);
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// Webhook para recibir notificaciones de Wompi
+app.post("/make-server-9dadc017/payments/webhook", async (c) => {
+  try {
+    const body = await c.req.json();
+    const { event, data } = body;
+
+    console.log(`📬 Webhook de Wompi recibido: ${event}`);
+    console.log(`📋 Datos:`, data);
+
+    // Verificar firma del webhook (si Wompi lo soporta)
+    const signature = c.req.header('x-wompi-signature');
+    const wompiSecret = Deno.env.get('WOMPI_EVENT_SECRET');
+    
+    // TODO: Validar firma si Wompi lo requiere
+
+    if (event === 'transaction.updated') {
+      const { reference, status, id: transactionId } = data.transaction;
+
+      // Obtener información de pago guardada
+      const paymentInfo = await kv.get(`payment:${reference}`);
+      
+      if (!paymentInfo) {
+        console.warn(`⚠️ No se encontró información de pago para referencia: ${reference}`);
+        return c.json({ received: true });
+      }
+
+      // Actualizar estado del pago
+      await kv.set(`payment:${reference}`, {
+        ...paymentInfo,
+        status: status,
+        updatedAt: new Date().toISOString(),
+      });
+
+      // Si el pago fue aprobado, actualizar el agendamiento
+      if (status === 'APPROVED') {
+        console.log(`✅ Pago aprobado para referencia: ${reference}`);
+        
+        // Actualizar agendamiento en KV Store
+        if (paymentInfo.agendamientoId) {
+          const agendamiento = await kv.get(`agendamiento:${paymentInfo.agendamientoId}`);
+          
+          if (agendamiento) {
+            await kv.set(`agendamiento:${paymentInfo.agendamientoId}`, {
+              ...agendamiento,
+              estadoPago: 'pagado',
+              transaccionId: transactionId,
+              fechaPago: new Date().toISOString(),
+              estado: 'confirmado', // Cambiar estado a confirmado
+            });
+            
+            console.log(`✅ Agendamiento ${paymentInfo.agendamientoId} actualizado a confirmado`);
+          }
+        }
+      } else if (status === 'DECLINED' || status === 'ERROR') {
+        console.error(`❌ Pago rechazado/error para referencia: ${reference}`);
+        
+        // Opcional: Actualizar agendamiento a cancelado
+        if (paymentInfo.agendamientoId) {
+          const agendamiento = await kv.get(`agendamiento:${paymentInfo.agendamientoId}`);
+          
+          if (agendamiento) {
+            await kv.set(`agendamiento:${paymentInfo.agendamientoId}`, {
+              ...agendamiento,
+              estadoPago: 'rechazado',
+              estado: 'cancelado',
+              motivoCancelacion: 'Pago rechazado',
+            });
+          }
+        }
+      }
+    }
+
+    return c.json({ received: true });
+  } catch (error) {
+    console.error(`❌ Error procesando webhook de Wompi: ${error}`);
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// Consultar estado de una transacción
+app.get("/make-server-9dadc017/payments/:reference", async (c) => {
+  try {
+    const reference = c.req.param("reference");
+    
+    const paymentInfo = await kv.get(`payment:${reference}`);
+    
+    if (!paymentInfo) {
+      return c.json({ error: "Transacción no encontrada" }, 404);
+    }
+
+    // Opcionalmente, consultar estado actualizado en Wompi
+    const wompiPrivateKey = Deno.env.get('WOMPI_PRIVATE_KEY');
+    
+    if (wompiPrivateKey && paymentInfo.transactionId) {
+      const wompiResponse = await fetch(
+        `https://production.wompi.co/v1/transactions/${paymentInfo.transactionId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${wompiPrivateKey}`,
+          }
+        }
+      );
+
+      if (wompiResponse.ok) {
+        const wompiData = await wompiResponse.json();
+        
+        // Actualizar estado si cambió
+        if (wompiData.data.status !== paymentInfo.status) {
+          await kv.set(`payment:${reference}`, {
+            ...paymentInfo,
+            status: wompiData.data.status,
+            updatedAt: new Date().toISOString(),
+            wompiData: wompiData.data,
+          });
+          
+          return c.json({ 
+            payment: {
+              ...paymentInfo,
+              status: wompiData.data.status,
+            }
+          });
+        }
+      }
+    }
+
+    return c.json({ payment: paymentInfo });
+  } catch (error) {
+    console.error(`❌ Error al consultar pago: ${error}`);
+    return c.json({ error: error.message }, 500);
   }
 });
 

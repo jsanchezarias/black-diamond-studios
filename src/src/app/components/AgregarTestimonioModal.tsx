@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { X, Star, MessageSquare, User, Mail, Send, CheckCircle } from 'lucide-react';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
-import { Textarea } from './ui/textarea';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
+import { Star, X, Camera, MessageSquare, User, Mail, Send, CheckCircle } from 'lucide-react';
+import { Button } from '../../../components/ui/button';
+import { Input } from '../../../components/ui/input';
+import { Label } from '../../../components/ui/label';
+import { Textarea } from '../../../components/ui/textarea';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../../../components/ui/dialog';
 import { useTestimonios } from './TestimoniosContext';
 import { toast } from 'sonner';
 
@@ -82,7 +82,13 @@ export function AgregarTestimonioModal({ open, onClose }: AgregarTestimonioModal
                     <button
                       key={rating}
                       type="button"
-                      onClick={() => setFormData({ ...formData, calificacion: rating })}
+                      onClick={() => {
+                        try {
+                          setFormData(prev => ({ ...prev, calificacion: rating }));
+                        } catch (error) {
+                          console.error('❌ Error al seleccionar calificación:', error);
+                        }
+                      }}
                       className="transition-transform hover:scale-110"
                     >
                       <Star

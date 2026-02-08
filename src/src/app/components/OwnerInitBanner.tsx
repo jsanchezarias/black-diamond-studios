@@ -1,5 +1,5 @@
 import { AlertCircle, ExternalLink } from 'lucide-react';
-import { Button } from './ui/button';
+import { Button } from '../../../components/ui/button';
 
 export function OwnerInitBanner() {
   const handleGoToInit = () => {

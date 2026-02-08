@@ -24,28 +24,40 @@ export function CancelarAgendamientoModal({
   userEmail,
   tipo
 }: CancelarAgendamientoModalProps) {
-  const { cancelarAgendamiento, marcarComoNoShow } = useAgendamientos();
-  const { agregarServicioACliente } = useClientes();
+  const agendamientosContext = useAgendamientos();
+  const clientesContext = useClientes();
+  
+  const cancelarAgendamiento = agendamientosContext?.cancelarAgendamiento ?? (async () => {});
+  const marcarComoNoShow = agendamientosContext?.marcarComoNoShow ?? (async () => {});
+  const agregarServicioACliente = clientesContext?.agregarServicioACliente ?? (async () => {});
   
   const [motivo, setMotivo] = useState('');
   const [error, setError] = useState('');
   const [exitoso, setExitoso] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async () => {
+    if (loading) return; // Prevenir doble click
+    
     setError('');
+    setLoading(true);
 
     // Validaciones
     if (!motivo.trim()) {
       setError('Por favor ingresa un motivo');
+      setLoading(false);
       return;
     }
 
-    if (!agendamiento) return;
+    if (!agendamiento) {
+      setLoading(false);
+      return;
+    }
 
     try {
       if (tipo === 'cancelar') {
         // Cancelar agendamiento
-        cancelarAgendamiento(agendamiento.id, motivo, userEmail);
+        await cancelarAgendamiento(agendamiento.id, motivo, userEmail);
 
         // Registrar en el historial del cliente como cancelado
         await agregarServicioACliente(agendamiento.clienteTelefono, {
@@ -67,7 +79,7 @@ export function CancelarAgendamientoModal({
         });
       } else {
         // Marcar como no show
-        marcarComoNoShow(agendamiento.id, motivo, userEmail);
+        await marcarComoNoShow(agendamiento.id, motivo, userEmail);
 
         // Registrar en el historial del cliente como no show
         await agregarServicioACliente(agendamiento.clienteTelefono, {
@@ -91,6 +103,7 @@ export function CancelarAgendamientoModal({
 
       // Mostrar éxito
       setExitoso(true);
+      setLoading(false);
 
       // Cerrar después de 2 segundos
       setTimeout(() => {
@@ -99,6 +112,7 @@ export function CancelarAgendamientoModal({
     } catch (error) {
       console.error('Error al procesar agendamiento:', error);
       setError('Error al procesar la solicitud. Intenta nuevamente.');
+      setLoading(false);
     }
   };
 
@@ -323,7 +337,7 @@ export function CancelarAgendamientoModal({
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={!motivo.trim()}
+              disabled={!motivo.trim() || loading}
               className={
                 tipo === 'cancelar'
                   ? 'bg-orange-600 text-white hover:bg-orange-700'

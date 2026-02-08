@@ -1,0 +1,312 @@
+/* ======================================================================
+   BLACK DIAMOND - FIX CRÍTICO DE COLORES
+   Este archivo FUERZA colores claros en TODO el sitio
+   ====================================================================== */
+
+/* ======================================================================
+   NIVEL 1: PREVENIR TEXTO NEGRO GLOBALMENTE
+   ====================================================================== */
+
+/* Forzar herencia de color desde body */
+* {
+  color: inherit;
+}
+
+/* Específicamente sobreescribir clases de Tailwind problemáticas */
+.text-black,
+.text-gray-900,
+.text-gray-800,
+.text-gray-700,
+.text-slate-900,
+.text-slate-800,
+.text-slate-700,
+.text-zinc-900,
+.text-zinc-800,
+.text-zinc-700,
+.text-neutral-900,
+.text-neutral-800,
+.text-neutral-700,
+.text-stone-900,
+.text-stone-800,
+.text-stone-700,
+[class*="text-black"],
+[class*="text-gray-9"],
+[class*="text-gray-8"],
+[class*="text-gray-7"],
+[class*="text-slate-9"],
+[class*="text-slate-8"],
+[class*="text-slate-7"] {
+  color: hsl(var(--foreground)) !important;
+}
+
+/* ======================================================================
+   NIVEL 2: ELEMENTOS ESPECÍFICOS
+   ====================================================================== */
+
+/* Todos los elementos de texto */
+p, span, div, label, a, li, td, th, dt, dd, figcaption {
+  color: hsl(var(--foreground)) !important;
+}
+
+/* Headings */
+h1, h2, h3, h4, h5, h6 {
+  color: hsl(var(--foreground)) !important;
+}
+
+/* Labels y formularios */
+label, legend {
+  color: hsl(var(--foreground)) !important;
+}
+
+/* Links */
+a {
+  color: hsl(var(--foreground)) !important;
+}
+
+a:hover {
+  color: hsl(var(--primary)) !important;
+}
+
+/* ======================================================================
+   NIVEL 3: COMPONENTES UI
+   ====================================================================== */
+
+/* Cards y sus contenidos */
+.card,
+.card *,
+[class*="card"],
+[class*="card"] * {
+  color: hsl(var(--card-foreground)) !important;
+}
+
+/* Botones - mantener su color específico pero no negro */
+button {
+  color: inherit;
+}
+
+button.text-black,
+button[class*="text-black"] {
+  color: hsl(var(--primary-foreground)) !important;
+}
+
+/* Inputs */
+input,
+textarea,
+select,
+input::placeholder,
+textarea::placeholder {
+  color: hsl(var(--foreground)) !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  opacity: 0.6;
+}
+
+/* ======================================================================
+   NIVEL 4: ESTADOS Y VARIANTES
+   ====================================================================== */
+
+/* Muted text - debe ser gris claro, NO negro */
+.text-muted,
+.text-muted-foreground,
+[class*="text-muted"] {
+  color: hsl(var(--muted-foreground)) !important;
+}
+
+/* Secondary text */
+.text-secondary,
+[class*="text-secondary"] {
+  color: hsl(var(--secondary-foreground)) !important;
+}
+
+/* Destructive/Error text */
+.text-destructive,
+[class*="text-destructive"] {
+  color: hsl(var(--destructive)) !important;
+}
+
+/* ======================================================================
+   NIVEL 5: CONTENEDORES ESPECÍFICOS
+   ====================================================================== */
+
+/* Dialogs y Modals */
+[role="dialog"] *,
+.dialog *,
+.modal * {
+  color: hsl(var(--foreground)) !important;
+}
+
+/* Popovers */
+.popover *,
+[data-radix-popper-content-wrapper] * {
+  color: hsl(var(--popover-foreground)) !important;
+}
+
+/* Dropdowns */
+.dropdown-menu *,
+[role="menu"] * {
+  color: hsl(var(--foreground)) !important;
+}
+
+/* Tables */
+table,
+thead,
+tbody,
+tfoot,
+tr,
+th,
+td {
+  color: hsl(var(--foreground)) !important;
+}
+
+/* ======================================================================
+   NIVEL 6: SHADCN UI ESPECÍFICO
+   ====================================================================== */
+
+/* Accordion */
+.accordion-trigger,
+.accordion-content {
+  color: hsl(var(--foreground)) !important;
+}
+
+/* Alert */
+.alert,
+.alert * {
+  color: hsl(var(--foreground)) !important;
+}
+
+/* Badge */
+.badge {
+  color: inherit;
+}
+
+/* Calendar */
+.calendar {
+  color: hsl(var(--foreground)) !important;
+}
+
+/* Command */
+.command,
+.command-input,
+.command-item {
+  color: hsl(var(--foreground)) !important;
+}
+
+/* Select */
+.select-trigger,
+.select-content,
+.select-item {
+  color: hsl(var(--foreground)) !important;
+}
+
+/* Sheet */
+.sheet,
+.sheet * {
+  color: hsl(var(--foreground)) !important;
+}
+
+/* Tabs */
+.tabs-trigger,
+.tabs-content {
+  color: hsl(var(--foreground)) !important;
+}
+
+/* Toast/Sonner */
+.toast,
+.toast *,
+[data-sonner-toast],
+[data-sonner-toast] * {
+  color: hsl(var(--foreground)) !important;
+}
+
+/* Tooltip */
+.tooltip,
+[role="tooltip"],
+[data-radix-tooltip-content] {
+  color: hsl(var(--foreground)) !important;
+}
+
+/* ======================================================================
+   NIVEL 7: FIX PARA ELEMENTOS DINÁMICOS
+   ====================================================================== */
+
+/* React portals y elementos insertados dinámicamente */
+[data-radix-portal] *,
+[data-headlessui-portal] * {
+  color: inherit !important;
+}
+
+/* Elementos con z-index alto (modals, dropdowns) */
+[style*="z-index"] {
+  color: inherit;
+}
+
+/* ======================================================================
+   NIVEL 8: BACKGROUNDS
+   ====================================================================== */
+
+/* Prevenir backgrounds blancos */
+.bg-white,
+.bg-gray-50,
+.bg-gray-100,
+[class*="bg-white"],
+[class*="bg-gray-5"],
+[class*="bg-gray-1"] {
+  background-color: hsl(var(--card)) !important;
+}
+
+/* ======================================================================
+   NIVEL 9: SVG ICONS
+   ====================================================================== */
+
+/* Iconos - heredar color del padre */
+svg {
+  color: inherit;
+  fill: currentColor;
+}
+
+svg path {
+  fill: inherit;
+}
+
+/* ======================================================================
+   NIVEL 10: DEBUGGING
+   ====================================================================== */
+
+/* Si ves este borde rojo, significa que el elemento tiene texto negro */
+/* Descomenta para debugging */
+/*
+.text-black,
+[class*="text-black"] {
+  outline: 2px solid red !important;
+}
+*/
+
+/* ======================================================================
+   NIVEL 11: MEDIA QUERIES
+   ====================================================================== */
+
+/* Forzar en todos los tamaños de pantalla */
+@media (max-width: 640px),
+@media (min-width: 641px) and (max-width: 1024px),
+@media (min-width: 1025px) {
+  * {
+    color: inherit;
+  }
+  
+  p, span, div, label, h1, h2, h3, h4, h5, h6, a, li, td, th {
+    color: hsl(var(--foreground)) !important;
+  }
+}
+
+/* ======================================================================
+   NIVEL 12: PRINT
+   ====================================================================== */
+
+@media print {
+  * {
+    color: #000 !important;
+    background: #fff !important;
+  }
+}

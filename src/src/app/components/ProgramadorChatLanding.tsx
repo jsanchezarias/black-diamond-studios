@@ -1,5 +1,5 @@
 import { Logo } from './Logo';
-import { supabase } from '../../../lib/supabaseClient';
+import { supabase } from '../../utils/supabase/info'; // ✅ Corregido: ruta correcta
 
 interface ConversacionUsuario {
   userId: string;

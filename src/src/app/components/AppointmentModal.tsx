@@ -1,7 +1,8 @@
-import { X, Calendar, Clock, Gem, Phone, Send } from 'lucide-react';
-import { Button } from './ui/button';
-import { Card, CardContent } from './ui/card';
-import { Badge } from './ui/badge';
+import { useState } from 'react';
+import { Button } from '../../../components/ui/button';
+import { Card, CardContent } from '../../../components/ui/card';
+import { Badge } from '../../../components/ui/badge';
+import { Gem, X, Calendar, Clock, Send, Phone } from 'lucide-react';
 
 interface Model {
   id: string;

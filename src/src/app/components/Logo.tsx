@@ -47,7 +47,7 @@ export function Logo({ className = '', size = 'md', variant = 'vertical' }: Logo
           <text 
             x="70" 
             y="35" 
-            fontFamily="Cinzel, serif" 
+            fontFamily="Playfair Display, serif" 
             fontSize="18" 
             fontWeight="700" 
             fill="url(#textGradient)" 
@@ -113,7 +113,7 @@ export function Logo({ className = '', size = 'md', variant = 'vertical' }: Logo
         <text 
           x="100" 
           y="210" 
-          fontFamily="Cinzel, serif" 
+          fontFamily="Playfair Display, serif" 
           fontSize="22" 
           fontWeight="700" 
           fill="url(#textGradientV)" 
@@ -127,7 +127,7 @@ export function Logo({ className = '', size = 'md', variant = 'vertical' }: Logo
         <text 
           x="100" 
           y="230" 
-          fontFamily="Cinzel, serif" 
+          fontFamily="Playfair Display, serif" 
           fontSize="22" 
           fontWeight="700" 
           fill="url(#textGradientV)" 

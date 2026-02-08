@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { supabase } from '../../../lib/supabaseClient';
+import { supabase } from '../../utils/supabase/info'; // ✅ Corregido: ruta correcta
 import { toast } from 'sonner@2.0.3';
 
 // ============================================
@@ -83,7 +83,9 @@ export function VideosProvider({ children }: { children: ReactNode }) {
       setVideos(videosData);
     } catch (error: any) {
       console.error('Error al cargar videos:', error);
-      toast.error('Error al cargar los videos');
+      console.warn('⚠️ Usando MODO FALLBACK - Sin videos iniciales');
+      setVideos([]);
+      // NO mostrar toast de error al cargar inicialmente
     } finally {
       setCargando(false);
     }

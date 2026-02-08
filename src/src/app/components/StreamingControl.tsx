@@ -13,7 +13,7 @@ import {
   AlertCircle,
   ExternalLink
 } from 'lucide-react';
-import { projectId, publicAnonKey } from '../../../utils/supabase/info';
+import { projectId, publicAnonKey } from '../../utils/supabase/info';
 
 interface StreamSession {
   id: string;

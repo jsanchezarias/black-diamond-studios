@@ -1,6 +1,5 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { supabase } from '../../../lib/supabaseClient';
-import { projectId, publicAnonKey } from '../../../utils/supabase/info';
+import { useState } from 'react';
+import { supabase, projectId, publicAnonKey } from '../../utils/supabase/info'; // ✅ Corregido: ruta correcta
 
 export function InitOwnerPage() {
   const [estado, setEstado] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
@@ -68,7 +67,7 @@ export function InitOwnerPage() {
 
       // Llamar al endpoint de inicialización con el nombre y el token
       const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-ae3a00e9/init-owner`,
+        `https://${projectId}.supabase.co/functions/v1/make-server-9dadc017/init-owner`,
         {
           method: 'POST',
           headers: {

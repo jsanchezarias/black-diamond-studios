@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { projectId, publicAnonKey } from '../../../utils/supabase/info';
+import { User, Phone, Lock, X, Loader2, CheckCircle, AlertCircle, Mail, Calendar, MapPin } from 'lucide-react';
+import { useClientes } from './ClientesContext';
+import { toast } from 'sonner@2.0.3';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../../components/ui/dialog';
+import { Button } from '../../../components/ui/button';
+import { Input } from '../../../components/ui/input';
+import { Label } from '../../../components/ui/label';
+import { supabase, projectId, publicAnonKey } from '../../utils/supabase/info'; // ✅ Corregido: ruta correcta
 import { Logo } from './Logo';
-import { supabase } from '../../../lib/supabaseClient';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
-import { Phone, Lock, User, AlertCircle, Mail, MapPin, Calendar, CheckCircle } from 'lucide-react';
 
 interface ClienteLoginModalProps {
   isOpen: boolean;
@@ -79,7 +80,14 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
 
       if (!response.ok) {
         const errorData = await response.json();
-        setError(errorData.error || 'Error al iniciar sesión');
+        // Mensaje de error amigable y limpio
+        if (errorData.error?.toLowerCase().includes('credenciales') || 
+            errorData.error?.toLowerCase().includes('contraseña') ||
+            errorData.error?.toLowerCase().includes('incorrecta')) {
+          setError('Teléfono o contraseña incorrectos. Por favor verifica tus datos.');
+        } else {
+          setError('Error al iniciar sesión. Por favor intenta nuevamente.');
+        }
         setProcesando(false);
         return;
       }
@@ -99,19 +107,19 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
           .eq('id', cliente.id);
 
         if (sesionError) {
-          console.error('❌ Error actualizando sesión en Supabase:', sesionError);
-          setError('Error al crear la sesión. Intenta de nuevo.');
+          console.error('❌ Error actualizando sesión:', sesionError);
+          setError('Error al crear la sesión. Por favor intenta de nuevo.');
           setProcesando(false);
           return;
         }
 
-        console.log('✅ Sesión actualizada en Supabase para cliente:', cliente.nombre);
+        console.log('✅ Sesión iniciada correctamente');
 
         // ✅ Realtime detectará automáticamente la actualización en clientes
         
       } catch (err) {
         console.error('❌ Error completo actualizando sesión:', err);
-        setError('Error al crear la sesión. Intenta de nuevo.');
+        setError('Error al crear la sesión. Por favor intenta de nuevo.');
         setProcesando(false);
         return;
       }
@@ -122,7 +130,8 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
         handleClose();
       }, 1500);
     } catch (err: any) {
-      setError(err.message || 'Error al iniciar sesión');
+      console.error('Error en login:', err);
+      setError('Error al iniciar sesión. Por favor verifica tu conexión e intenta nuevamente.');
       setProcesando(false);
     }
   };
@@ -189,7 +198,7 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
           .eq('id', nuevoCliente.id);
 
         if (sesionError) {
-          console.error('❌ Error actualizando sesión en Supabase:', sesionError);
+          console.error('❌ Error actualizando sesión:', sesionError);
           setError('Error al crear la sesión. Intenta de nuevo.');
           setProcesando(false);
           return;
@@ -259,33 +268,35 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
   if (modo === 'login') {
     return (
       <Dialog open={isOpen} onOpenChange={handleClose}>
-        <DialogContent className="max-w-md bg-card backdrop-blur-lg border-primary/30">
-          <DialogHeader>
-            <div className="flex justify-center mb-4">
-              <Logo variant="horizontal" size="md" />
+        <DialogContent className="max-w-md w-[calc(100vw-2rem)] sm:w-full bg-card backdrop-blur-lg border-primary/30 p-3 sm:p-6 overflow-x-hidden">
+          <DialogHeader className="space-y-2 sm:space-y-4">
+            <div className="flex justify-center">
+              <div className="max-w-[200px] w-full">
+                <Logo variant="horizontal" size="sm" />
+              </div>
             </div>
-            <DialogTitle className="text-2xl text-center">
+            <DialogTitle className="text-xl sm:text-2xl text-center break-words">
               Iniciar Sesión
             </DialogTitle>
-            <DialogDescription className="text-center">
+            <DialogDescription className="text-center text-xs sm:text-sm break-words px-2">
               Ingresa tus credenciales para acceder
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6 overflow-x-hidden">
             {/* Error */}
             {error && (
-              <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg flex items-start gap-2">
+              <div className="p-2 sm:p-3 bg-red-500/10 border border-red-500/30 rounded-lg flex items-start gap-2 overflow-hidden">
                 <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-red-400">{error}</p>
+                <p className="text-xs sm:text-sm text-red-400 break-words min-w-0">{error}</p>
               </div>
             )}
 
             {/* Teléfono */}
-            <div className="space-y-2">
-              <Label htmlFor="loginTelefono" className="flex items-center gap-2">
-                <Phone className="w-4 h-4 text-primary" />
-                Número de Teléfono
+            <div className="space-y-2 overflow-hidden">
+              <Label htmlFor="loginTelefono" className="flex items-center gap-2 text-xs sm:text-sm flex-wrap">
+                <Phone className="w-4 h-4 text-primary flex-shrink-0" />
+                <span className="break-words min-w-0">Número de Teléfono</span>
               </Label>
               <Input
                 id="loginTelefono"
@@ -293,16 +304,16 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
                 value={loginTelefono}
                 onChange={(e) => setLoginTelefono(e.target.value)}
                 placeholder="3017626768"
-                className="bg-secondary/50"
+                className="bg-secondary/50 w-full"
                 disabled={procesando}
               />
             </div>
 
             {/* Contraseña */}
-            <div className="space-y-2">
-              <Label htmlFor="loginPassword" className="flex items-center gap-2">
-                <Lock className="w-4 h-4 text-primary" />
-                Contraseña
+            <div className="space-y-2 overflow-hidden">
+              <Label htmlFor="loginPassword" className="flex items-center gap-2 text-xs sm:text-sm flex-wrap">
+                <Lock className="w-4 h-4 text-primary flex-shrink-0" />
+                <span className="break-words min-w-0">Contraseña</span>
               </Label>
               <Input
                 id="loginPassword"
@@ -310,41 +321,42 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
                 value={loginPassword}
                 onChange={(e) => setLoginPassword(e.target.value)}
                 placeholder="••••••••"
-                className="bg-secondary/50"
+                className="bg-secondary/50 w-full"
                 disabled={procesando}
                 onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
               />
             </div>
 
             {/* Botones */}
-            <div className="space-y-3">
+            <div className="space-y-3 w-full overflow-hidden">
               <Button
                 onClick={handleLogin}
                 disabled={procesando}
-                className="w-full"
+                className="w-full !whitespace-normal !h-auto !min-h-[44px] !py-3 !px-3 sm:!px-4 flex items-center justify-center !shrink"
                 size="lg"
+                style={{ whiteSpace: 'normal', height: 'auto', minHeight: '44px', flexShrink: 1 }}
               >
                 {procesando ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin mr-2" />
-                    Verificando...
-                  </>
+                  <div className="flex items-center justify-center gap-2 w-full min-w-0">
+                    <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin flex-shrink-0" />
+                    <span className="break-words text-center text-xs sm:text-sm min-w-0">Verificando...</span>
+                  </div>
                 ) : (
-                  <>
-                    <User className="w-4 h-4 mr-2" />
-                    Iniciar Sesión
-                  </>
+                  <div className="flex items-center justify-center gap-2 w-full min-w-0">
+                    <User className="w-4 h-4 flex-shrink-0" />
+                    <span className="break-words text-center text-xs sm:text-sm min-w-0">Iniciar Sesión</span>
+                  </div>
                 )}
               </Button>
 
-              <div className="text-center">
+              <div className="text-center overflow-hidden px-2">
                 <button
                   type="button"
                   onClick={() => {
                     setModo('registro');
                     setError('');
                   }}
-                  className="text-sm text-primary hover:underline"
+                  className="text-xs sm:text-sm text-primary hover:underline break-words"
                   disabled={procesando}
                 >
                   ¿No tienes cuenta? Regístrate aquí

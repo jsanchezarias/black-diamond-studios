@@ -1,4 +1,9 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
+import { 
+  notificarPagoRecibido,
+  notificarAdelantoAprobado,
+  notificarAdelantoRechazado
+} from './NotificacionesHelpers';
 
 export interface Adelanto {
   id: string;
@@ -126,33 +131,58 @@ export function PagosProvider({ children }: { children: ReactNode }) {
   };
 
   const aprobarAdelanto = (adelantoId: string, aprobadoPor: string) => {
+    const adelanto = adelantos.find(a => a.id === adelantoId);
+    
     setAdelantos(
-      adelantos.map((adelanto) =>
-        adelanto.id === adelantoId
+      adelantos.map((a) =>
+        a.id === adelantoId
           ? {
-              ...adelanto,
+              ...a,
               estado: 'aprobado' as const,
               fechaRespuesta: new Date(),
               aprobadoPor,
             }
-          : adelanto
+          : a
       )
     );
+
+    // 🔔 NOTIFICACIÓN: Adelanto aprobado
+    if (adelanto) {
+      const fechaPago = new Date();
+      fechaPago.setDate(fechaPago.getDate() + 1); // Ejemplo: pago al día siguiente
+      
+      notificarAdelantoAprobado({
+        modeloEmail: adelanto.modeloEmail,
+        monto: adelanto.monto,
+        fechaPago: fechaPago.toLocaleDateString('es-CO')
+      }).catch(err => console.error('Error notificando adelanto aprobado:', err));
+    }
   };
 
   const rechazarAdelanto = (adelantoId: string, aprobadoPor: string) => {
+    const adelanto = adelantos.find(a => a.id === adelantoId);
+    
     setAdelantos(
-      adelantos.map((adelanto) =>
-        adelanto.id === adelantoId
+      adelantos.map((a) =>
+        a.id === adelantoId
           ? {
-              ...adelanto,
+              ...a,
               estado: 'rechazado' as const,
               fechaRespuesta: new Date(),
               aprobadoPor,
             }
-          : adelanto
+          : a
       )
     );
+
+    // 🔔 NOTIFICACIÓN: Adelanto rechazado
+    if (adelanto) {
+      notificarAdelantoRechazado({
+        modeloEmail: adelanto.modeloEmail,
+        monto: adelanto.monto,
+        motivo: 'Solicitud denegada por administración'
+      }).catch(err => console.error('Error notificando adelanto rechazado:', err));
+    }
   };
 
   const registrarPago = (
@@ -189,6 +219,14 @@ export function PagosProvider({ children }: { children: ReactNode }) {
     };
 
     setPagos([nuevoPago, ...pagos]);
+
+    // 🔔 NOTIFICACIÓN: Pago recibido
+    notificarPagoRecibido({
+      modeloEmail,
+      monto: detalles.totalAPagar,
+      concepto: 'Liquidación de servicios',
+      metodoPago
+    }).catch(err => console.error('Error notificando pago recibido:', err));
   };
 
   const obtenerAdelantosModelo = (modeloEmail: string) => {

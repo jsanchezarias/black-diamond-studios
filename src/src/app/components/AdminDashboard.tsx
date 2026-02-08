@@ -20,7 +20,9 @@ import {
   Edit,
   Trash2,
   MessageSquare,
-  Code // Agregado para el icono de programadores
+  Code, // Agregado para el icono de programadores
+  Bell,
+  PieChart // 📊 Icono para Analytics
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../../components/ui/card';
 import { Badge } from '../../../components/ui/badge';
@@ -49,8 +51,11 @@ import { MigrarModelosRealesPanel } from '../../../components/MigrarModelosReale
 import { DiagnosticoPanel } from '../../../components/admin/DiagnosticoPanel';
 import { ConfiguracionChatPanel } from '../../../components/ConfiguracionChatPanel';
 import { GestionUsuariosPanel } from '../../../components/GestionUsuariosPanel'; // Agregado
+import { GestionClientesAdmin } from './GestionClientesAdmin'; // 🆕 Gestión de clientes con multas
+import { NotificacionesPanel } from './NotificacionesPanel';
+import { AnalyticsPanel } from './AnalyticsPanel'; // 📊 Sistema de Analytics
 
-type ModuloType = 'general' | 'modelos' | 'clientes' | 'pagos' | 'habitaciones' | 'finanzas' | 'operaciones' | 'boutique' | 'streams' | 'diagnostico' | 'chat' | 'programadores'; // Agregado 'programadores'
+type ModuloType = 'general' | 'modelos' | 'clientes' | 'pagos' | 'habitaciones' | 'finanzas' | 'operaciones' | 'boutique' | 'streams' | 'diagnostico' | 'chat' | 'programadores' | 'notificaciones' | 'analytics'; // Agregado 'analytics'
 
 interface Modulo {
   id: ModuloType;
@@ -74,10 +79,33 @@ export function AdminDashboard({ accessToken, userId, onLogout }: AdminDashboard
   const [productoEditar, setProductoEditar] = useState<any>(null);
   const [modoGestionBoutique, setModoGestionBoutique] = useState<'crear' | 'editar'>('crear');
   
-  const { obtenerAdelantosPendientes } = usePagos();
-  const { modelos, modelosArchivadas } = useModelos();
-  const { serviciosFinalizados, serviciosHoy, serviciosMes, ingresosHoy, ingresosMes, productosVendidos, ventasBoutique } = useServicios();
-  const { inventario, eliminarProducto } = useInventory();
+  // ✅ MANEJO DEFENSIVO DE CONTEXTOS
+  try {
+    var pagosCtx = usePagos();
+    var modelosCtx = useModelos();
+    var serviciosCtx = useServicios();
+    var inventoryCtx = useInventory();
+  } catch (error) {
+    console.error('❌ ERROR AL CARGAR CONTEXTOS EN ADMIN DASHBOARD:', error);
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center bg-[#0f1014]">
+        <div className="text-center space-y-4">
+          <h1 className="text-2xl font-bold text-red-500">Error al cargar AdminDashboard</h1>
+          <p className="text-gray-400">{error instanceof Error ? error.message : 'Error desconocido'}</p>
+          {onLogout && (
+            <Button onClick={onLogout} className="mt-4">
+              Volver al inicio
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  const { obtenerAdelantosPendientes } = pagosCtx;
+  const { modelos = [], modelosArchivadas = [] } = modelosCtx;
+  const { serviciosFinalizados = [], serviciosHoy = [], serviciosMes = [], ingresosHoy = 0, ingresosMes = 0, productosVendidos = 0, ventasBoutique = 0 } = serviciosCtx;
+  const { inventario = [], eliminarProducto } = inventoryCtx;
 
   const modulos: Modulo[] = [
     {
@@ -151,6 +179,18 @@ export function AdminDashboard({ accessToken, userId, onLogout }: AdminDashboard
       nombre: 'Programadores',
       icono: <Code className="w-5 h-5" />,
       descripcion: 'Gestión de usuarios y roles'
+    },
+    {
+      id: 'notificaciones',
+      nombre: 'Notificaciones',
+      icono: <Bell className="w-5 h-5" />,
+      descripcion: 'Gestión de notificaciones'
+    },
+    {
+      id: 'analytics',
+      nombre: 'Analytics',
+      icono: <PieChart className="w-5 h-5" />,
+      descripcion: 'Análisis de datos y métricas'
     }
   ];
 
@@ -497,7 +537,7 @@ export function AdminDashboard({ accessToken, userId, onLogout }: AdminDashboard
         )}
 
         {moduloActivo === 'clientes' && (
-          <HistorialClientesPanel />
+          <GestionClientesAdmin />
         )}
 
         {moduloActivo === 'pagos' && (
@@ -754,6 +794,14 @@ export function AdminDashboard({ accessToken, userId, onLogout }: AdminDashboard
 
         {moduloActivo === 'programadores' && (
           <GestionUsuariosPanel userRole="admin" />
+        )}
+
+        {moduloActivo === 'notificaciones' && (
+          <NotificacionesPanel />
+        )}
+
+        {moduloActivo === 'analytics' && (
+          <AnalyticsPanel />
         )}
       </div>
 

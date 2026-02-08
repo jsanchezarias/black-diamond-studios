@@ -1,4 +1,8 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
+import { 
+  notificarMultaAplicada, 
+  notificarMultaPagada 
+} from './NotificacionesHelpers';
 
 export interface Multa {
   id: number;
@@ -32,15 +36,24 @@ export function MultasProvider({ children }: { children: ReactNode }) {
     const newId = Math.max(...multas.map(m => m.id), 0) + 1;
     const today = new Date().toISOString().split('T')[0];
     
-    setMultas(prev => [
-      ...prev,
-      {
-        ...multa,
-        id: newId,
-        fecha: today,
-        estado: 'pendiente',
-      },
-    ]);
+    const nuevaMulta = {
+      ...multa,
+      id: newId,
+      fecha: today,
+      estado: 'pendiente' as const,
+    };
+
+    setMultas(prev => [...prev, nuevaMulta]);
+
+    // 🔔 NOTIFICACIÓN: Multa aplicada
+    if (multa.modeloEmail) {
+      notificarMultaAplicada({
+        clienteEmail: multa.modeloEmail,
+        clienteNombre: multa.modeloNombre,
+        monto: multa.monto,
+        motivo: multa.concepto
+      }).catch(err => console.error('Error notificando multa aplicada:', err));
+    }
   };
 
   const eliminarMulta = (id: number) => {
@@ -48,7 +61,17 @@ export function MultasProvider({ children }: { children: ReactNode }) {
   };
 
   const actualizarEstadoMulta = (id: number, estado: 'pendiente' | 'pagada' | 'cancelada') => {
+    const multa = multas.find(m => m.id === id);
+    
     setMultas(prev => prev.map(m => (m.id === id ? { ...m, estado } : m)));
+
+    // 🔔 NOTIFICACIÓN: Multa pagada
+    if (estado === 'pagada' && multa && multa.modeloEmail) {
+      notificarMultaPagada({
+        clienteEmail: multa.modeloEmail,
+        monto: multa.monto
+      }).catch(err => console.error('Error notificando multa pagada:', err));
+    }
   };
 
   const obtenerMultasPorModelo = (modeloId: number) => {

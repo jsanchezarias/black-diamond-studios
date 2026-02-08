@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { ArrowLeft, Loader2 } from 'lucide-react';
+import { Label } from '../../../components/ui/label';
+import { Input } from '../../../components/ui/input';
+import { Button } from '../../../components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Logo } from './Logo';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { supabase } from '../../../lib/supabaseClient';
+import { supabase } from '../../utils/supabase/info'; // ✅ Corregido: ruta correcta
 
 interface LoginFormProps {
   onLogin: (accessToken: string, userId: string, email: string, role: string) => void;
@@ -32,30 +32,22 @@ export function LoginForm({ onLogin, onBackToLanding }: LoginFormProps) {
       });
 
       if (authError) {
-        console.error('Error en login:', authError);
-        
-        // Mensajes de error más amigables y con soluciones
+        // Mensajes de error amigables sin consolas técnicas
         if (authError.message.includes('Invalid login credentials')) {
-          setError('❌ Email o contraseña incorrectos.');
-          console.error('========================================');
-          console.error('🔧 SOLUCIÓN:');
-          console.error('1. Verifica que el usuario exista en Supabase Auth');
-          console.error('2. O crea un usuario usando CrearModeloModal');
-          console.error('3. Email ingresado:', email);
-          console.error('========================================');
+          setError('Email o contraseña incorrectos. Por favor verifica tus credenciales.');
         } else if (authError.message.includes('Email not confirmed')) {
-          setError('⚠️ Debes confirmar tu email antes de iniciar sesión.');
+          setError('Debes confirmar tu email antes de iniciar sesión.');
         } else if (authError.message.includes('Invalid email')) {
-          setError('❌ Formato de email inválido.');
+          setError('Formato de email inválido.');
         } else {
-          setError(`❌ Error: ${authError.message}`);
+          setError('Error al iniciar sesión. Intenta nuevamente.');
         }
         setLoading(false);
         return;
       }
 
       if (!authData.user) {
-        setError('No se pudo obtener la información del usuario');
+        setError('No se pudo obtener la información del usuario.');
         setLoading(false);
         return;
       }
@@ -67,44 +59,22 @@ export function LoginForm({ onLogin, onBackToLanding }: LoginFormProps) {
         .eq('id', authData.user.id)
         .single();
 
-      console.log('📋 Datos de usuario de Supabase:', { userData, userError });
-
-      if (userError) {
-        console.error('❌ Error obteniendo rol:', userError);
-        console.error('========================================');
-        console.error('🔧 DIAGNÓSTICO:');
-        console.error('1. La tabla "usuarios" no existe o no tiene el campo "role"');
-        console.error('2. Usuario ID:', authData.user.id);
-        console.error('3. Verifica que el usuario esté en la tabla usuarios');
-        console.error('========================================');
-        setError('No se pudo obtener el rol del usuario. El usuario no existe en la tabla usuarios.');
+      if (userError || !userData) {
+        setError('No se pudo verificar el rol del usuario. Contacta al administrador.');
         setLoading(false);
         return;
       }
 
       const role = userData?.role;
       
-      console.log('🔑 Rol obtenido:', role);
-      
       if (!role) {
-        console.error('❌ Usuario sin rol asignado');
-        console.error('========================================');
-        console.error('🔧 SOLUCIÓN:');
-        console.error('1. Agrega el usuario a la tabla usuarios con un rol válido');
-        console.error('2. Roles válidos: owner, admin, modelo, programador');
-        console.error('3. Usuario email:', authData.user.email);
-        console.error('========================================');
         setError('Usuario sin rol asignado. Contacta al administrador.');
         setLoading(false);
         return;
       }
 
       // Login exitoso
-      console.log('✅ Login exitoso:', {
-        email: authData.user.email,
-        role: role,
-        userId: authData.user.id
-      });
+      console.log('✅ Login exitoso');
 
       onLogin(
         authData.session.access_token,
@@ -115,7 +85,7 @@ export function LoginForm({ onLogin, onBackToLanding }: LoginFormProps) {
 
     } catch (err: any) {
       console.error('Error en login:', err);
-      setError(err.message || 'Error desconocido');
+      setError('Error inesperado. Por favor intenta nuevamente.');
     } finally {
       setLoading(false);
     }
