@@ -448,38 +448,32 @@ export function ModelCard({ model, onContact }: ModelCardProps) {
                 {/* Selector de Ubicación */}
                 {model.domicilio ? (
                   // ✅ Modelo PRESTA servicio a domicilio - Mostrar selector
-                  <div className="flex gap-3 mb-4 p-1 bg-gradient-to-r from-primary/10 to-primary/5 rounded-xl border border-primary/20">
+                  <div className="flex gap-2 mb-3 p-1 bg-gradient-to-r from-primary/10 to-primary/5 rounded-lg border border-primary/20">
                     <button
                       onClick={() => setSelectedLocation('sede')}
-                      className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg text-xs font-semibold tracking-wide transition-all duration-300 ${
+                      className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-[11px] font-semibold tracking-wide transition-all duration-300 ${
                         selectedLocation === 'sede'
-                          ? 'bg-primary text-background shadow-lg shadow-primary/30 scale-[1.02] border-2 border-primary'
-                          : 'bg-transparent text-muted-foreground hover:bg-primary/10 hover:text-foreground border-2 border-transparent'
+                          ? 'bg-primary text-background shadow-sm shadow-primary/30 border border-primary'
+                          : 'bg-transparent text-muted-foreground hover:bg-primary/10 hover:text-foreground border border-transparent'
                       }`}
                     >
-                      <Building2 className={`w-4 h-4 transition-all ${
+                      <Building2 className={`w-3.5 h-3.5 transition-all ${
                         selectedLocation === 'sede' ? 'text-background' : 'text-primary'
                       }`} />
                       <span>En Sede</span>
-                      {selectedLocation === 'sede' && (
-                        <Check className="w-3 h-3 ml-1 text-background" />
-                      )}
                     </button>
                     <button
                       onClick={() => setSelectedLocation('domicilio')}
-                      className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg text-xs font-semibold tracking-wide transition-all duration-300 ${
+                      className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-[11px] font-semibold tracking-wide transition-all duration-300 ${
                         selectedLocation === 'domicilio'
-                          ? 'bg-primary text-background shadow-lg shadow-primary/30 scale-[1.02] border-2 border-primary'
-                          : 'bg-transparent text-muted-foreground hover:bg-primary/10 hover:text-foreground border-2 border-transparent'
+                          ? 'bg-primary text-background shadow-sm shadow-primary/30 border border-primary'
+                          : 'bg-transparent text-muted-foreground hover:bg-primary/10 hover:text-foreground border border-transparent'
                       }`}
                     >
-                      <Home className={`w-4 h-4 transition-all ${
+                      <Home className={`w-3.5 h-3.5 transition-all ${
                         selectedLocation === 'domicilio' ? 'text-background' : 'text-primary'
                       }`} />
                       <span>A Domicilio</span>
-                      {selectedLocation === 'domicilio' && (
-                        <Check className="w-3 h-3 ml-1 text-background" />
-                      )}
                     </button>
                   </div>
                 ) : (
@@ -499,22 +493,20 @@ export function ModelCard({ model, onContact }: ModelCardProps) {
                   </div>
                 )}
 
-                <div className="space-y-2">
+                {/* MOSAICO DE TARIFAS COMPACTO */}
+                <div className="grid grid-cols-2 gap-2 mt-2">
                   {model.services.map((service, idx) => {
                     const isSelected = selectedService?.name === service.name;
                     
-                    // ✅ FILTRADO CORRECTO DE SERVICIOS
-                    // 1. Si estamos en "A Domicilio" y el servicio NO tiene priceHome, no mostrarlo
+                    // FILTRADO CORRECTO DE SERVICIOS
                     if (model.domicilio && selectedLocation === 'domicilio' && !service.priceHome) {
-                      return null; // Ocultar "Rato" y "30 min" en domicilio
+                      return null;
                     }
                     
-                    // 2. Determinar el precio a mostrar según ubicación
                     const precioMostrado = model.domicilio 
                       ? (selectedLocation === 'sede' ? service.price : service.priceHome)
-                      : service.price; // Solo precio de sede para modelos que no hacen domicilio
+                      : service.price;
                     
-                    // 3. Si no hay precio disponible, no mostrar el servicio
                     if (!precioMostrado) {
                       return null;
                     }
@@ -523,39 +515,29 @@ export function ModelCard({ model, onContact }: ModelCardProps) {
                       <div
                         key={idx}
                         onClick={() => setSelectedService(service)}
-                        className={`flex items-center justify-between p-3 rounded-lg transition-all cursor-pointer ${
+                        className={`flex flex-col justify-between p-2 rounded-lg transition-all cursor-pointer border ${
                           isSelected
-                            ? 'bg-gradient-to-r from-primary/20 to-primary/10 border-2 border-primary shadow-md scale-[1.02]'
-                            : 'bg-gradient-to-r from-primary/5 to-transparent border border-primary/10 hover:border-primary/30 hover:scale-[1.01]'
+                            ? 'bg-primary/20 border-primary shadow-sm'
+                            : 'bg-primary/5 border-primary/10 hover:border-primary/30 hover:bg-primary/10'
                         }`}
                       >
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <p className={`font-medium text-sm ${
-                              isSelected ? 'text-primary' : ''
-                            }`}>
-                              {service.name}
-                            </p>
-                            <Badge variant="outline" className={`text-xs ${
-                              isSelected ? 'border-primary/50 bg-primary/10' : 'border-primary/30'
-                            }`}>
-                              <Clock className="w-3 h-3 mr-1" />
-                              {service.duration}
-                            </Badge>
-                          </div>
-                          {isSelected && service.description && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {service.description}
-                            </p>
-                          )}
-                        </div>
-                        <div className="ml-4">
-                          <p className={`text-lg font-bold ${
-                            isSelected ? 'text-primary' : 'text-primary/80'
-                          }`} style={{ fontFamily: 'Montserrat, sans-serif' }}>
-                            ${precioMostrado}
+                        <div className="flex items-center justify-between mb-1">
+                          <p className={`font-medium text-xs truncate ${
+                            isSelected ? 'text-primary' : 'text-foreground/90'
+                          }`}>
+                            {service.name}
                           </p>
+                          <div className="flex items-center text-[10px] text-muted-foreground opacity-70">
+                            <Clock className="w-2.5 h-2.5 mr-0.5" />
+                            {service.duration}
+                          </div>
                         </div>
+                        
+                        <p className={`text-sm font-bold text-right mt-1 ${
+                          isSelected ? 'text-primary' : 'text-primary/80'
+                        }`} style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                          ${precioMostrado}
+                        </p>
                       </div>
                     );
                   })}
@@ -563,42 +545,39 @@ export function ModelCard({ model, onContact }: ModelCardProps) {
               </div>
 
               {/* Tarifas adicionales y botón */}
-              <div className="p-4 bg-gradient-to-br from-primary/5 to-transparent">
+              <div className="p-3 bg-gradient-to-br from-primary/5 to-transparent border-t border-primary/10">
                 {selectedService && (
-                  <div className="mb-3 p-3 bg-primary/10 rounded-lg border border-primary/30">
-                    <p className="text-xs text-muted-foreground mb-1">Has seleccionado:</p>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-bold text-sm text-primary">{selectedService.name}</p>
-                        <p className="text-xs text-muted-foreground flex items-center gap-1">
-                          {selectedLocation === 'sede' ? (
-                            <><Building2 className="w-3 h-3 text-primary" /> En Sede</>
-                          ) : (
-                            <><Home className="w-3 h-3 text-primary" /> A Domicilio</>
-                          )}
-                        </p>
-                      </div>
-                      <p className="text-xl font-bold text-primary" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-                        ${selectedLocation === 'sede' ? selectedService.price : (selectedService.priceHome || selectedService.price)}
+                  <div className="mb-2 p-2 bg-primary/10 rounded-lg border border-primary/30 flex justify-between items-center">
+                    <div>
+                      <p className="font-bold text-xs text-primary">{selectedService.name}</p>
+                      <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                        {selectedLocation === 'sede' ? (
+                          <><Building2 className="w-2.5 h-2.5 text-primary" /> En Sede</>
+                        ) : (
+                          <><Home className="w-2.5 h-2.5 text-primary" /> A Domicilio</>
+                        )}
                       </p>
                     </div>
+                    <p className="text-base font-bold text-primary" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                      ${selectedLocation === 'sede' ? selectedService.price : (selectedService.priceHome || selectedService.price)}
+                    </p>
                   </div>
                 )}
                 <Button
                   onClick={handleReservar}
-                  className={`w-full gap-2 ${
+                  className={`w-full gap-2 h-9 text-xs transition-all ${
                     selectedService 
-                      ? 'bg-primary text-background hover:bg-primary/90 shadow-lg shadow-primary/30' 
-                      : 'bg-primary/70 text-background hover:bg-primary'
+                      ? 'bg-primary text-background hover:bg-primary/90 shadow-md shadow-primary/20 scale-[1.02]' 
+                      : 'bg-primary/20 text-primary hover:bg-primary/30'
                   }`}
-                  size="lg"
+                  size="sm"
                 >
-                  <Send className="w-4 h-4" />
-                  {selectedService ? `Confirmar Reserva` : `Reservar con ${model.name}`}
+                  <Send className="w-3 h-3" />
+                  {selectedService ? `Confirmar Reserva` : `Selecciona un servicio`}
                 </Button>
                 {!selectedService && (
-                  <p className="text-xs text-muted-foreground text-center mt-2">
-                    💡 Selecciona un servicio para una reserva más rápida
+                  <p className="text-[10px] text-muted-foreground text-center mt-1">
+                    Selecciona un servicio para habilitar la reserva
                   </p>
                 )}
               </div>
