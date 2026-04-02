@@ -19,14 +19,18 @@ const telefonoToEmail = (telefono: string) =>
   `${telefono.replace(/\s+/g, '')}@clientes.blackdiamond.app`;
 
 export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLoginModalProps) {
-  const [modo, setModo] = useState<'login' | 'registro'>('login');
+  const [modo, setModo] = useState<'login' | 'registro' | 'recuperar'>('login');
   const [procesando, setProcesando] = useState(false);
   const [error, setError] = useState('');
   const [exitoso, setExitoso] = useState(false);
+  const [recuperarEnviado, setRecuperarEnviado] = useState(false);
 
   // Login
   const [loginTelefono, setLoginTelefono] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+
+  // Recuperar contraseña
+  const [recuperarTelefono, setRecuperarTelefono] = useState('');
 
   // Registro
   const [nombre, setNombre] = useState('');
@@ -50,10 +54,57 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
     setConfirmPassword('');
     setFechaNacimiento('');
     setCiudad('');
+    setRecuperarTelefono('');
+    setRecuperarEnviado(false);
     setError('');
     setExitoso(false);
     setProcesando(false);
     onClose();
+  };
+
+  const handleRecuperar = async () => {
+    if (!recuperarTelefono.trim()) {
+      setError('Por favor ingresa tu número de teléfono');
+      return;
+    }
+
+    setProcesando(true);
+    setError('');
+
+    try {
+      // Buscar el cliente por teléfono para ver si tiene email real
+      const { data: clienteData } = await supabase
+        .from('clientes')
+        .select('email, nombre')
+        .eq('telefono', recuperarTelefono.trim())
+        .maybeSingle();
+
+      if (!clienteData) {
+        setError('No encontramos una cuenta con ese número de teléfono.');
+        return;
+      }
+
+      if (clienteData.email) {
+        // Enviar reset al email real del cliente
+        const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+          clienteData.email,
+          { redirectTo: `${window.location.origin}/reset-password` }
+        );
+        if (resetError) throw resetError;
+      } else {
+        // No tiene email — enviar al email sintético (igual genera el link de reset)
+        const emailSintetico = telefonoToEmail(recuperarTelefono.trim());
+        await supabase.auth.resetPasswordForEmail(emailSintetico, {
+          redirectTo: `${window.location.origin}/reset-password`
+        });
+      }
+
+      setRecuperarEnviado(true);
+    } catch (err: any) {
+      setError('Error al enviar el correo de recuperación. Intenta nuevamente.');
+    } finally {
+      setProcesando(false);
+    }
   };
 
   const handleLogin = async () => {
@@ -321,7 +372,15 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
                 )}
               </Button>
 
-              <div className="text-center overflow-hidden px-2">
+              <div className="text-center overflow-hidden px-2 space-y-2">
+                <button
+                  type="button"
+                  onClick={() => { setModo('recuperar'); setError(''); }}
+                  className="text-xs sm:text-sm text-muted-foreground hover:text-primary hover:underline break-words block w-full"
+                  disabled={procesando}
+                >
+                  ¿Olvidaste tu contraseña?
+                </button>
                 <button
                   type="button"
                   onClick={() => { setModo('registro'); setError(''); }}
@@ -332,6 +391,110 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
                 </button>
               </div>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  // Formulario de recuperar contraseña
+  if (modo === 'recuperar') {
+    return (
+      <Dialog open={isOpen} onOpenChange={handleClose}>
+        <DialogContent className="max-w-md w-[calc(100vw-2rem)] sm:w-full bg-card backdrop-blur-lg border-primary/30 p-3 sm:p-6">
+          <DialogHeader className="space-y-2 sm:space-y-4">
+            <div className="flex justify-center">
+              <div className="max-w-[200px] w-full">
+                <Logo variant="horizontal" size="sm" />
+              </div>
+            </div>
+            <DialogTitle className="text-xl sm:text-2xl text-center">
+              Recuperar Contraseña
+            </DialogTitle>
+            <DialogDescription className="text-center text-xs sm:text-sm px-2">
+              Ingresa tu número de teléfono y te enviaremos un enlace de recuperación a tu correo
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 sm:space-y-6">
+            {error && (
+              <div className="p-2 sm:p-3 bg-red-500/10 border border-red-500/30 rounded-lg flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                <p className="text-xs sm:text-sm text-red-400 break-words min-w-0">{error}</p>
+              </div>
+            )}
+
+            {recuperarEnviado ? (
+              <div className="text-center py-6 space-y-4">
+                <div className="w-16 h-16 rounded-full bg-green-500/20 border-2 border-green-500 flex items-center justify-center mx-auto">
+                  <CheckCircle className="w-9 h-9 text-green-500" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-green-500 mb-1">¡Correo enviado!</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Si tu cuenta tiene un correo registrado, recibirás un enlace para restablecer tu contraseña.
+                  </p>
+                </div>
+                <Button
+                  onClick={() => { setModo('login'); setRecuperarEnviado(false); setError(''); }}
+                  variant="outline"
+                  className="w-full"
+                >
+                  Volver al inicio de sesión
+                </Button>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="recuperarTelefono" className="flex items-center gap-2 text-xs sm:text-sm">
+                    <Phone className="w-4 h-4 text-primary flex-shrink-0" />
+                    Número de Teléfono
+                  </Label>
+                  <Input
+                    id="recuperarTelefono"
+                    type="tel"
+                    value={recuperarTelefono}
+                    onChange={(e) => setRecuperarTelefono(e.target.value)}
+                    placeholder="3017626768"
+                    className="bg-secondary/50 w-full"
+                    disabled={procesando}
+                    onKeyDown={(e) => e.key === 'Enter' && handleRecuperar()}
+                  />
+                </div>
+
+                <div className="space-y-3">
+                  <Button
+                    onClick={handleRecuperar}
+                    disabled={procesando}
+                    className="w-full !min-h-[44px]"
+                    size="lg"
+                  >
+                    {procesando ? (
+                      <div className="flex items-center justify-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" />
+                        <span className="text-xs sm:text-sm">Enviando...</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center gap-2">
+                        <Mail className="w-4 h-4 flex-shrink-0" />
+                        <span className="text-xs sm:text-sm">Enviar Enlace de Recuperación</span>
+                      </div>
+                    )}
+                  </Button>
+
+                  <div className="text-center">
+                    <button
+                      type="button"
+                      onClick={() => { setModo('login'); setError(''); }}
+                      className="text-xs sm:text-sm text-primary hover:underline"
+                      disabled={procesando}
+                    >
+                      Volver al inicio de sesión
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </DialogContent>
       </Dialog>
