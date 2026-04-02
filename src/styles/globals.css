@@ -14,40 +14,27 @@
    ================================================================= */
 
 :root {
-  /* FONDOS - Del más oscuro al más claro */
-  --bg-black: #000000;           /* Negro puro - Fondo principal */
-  --bg-dark: #0f0f0f;            /* Negro carbón - Sidebars */
-  --bg-card: #1a1a1a;            /* Gris muy oscuro - Cards */
-  --bg-hover: #242424;           /* Gris oscuro - Hover states */
-  
-  /* BORDES */
-  --border-color: #2a2a2a;       /* Gris medio - Bordes sutiles */
-  --border-hover: #d4af37;       /* Dorado - Bordes activos */
-  
-  /* TEXTOS - De más claro a más oscuro */
-  --text-white: #ffffff;         /* Blanco - Títulos importantes */
-  --text-gray: #a0a0a0;          /* Gris claro - Texto normal */
-  --text-muted: #666666;         /* Gris oscuro - Texto secundario */
-  
-  /* DORADO - Un solo tono principal */
-  --gold: #d4af37;               /* Dorado único - Acentos */
-  --gold-hover: #e5c158;         /* Dorado claro - Hover */
-  --gold-dark: #b8941f;          /* Dorado oscuro - Active */
-  
-  /* ESTADOS */
+  --bg-black: #000000;
+  --bg-dark: #0a0a08;
+  --bg-card: #0d0d0a;
+  --bg-hover: #1a1a10;
+  --border-color: #2a2210;
+  --border-hover: #d4af37;
+  --text-white: #f0e8c8;
+  --text-gray: #a08030;
+  --text-muted: #5a4820;
+  --gold: #d4af37;
+  --gold-hover: #e5c158;
+  --gold-dark: #b8941f;
   --success: #10b981;
   --error: #ef4444;
   --warning: #f59e0b;
   --info: #3b82f6;
-  
-  /* FUENTES */
   --font-main: 'Inter', sans-serif;
   --font-display: 'Playfair Display', serif;
-  
-  /* SOMBRAS */
-  --shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.7);
-  --shadow-gold: 0 0 20px rgba(212, 175, 55, 0.3);
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.8);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.9);
+  --shadow-gold: 0 0 20px rgba(212, 175, 55, 0.4);
 }
 
 /* =================================================================
