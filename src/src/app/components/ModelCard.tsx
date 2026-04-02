@@ -1,5 +1,42 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Star, MapPin, Clock, ChevronRight, Check, X, Heart, MessageCircle, ZoomIn, ChevronLeft, Send, Building2, Home } from 'lucide-react';
+
+// ── Lucetas doradas ──────────────────────────────────────────
+const GOLD_COLORS = ['#d4af37', '#e5c158', '#ffd700', '#f0d060', '#c9a227'];
+
+interface GoldSparkle { id: string; x: number; y: number; size: number; tx: number; ty: number; color: string; }
+
+function useGoldSparkles() {
+  const [sparkles, setSparkles] = useState<GoldSparkle[]>([]);
+  const lastTime = useRef(0);
+  const onMouseMove = useCallback((e: React.MouseEvent<HTMLElement>) => {
+    const now = Date.now();
+    if (now - lastTime.current < 85) return;
+    lastTime.current = now;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const s: GoldSparkle = {
+      id: `${now}-${Math.random()}`,
+      x: (e.clientX - rect.left) + (Math.random() - 0.5) * 50,
+      y: (e.clientY - rect.top) + (Math.random() - 0.5) * 50,
+      size: Math.random() * 14 + 7,
+      tx: (Math.random() - 0.5) * 60,
+      ty: -(Math.random() * 55 + 20),
+      color: GOLD_COLORS[Math.floor(Math.random() * GOLD_COLORS.length)],
+    };
+    setSparkles(prev => [...prev.slice(-12), s]);
+    setTimeout(() => setSparkles(prev => prev.filter(p => p.id !== s.id)), 750);
+  }, []);
+  const onMouseLeave = useCallback(() => setSparkles([]), []);
+  return { sparkles, onMouseMove, onMouseLeave };
+}
+
+function SparkleIcon({ size, color }: { size: number; color: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 160 160" fill="none">
+      <path d="M80 7C80 7 74 36 68 56C62 76 40 92 7 80C40 68 62 84 68 104C74 124 80 153 80 153C80 153 86 124 92 104C98 84 120 68 153 80C120 92 98 76 92 56C86 36 80 7 80 7Z" fill={color} />
+    </svg>
+  );
+}
 import { Card, CardContent } from '../../../components/ui/card';
 import { Badge } from '../../../components/ui/badge';
 import { Button } from '../../../components/ui/button';
@@ -38,6 +75,7 @@ interface ModelCardProps {
 }
 
 export function ModelCard({ model, onContact }: ModelCardProps) {
+  const { sparkles, onMouseMove: onPhotoMouseMove, onMouseLeave: onPhotoMouseLeave } = useGoldSparkles();
   const [showGallery, setShowGallery] = useState(false);
   const [selectedImage, setSelectedImage] = useState(0);
   const [showFullDescription, setShowFullDescription] = useState(false);
@@ -189,11 +227,22 @@ export function ModelCard({ model, onContact }: ModelCardProps) {
             {/* Columna Izquierda: Foto de perfil + Galería - Se ajusta a la altura de la derecha */}
             <div className="md:w-[350px] flex-shrink-0 flex flex-col border-b md:border-b-0 md:border-r border-primary/10 md:max-h-full">
               {/* Header con foto de perfil */}
-              <div ref={headerRef} className="relative bg-gradient-to-br from-primary/10 to-primary/5 p-6 backdrop-blur-sm flex-shrink-0">
+              <div
+                ref={headerRef}
+                className="relative bg-gradient-to-br from-black to-neutral-950 p-6 backdrop-blur-sm flex-shrink-0 overflow-hidden"
+                onMouseMove={onPhotoMouseMove}
+                onMouseLeave={onPhotoMouseLeave}
+              >
+                {/* Lucetas en el header */}
+                {sparkles.map(s => (
+                  <div key={s.id} className="bd-sparkle" style={{ left: s.x, top: s.y, '--s-tx': `${s.tx}px`, '--s-ty': `${s.ty}px` } as React.CSSProperties}>
+                    <SparkleIcon size={s.size} color={s.color} />
+                  </div>
+                ))}
                 <div className="flex items-start gap-5">
                   {/* Foto de perfil circular */}
                   <div className="relative flex-shrink-0">
-                    <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-primary/30 shadow-lg shadow-primary/20 group-hover:border-primary/50 transition-all duration-300">
+                    <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-amber-500/30 shadow-lg shadow-amber-500/20 bd-gold-photo-border group-hover:border-amber-500/60 transition-all duration-500">
                       <ImageWithFallback
                         src={model.photo}
                         alt={model.name}
@@ -201,7 +250,7 @@ export function ModelCard({ model, onContact }: ModelCardProps) {
                       />
                     </div>
                     {model.available && (
-                      <div className="absolute bottom-1 right-1 w-7 h-7 bg-green-500 rounded-full border-4 border-background animate-pulse shadow-lg shadow-green-500/50"></div>
+                      <div className="absolute bottom-1 right-1 w-7 h-7 bg-amber-400 rounded-full border-4 border-black animate-pulse shadow-lg shadow-amber-400/60"></div>
                     )}
                   </div>
 
@@ -209,7 +258,7 @@ export function ModelCard({ model, onContact }: ModelCardProps) {
                   <div className="flex-1 pt-1">
                     <div className="flex items-start justify-between mb-2">
                       <div>
-                        <h3 className="text-3xl font-bold mb-1 text-gradient-gold" style={{ fontFamily: 'Playfair Display, serif' }}>
+                        <h3 className="text-3xl font-bold mb-1 bd-gold-shimmer" style={{ fontFamily: 'Playfair Display, serif' }}>
                           {model.name}
                         </h3>
                         <p className="text-base text-muted-foreground">{model.age} años</p>

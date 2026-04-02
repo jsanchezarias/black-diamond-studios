@@ -8173,3 +8173,111 @@
     transform: translate3d(var(--tw-exit-translate-x, 0), var(--tw-exit-translate-y, 0), 0) scale3d(var(--tw-exit-scale, 1), var(--tw-exit-scale, 1), var(--tw-exit-scale, 1)) rotate(var(--tw-exit-rotate, 0));
   }
 }
+
+/* ============================================================
+   BLACK DIAMOND STUDIOS — GOLD SPARKLE & THEME SYSTEM
+   ============================================================ */
+
+@keyframes gold-sparkle-rise {
+  0%   { transform: translate(0, 0) scale(0) rotate(0deg);   opacity: 1; }
+  40%  { opacity: 1; }
+  100% { transform: translate(var(--s-tx, 0px), var(--s-ty, -50px)) scale(1) rotate(200deg); opacity: 0; }
+}
+
+@keyframes gold-shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+
+@keyframes gold-pulse-border {
+  0%, 100% { box-shadow: 0 0 0px 0px rgba(212,175,55,0); }
+  50%       { box-shadow: 0 0 22px 4px rgba(212,175,55,0.45); }
+}
+
+@keyframes gold-glow-float {
+  0%   { opacity: 0; transform: translateY(4px) scale(0.95); }
+  50%  { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-30px) scale(0.6); }
+}
+
+@keyframes card-rise {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Partícula de luceta dorada */
+.bd-sparkle {
+  position: absolute;
+  pointer-events: none;
+  z-index: 40;
+  animation: gold-sparkle-rise 0.75s ease-out forwards;
+  filter: drop-shadow(0 0 5px rgba(212,175,55,0.9));
+}
+
+/* Tarjeta con efecto gold hover */
+.bd-gold-card {
+  transition: transform 0.35s cubic-bezier(0.4,0,0.2,1),
+              box-shadow 0.35s cubic-bezier(0.4,0,0.2,1),
+              border-color 0.35s ease;
+}
+.bd-gold-card:hover {
+  transform: translateY(-4px) scale(1.01);
+  box-shadow:
+    0 0 0 1px rgba(212,175,55,0.5),
+    0 8px 40px rgba(212,175,55,0.25),
+    0 2px 8px rgba(0,0,0,0.8);
+  border-color: rgba(212,175,55,0.7) !important;
+  animation: gold-pulse-border 2.5s ease-in-out infinite;
+}
+
+/* Texto shimmer dorado */
+.bd-gold-shimmer {
+  background: linear-gradient(90deg,
+    #c9a227 0%, #e5c158 18%, #ffd700 35%, #fff0a0 50%,
+    #ffd700 65%, #e5c158 82%, #c9a227 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gold-shimmer 5s linear infinite;
+}
+
+/* Borde gold animado en foto de perfil */
+.bd-gold-photo-border {
+  transition: box-shadow 0.4s ease, border-color 0.4s ease;
+}
+.bd-gold-photo-border:hover,
+.group:hover .bd-gold-photo-border {
+  box-shadow:
+    0 0 0 3px rgba(212,175,55,0.6),
+    0 0 20px rgba(212,175,55,0.4),
+    inset 0 0 10px rgba(212,175,55,0.1);
+  border-color: rgba(212,175,55,0.9) !important;
+}
+
+/* Entrada animada para las tarjetas */
+.bd-card-enter {
+  animation: card-rise 0.5s ease-out both;
+}
+
+/* Overlay dorado de hover */
+.bd-gold-overlay {
+  background: linear-gradient(
+    to top,
+    rgba(0,0,0,0.95) 0%,
+    rgba(20,14,0,0.7) 40%,
+    rgba(212,175,55,0.08) 80%,
+    transparent 100%
+  );
+  transition: opacity 0.3s ease;
+}
+.group:hover .bd-gold-overlay {
+  background: linear-gradient(
+    to top,
+    rgba(0,0,0,1) 0%,
+    rgba(30,20,0,0.8) 40%,
+    rgba(212,175,55,0.15) 80%,
+    rgba(212,175,55,0.05) 100%
+  );
+}
