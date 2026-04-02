@@ -41,7 +41,7 @@ interface PublicUsersContextType {
   messages: ChatMessage[];
   onlineUsers?: number;
   getVisibleMessages?: () => ChatMessage[];
-  logoutRef?: React.MutableRefObject<(() => Promise<void>) | undefined>;
+  logoutRef?: { current: (() => Promise<void>) | undefined };
 }
 
 const PublicUsersContext = createContext<PublicUsersContextType | undefined>(undefined);
@@ -456,14 +456,16 @@ export function PublicUsersProvider({ children }: { children: ReactNode }) {
         console.log('🚪 Usuario abandonando la página, cerrando sesión...');
         
         // 🆕 Archivar conversación antes de cerrar
+        const supabaseUrl = `https://${projectId}.supabase.co`;
         try {
           // Obtener mensajes para archivar (síncrono con fetch porque sendBeacon no soporta esto)
+          // Obtener mensajes para archivar (síncrono con fetch porque sendBeacon no soporta esto)
           const response = await fetch(
-            `${supabase.supabaseUrl}/rest/v1/chat_mensajes_publicos?or=(sender_id.eq.${currentUserRef.id},receiver_id.eq.${currentUserRef.id})&select=*,sender:sender_id(nombre),receiver:receiver_id(nombre)&order=created_at.asc`,
+            `${supabaseUrl}/rest/v1/chat_mensajes_publicos?or=(sender_id.eq.${currentUserRef.id},receiver_id.eq.${currentUserRef.id})&select=*,sender:sender_id(nombre),receiver:receiver_id(nombre)&order=created_at.asc`,
             {
               headers: {
-                'apikey': supabase.supabaseKey,
-                'Authorization': `Bearer ${supabase.supabaseKey}`
+                'apikey': publicAnonKey,
+                'Authorization': `Bearer ${publicAnonKey}`
               }
             }
           );
@@ -484,7 +486,7 @@ export function PublicUsersProvider({ children }: { children: ReactNode }) {
             historialPayload.append('ultima_conversacion_fecha', new Date().toISOString());
             
             navigator.sendBeacon(
-              `${supabase.supabaseUrl}/rest/v1/clientes?id=eq.${currentUserRef.id}`,
+              `${supabaseUrl}/rest/v1/clientes?id=eq.${currentUserRef.id}`,
               new Blob([JSON.stringify({
                 ultima_conversacion: conversacionTexto,
                 ultima_conversacion_fecha: new Date().toISOString()
@@ -493,7 +495,7 @@ export function PublicUsersProvider({ children }: { children: ReactNode }) {
             
             // Eliminar mensajes del chat activo
             navigator.sendBeacon(
-              `${supabase.supabaseUrl}/rest/v1/chat_mensajes_publicos?or=(sender_id.eq.${currentUserRef.id},receiver_id.eq.${currentUserRef.id})`,
+              `${supabaseUrl}/rest/v1/chat_mensajes_publicos?or=(sender_id.eq.${currentUserRef.id},receiver_id.eq.${currentUserRef.id})`,
               new Blob([JSON.stringify({})], { type: 'application/json' })
             );
           }
@@ -503,7 +505,7 @@ export function PublicUsersProvider({ children }: { children: ReactNode }) {
         
         // Marcar sesión como inactiva
         navigator.sendBeacon(
-          `${supabase.supabaseUrl}/rest/v1/clientes?id=eq.${currentUserRef.id}`,
+          `${supabaseUrl}/rest/v1/clientes?id=eq.${currentUserRef.id}`,
           new Blob([JSON.stringify({
             sesion_activa: false,
             sesion_token: null,
@@ -536,7 +538,7 @@ export function PublicUsersProvider({ children }: { children: ReactNode }) {
       id: clienteData.id,
       username: clienteData.nombre || clienteData.nombre_usuario || 'Usuario',
       telefono: clienteData.telefono || '',
-      registeredAt: new Date(clienteData.fecha_registro || clienteData.created_at || Date.now()),
+      registeredAt: new Date(clienteData.fecha_registro || clienteData.created_at || clienteData.fecha_creacion || Date.now()),
       avatar: undefined,
       isVIP: false,
       role: clienteData.email === PROGRAMADOR_EMAIL ? 'programador' : 'user',

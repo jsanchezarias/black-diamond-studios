@@ -220,12 +220,12 @@ export function ModelCard({ model, onContact }: ModelCardProps) {
 
   return (
     <>
-      <Card className="border-primary/15 bg-gradient-card shadow-card hover:shadow-premium hover:border-primary/25 transition-all duration-500 overflow-hidden min-w-[320px] md:min-w-[800px] flex-shrink-0 group">
+      <Card className="border-primary/15 bg-gradient-card shadow-card hover:shadow-premium hover:border-primary/25 transition-all duration-500 overflow-hidden w-full group">
         <CardContent className="p-0">
-          {/* Layout Desktop Horizontal - La columna derecha define la altura */}
-          <div className="flex flex-col md:flex-row">
-            {/* Columna Izquierda: Foto de perfil + Galería - Se ajusta a la altura de la derecha */}
-            <div className="md:w-[350px] flex-shrink-0 flex flex-col border-b md:border-b-0 md:border-r border-primary/10 md:max-h-full">
+          {/* Layout Vertical optimizado para cuadrícula (Grid) */}
+          <div className="flex flex-col">
+            {/* Cabecera: Foto de perfil + Info básica */}
+            <div className="w-full flex-shrink-0 flex flex-col border-b border-primary/10">
               {/* Header con foto de perfil */}
               <div
                 ref={headerRef}
@@ -308,7 +308,7 @@ export function ModelCard({ model, onContact }: ModelCardProps) {
                 <div 
                   className="overflow-y-auto pr-1"
                   style={{
-                    maxHeight: rightColumnHeight && rightColumnHeight > 0 ? `${rightColumnHeight}px` : '400px'
+                    maxHeight: '300px'
                   }}
                 >
                   <div 
@@ -386,8 +386,8 @@ export function ModelCard({ model, onContact }: ModelCardProps) {
               </div>
             </div>
 
-            {/* Columna Derecha: Info, Servicios y Tarifas - ESTA COLUMNA DEFINE LA ALTURA */}
-            <div className="flex-1 flex flex-col md:h-full md:overflow-y-auto" ref={rightColumnRef}>
+            {/* Contenido: Info, Servicios y Tarifas */}
+            <div className="flex-1 flex flex-col w-full" ref={rightColumnRef}>
               {/* Información detallada */}
               <div className="p-4 border-b border-primary/10">
                 <div className="flex flex-wrap gap-1 mb-3">

@@ -111,7 +111,8 @@ function dbRowToCliente(row: any): Cliente {
     rating: row.rating,
     historialServicios: row.historial_servicios ?? row.historialServicios ?? [],
     userId: row.user_id ?? row.auth_user_id ?? row.userId,
-    fechaRegistro: new Date(row.fecha_registro ?? row.created_at ?? row.fechaRegistro ?? Date.now()),
+    // ✅ Fallback para diferentes nombres de columna de fecha
+    fechaRegistro: new Date(row.fecha_registro || row.created_at || row.fecha_creacion || Date.now()),
     ultimaVisita: row.ultima_visita ? new Date(row.ultima_visita) : (row.ultimaVisita ? new Date(row.ultimaVisita) : undefined),
     totalServicios: row.total_servicios ?? row.totalServicios ?? 0,
     totalGastado: row.total_gastado ?? row.totalGastado ?? 0,
@@ -165,7 +166,7 @@ export function ClientesProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase
         .from('clientes')
         .select('*')
-        .order('fecha_registro', { ascending: false });
+        .order('created_at', { ascending: false }); // ✅ CAMBIO: Usar created_at que es estándar
 
       if (error) {
         console.error('❌ Error cargando clientes:', error.message);

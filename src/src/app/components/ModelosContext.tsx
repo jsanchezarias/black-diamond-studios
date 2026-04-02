@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { supabase } from '../../utils/supabase/info'; // ✅ Corregido: ruta correcta
+import { supabase } from '../../utils/supabase/info';
 import { createClient } from '@supabase/supabase-js';
+import { CacheSystem } from '../../utils/cache';
 
 // Interfaz de modelo con campos de archivo
 export interface Modelo {
@@ -73,21 +74,32 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
   const [modelosArchivadas, setModelosArchivadas] = useState<Modelo[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // ✅ CORREGIDO: useEffect simplificado sin función anidada
+  // ✅ NUEVO: Carga inicial híbrida (Caché + Red)
   useEffect(() => {
     let isMounted = true;
     
-    const cargarModelosInicial = async () => {
-      if (!isMounted) return;
-      await cargarModelos();
+    const inicializar = async () => {
+      // 1. Intentar cargar desde caché para visualización instantánea
+      const cacheData = CacheSystem.get<{activos: Modelo[], archivados: Modelo[]}>('modelos');
+      if (cacheData && isMounted) {
+        console.log('⚡ Modelos cargadas desde caché local');
+        setModelos(cacheData.activos);
+        setModelosArchivadas(cacheData.archivados);
+        setLoading(false);
+      }
+
+      // 2. Cargar desde Supabase para tener datos frescos
+      if (isMounted) {
+        await cargarModelos();
+      }
     };
     
-    cargarModelosInicial();
+    inicializar();
     
     return () => {
       isMounted = false;
     };
-  }, []); // ✅ Array vacío - solo ejecutar una vez al montar
+  }, []);
 
   const cargarModelos = async () => {
     try {
@@ -109,26 +121,22 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
             email: 'modelo1@blackdiamond.com',
             nombre: 'Isabella',
             nombreArtistico: 'Bella Diamond',
+            cedula: '123456789',
             telefono: '+57 300 123 4567',
-            role: 'modelo',
-            estado: 'activa',
+            direccion: 'Calle 10 # 5-20',
+            password: '****',
+            activa: true,
+            disponible: true,
+            domicilio: true,
             edad: 25,
-            altura: 170,
-            peso: 58,
+            altura: '170cm',
             medidas: '90-60-90',
-            colorCabello: 'Castaño oscuro',
-            colorOjos: 'Café',
-            idiomas: ['Español', 'Inglés'],
-            tarifas: [
-              { duracion: '1 hora', tarifaSede: 200000, tarifaDomicilio: 250000 },
-              { duracion: '2 horas', tarifaSede: 380000, tarifaDomicilio: 480000 },
-              { duracion: '3 horas', tarifaSede: 540000, tarifaDomicilio: 690000 },
-            ],
             fotoPerfil: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400',
-            galeria: [],
+            fotosAdicionales: [],
             descripcion: 'Modelo profesional con 3 años de experiencia',
-            zonasTrabajo: ['Poblado', 'Laureles', 'Envigado'],
-            disponibilidadHoraria: { inicio: '10:00', fin: '22:00' },
+            sede: 'Sede Norte',
+            servicios: 0,
+            ingresos: 0,
           } as Modelo,
         ]);
         setLoading(false);
@@ -231,8 +239,16 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
         const modelosActivos = modelosData.filter(m => !m.fechaArchivado);
         const modelosArchivados = modelosData.filter(m => m.fechaArchivado);
 
+        // ✅ NUEVO: Actualizar el estado con los datos frescos
         setModelos(modelosActivos);
         setModelosArchivadas(modelosArchivados);
+
+        // ✅ NUEVO: Guardar en caché para futuras cargas instantáneas
+        CacheSystem.set('modelos', {
+          activos: modelosActivos,
+          archivados: modelosArchivados
+        }, 120); // Caché por 2 horas
+
         console.log(`✅ Cargadas ${modelosActivos.length} modelos activos y ${modelosArchivados.length} archivados desde Supabase`);
         console.log('📋 Modelos activos:', modelosActivos.map(m => `${m.nombreArtistico} (${m.email}) - activa:${m.activa}`).join(', '));
         if (modelosArchivados.length > 0) {
@@ -240,34 +256,7 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
         }
         
         // 🔍 DEBUG DETALLADO: Verificar Natalia y Xiomara específicamente
-        const natalia = modelosData.find(m => m.email === 'natalia@blackdiamond.com');
-        const xiomara = modelosData.find(m => m.email === 'xiomara@blackdiamond.com');
-        
-        if (natalia) {
-          console.log('🔍 DEBUG - NATALIA:', {
-            nombre: natalia.nombreArtistico,
-            email: natalia.email,
-            activa: natalia.activa,
-            disponible: natalia.disponible,
-            fechaArchivado: natalia.fechaArchivado,
-            estado: natalia.fechaArchivado ? '📦 ARCHIVADA' : '✅ VISIBLE EN PERFILES'
-          });
-        } else {
-          console.log('❌ NATALIA NO ENCONTRADA en la base de datos');
-        }
-        
-        if (xiomara) {
-          console.log('🔍 DEBUG - XIOMARA:', {
-            nombre: xiomara.nombreArtistico,
-            email: xiomara.email,
-            activa: xiomara.activa,
-            disponible: xiomara.disponible,
-            fechaArchivado: xiomara.fechaArchivado,
-            estado: xiomara.fechaArchivado ? '📦 ARCHIVADA' : '✅ VISIBLE EN PERFILES'
-          });
-        } else {
-          console.log('❌ XIOMARA NO ENCONTRADA en la base de datos');
-        }
+        // ... (resto del código de debug)
       } else {
         console.log('⚠️ No se encontraron modelos en la base de datos');
         setModelos([]);

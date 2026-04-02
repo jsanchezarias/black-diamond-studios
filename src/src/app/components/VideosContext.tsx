@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { supabase } from '../../utils/supabase/info'; // ✅ Corregido: ruta correcta
+import { supabase } from '../../utils/supabase/info';
 import { toast } from 'sonner';
+import { CacheSystem } from '../../utils/cache';
 
 // ============================================
 // 🎥 TIPOS Y INTERFACES
@@ -80,7 +81,9 @@ export function VideosProvider({ children }: { children: ReactNode }) {
         .filter((v): v is Video => v !== null)
         .sort((a, b) => a.orden - b.orden);
 
+      // ✅ NUEVO: Guardar en caché
       setVideos(videosData);
+      CacheSystem.set('videos', videosData, 120); // 2 horas de caché
     } catch (error: any) {
       console.error('Error al cargar videos:', error);
       console.warn('⚠️ Usando MODO FALLBACK - Sin videos iniciales');
@@ -288,9 +291,18 @@ export function VideosProvider({ children }: { children: ReactNode }) {
   };
 
   // ============================================
-  // 🚀 INICIALIZACIÓN
+  // 🚀 INICIALIZACIÓN HÍBRIDA (Caché + Red)
   // ============================================
   useEffect(() => {
+    // 1. Intentar cargar desde caché para visualización instantánea
+    const cacheData = CacheSystem.get<Video[]>('videos');
+    if (cacheData) {
+        console.log('⚡ Videos cargados desde caché local');
+        setVideos(cacheData);
+        setCargando(false);
+    }
+
+    // 2. Cargar desde la red en segundo plano
     cargarVideos();
   }, []);
 

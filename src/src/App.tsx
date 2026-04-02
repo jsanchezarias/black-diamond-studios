@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { LanguageProvider } from './app/components/LanguageContext';
 import { PublicUsersProvider } from './app/components/PublicUsersContext';
 import { VideosProvider } from './app/components/VideosContext';
@@ -19,14 +19,11 @@ import { AnalyticsProvider } from './app/components/AnalyticsContext';
 import { ErrorBoundary } from './app/components/ErrorBoundary';
 import { LoginForm } from './app/components/LoginForm';
 import { Toaster } from 'sonner';
-
-// 🚀 OPTIMIZACIÓN: Lazy loading de componentes pesados
-// Solo se cargan cuando el usuario los necesita, reduciendo el bundle inicial
-const LandingPage = lazy(() => import('./app/components/LandingPage').then(m => ({ default: m.LandingPage })));
-const ProgramadorDashboard = lazy(() => import('./app/components/ProgramadorDashboard').then(m => ({ default: m.ProgramadorDashboard })));
-const OwnerDashboard = lazy(() => import('./app/components/OwnerDashboard').then(m => ({ default: m.OwnerDashboard })));
-const AdminDashboard = lazy(() => import('./app/components/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
-const ModeloDashboard = lazy(() => import('./app/components/ModeloDashboard').then(m => ({ default: m.ModeloDashboard })));
+import { LandingPage } from './app/components/LandingPage';
+import { ProgramadorDashboard } from './app/components/ProgramadorDashboard';
+import { OwnerDashboard } from './app/components/OwnerDashboard';
+import { AdminDashboard } from './app/components/AdminDashboard';
+import { ModeloDashboard } from './app/components/ModeloDashboard';
 
 // ✅ Componente que envuelve todos los providers en un solo lugar
 function AllProvidersWrapper({ children }: { children: React.ReactNode }) {
@@ -213,8 +210,20 @@ export default function App() {
   
   const [showLogin, setShowLogin] = useState(false);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
-
-  console.log('🔄 Estado inicial:', { showLogin, currentUser });
+  // ✅ NUEVO: Recuperar sesión de localStorage al cargar
+  useEffect(() => {
+    const savedUser = localStorage.getItem('blackDiamondUser');
+    if (savedUser) {
+      try {
+        const user = JSON.parse(savedUser);
+        setCurrentUser(user);
+        console.log('👤 Sesión recuperada de localStorage:', user.email);
+      } catch (error) {
+        console.error('❌ Error al parsear sesión guardada:', error);
+        localStorage.removeItem('blackDiamondUser');
+      }
+    }
+  }, []);
 
   // ✅ NUEVO: Listener global de errores para capturar throw null
   useEffect(() => {
@@ -298,45 +307,37 @@ export default function App() {
           <div className="min-h-screen w-full" style={{ backgroundColor: '#0f1014', color: '#e8e6e3' }}>
             {/* ✅ Renderizar dashboard según rol */}
             {currentUser.role === 'programador' && (
-              <Suspense fallback={<GlobalLoadingScreen />}>
-                <ProgramadorDashboard
-                  accessToken={currentUser.accessToken}
-                  userId={currentUser.userId}
-                  userEmail={currentUser.email}
-                  onLogout={handleLogout}
-                />
-              </Suspense>
+              <ProgramadorDashboard
+                accessToken={currentUser.accessToken}
+                userId={currentUser.userId}
+                userEmail={currentUser.email}
+                onLogout={handleLogout}
+              />
             )}
             
             {currentUser.role === 'owner' && (
-              <Suspense fallback={<GlobalLoadingScreen />}>
-                <OwnerDashboard
-                  accessToken={currentUser.accessToken}
-                  userId={currentUser.userId}
-                  onLogout={handleLogout}
-                />
-              </Suspense>
+              <OwnerDashboard
+                accessToken={currentUser.accessToken}
+                userId={currentUser.userId}
+                onLogout={handleLogout}
+              />
             )}
             
             {currentUser.role === 'admin' && (
-              <Suspense fallback={<GlobalLoadingScreen />}>
-                <AdminDashboard
-                  accessToken={currentUser.accessToken}
-                  userId={currentUser.userId}
-                  onLogout={handleLogout}
-                />
-              </Suspense>
+              <AdminDashboard
+                accessToken={currentUser.accessToken}
+                userId={currentUser.userId}
+                onLogout={handleLogout}
+              />
             )}
             
             {currentUser.role === 'modelo' && (
-              <Suspense fallback={<GlobalLoadingScreen />}>
-                <ModeloDashboard
-                  accessToken={currentUser.accessToken}
-                  userId={currentUser.userId}
-                  userEmail={currentUser.email}
-                  onLogout={handleLogout}
-                />
-              </Suspense>
+              <ModeloDashboard
+                accessToken={currentUser.accessToken}
+                userId={currentUser.userId}
+                userEmail={currentUser.email}
+                onLogout={handleLogout}
+              />
             )}
             
             {/* Fallback para roles no reconocidos */}
@@ -384,9 +385,7 @@ export default function App() {
               onBackToLanding={() => setShowLogin(false)}
             />
           ) : (
-            <Suspense fallback={<GlobalLoadingScreen />}>
-              <LandingPage onAccessSystem={() => setShowLogin(true)} />
-            </Suspense>
+            <LandingPage onAccessSystem={() => setShowLogin(true)} />
           )}
           <Toaster 
             theme="dark"

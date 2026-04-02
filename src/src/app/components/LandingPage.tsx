@@ -750,7 +750,7 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
               💎 {t.models.available} en {sedes.find(s => s.id === sedeActual)?.name}
             </h3>
             
-            <div className="grid gap-6 w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
               {modelosDisponibles.length > 0 ? (
                 modelosDisponibles.map((modelo) => (
                   <ModelCard key={modelo.id} model={modelo} onContact={handleContactModel} />
@@ -782,7 +782,7 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
                 </p>
               </div>
               
-              <div className="grid gap-6 w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 opacity-75 hover:opacity-100 transition-opacity">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 opacity-75 hover:opacity-100 transition-opacity">
                 {modelosNoDisponibles.map((modelo) => (
                   <ModelCard 
                     key={modelo.id} 
@@ -807,7 +807,7 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
                 </p>
               </div>
               
-              <div className="grid gap-6 w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 opacity-60 hover:opacity-90 transition-opacity">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 opacity-60 hover:opacity-90 transition-opacity">
                 {modelosInactivas.map((modelo) => (
                   <ModelCard 
                     key={modelo.id} 
