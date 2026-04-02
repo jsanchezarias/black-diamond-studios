@@ -36,7 +36,7 @@ export interface Model {
 export const sedes: Sede[] = [
   {
     id: 'sede-1',
-    name: 'Sede Zona Norte',
+    name: 'Sede Norte',
     location: 'Zona Norte Premium',
     streamUrl: 'https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8',
     modelosDisponibles: 1,
