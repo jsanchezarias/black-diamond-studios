@@ -231,6 +231,7 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
         sesion_token: authData.session?.access_token || null,
         sesion_ultimo_acceso: new Date().toISOString(),
         sesion_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        password_hash: 'supabase-auth', // columna requerida, la auth real está en Supabase Auth
       };
 
       const { data: clienteData, error: clienteError } = await supabase
