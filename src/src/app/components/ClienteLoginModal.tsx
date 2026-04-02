@@ -7,6 +7,7 @@ import { Input } from '../../../components/ui/input';
 import { Label } from '../../../components/ui/label';
 import { supabase } from '../../utils/supabase/info';
 import { Logo } from './Logo';
+import { usePublicUsers } from './PublicUsersContext';
 
 interface ClienteLoginModalProps {
   isOpen: boolean;
@@ -19,6 +20,7 @@ const telefonoToEmail = (telefono: string) =>
   `${telefono.replace(/\s+/g, '')}@clientes.blackdiamond.app`;
 
 export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLoginModalProps) {
+  const { loginUser } = usePublicUsers();
   const [modo, setModo] = useState<'login' | 'registro' | 'recuperar'>('login');
   const [procesando, setProcesando] = useState(false);
   const [error, setError] = useState('');
@@ -163,6 +165,7 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
         })
         .eq('id', clienteData.id);
 
+      loginUser(clienteData);
       setExitoso(true);
       setTimeout(() => {
         onLoginSuccess(clienteData);
@@ -247,6 +250,7 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
         return;
       }
 
+      loginUser(clienteData);
       setExitoso(true);
       setTimeout(() => {
         onLoginSuccess(clienteData);

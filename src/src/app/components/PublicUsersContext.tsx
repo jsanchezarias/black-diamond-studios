@@ -35,12 +35,13 @@ interface ChatMessage {
 
 interface PublicUsersContextType {
   currentUser: PublicUser | null;
-  logout: () => Promise<void>; // ✅ Cambiar a async
+  loginUser: (clienteData: any) => void; // ✅ Setear usuario directamente tras login
+  logout: () => Promise<void>;
   sendMessage: (message: string, receiverId?: string) => Promise<void>;
   messages: ChatMessage[];
   onlineUsers?: number;
-  getVisibleMessages?: () => ChatMessage[]; // Obtiene mensajes según permisos
-  logoutRef?: React.MutableRefObject<(() => Promise<void>) | undefined>; // ✅ Exportar ref
+  getVisibleMessages?: () => ChatMessage[];
+  logoutRef?: React.MutableRefObject<(() => Promise<void>) | undefined>;
 }
 
 const PublicUsersContext = createContext<PublicUsersContextType | undefined>(undefined);
@@ -528,6 +529,27 @@ export function PublicUsersProvider({ children }: { children: ReactNode }) {
   }, []); // 🔥 Sin dependencias para evitar loops
 
   // ============================================
+  // LOGIN DIRECTO (llamado desde ClienteLoginModal)
+  // ============================================
+  const loginUser = useCallback((clienteData: any) => {
+    const publicUser: PublicUser = {
+      id: clienteData.id,
+      username: clienteData.nombre || clienteData.nombre_usuario || 'Usuario',
+      telefono: clienteData.telefono || '',
+      registeredAt: new Date(clienteData.fecha_registro || clienteData.created_at || Date.now()),
+      avatar: undefined,
+      isVIP: false,
+      role: clienteData.email === PROGRAMADOR_EMAIL ? 'programador' : 'user',
+    };
+    currentUserRef.current = publicUser;
+    setCurrentUser(publicUser);
+    // Recargar mensajes al entrar
+    let mounted = true;
+    loadMessages(() => mounted);
+    return () => { mounted = false; };
+  }, []);
+
+  // ============================================
   // LOGOUT
   // ============================================
   const logout = useCallback(async () => {
@@ -828,6 +850,7 @@ export function PublicUsersProvider({ children }: { children: ReactNode }) {
     <PublicUsersContext.Provider
       value={{
         currentUser,
+        loginUser,
         logout,
         sendMessage,
         messages,
@@ -848,6 +871,7 @@ export function usePublicUsers() {
     console.warn('usePublicUsers debe usarse dentro de PublicUsersProvider');
     // Retornar un contexto vacío seguro en lugar de lanzar error
     return {
+      loginUser: () => {},
       users: [],
       loading: false,
       error: null,
