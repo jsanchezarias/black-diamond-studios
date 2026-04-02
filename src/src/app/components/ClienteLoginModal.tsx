@@ -86,7 +86,7 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
       const { data: clienteData, error: clienteError } = await supabase
         .from('clientes')
         .select('*')
-        .eq('auth_user_id', authData.user.id)
+        .eq('user_id', authData.user.id)
         .single();
 
       if (clienteError || !clienteData) {
@@ -106,7 +106,7 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
         .from('clientes')
         .update({
           sesion_activa: true,
-          sesion_token: authData.session.access_token,
+          sesion_token: authData.session?.access_token || null,
           sesion_ultimo_acceso: new Date().toISOString(),
           sesion_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
         })
@@ -169,7 +169,7 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
 
       // 2. Insertar perfil en tabla clientes
       const nuevoCliente = {
-        auth_user_id: authData.user.id,
+        user_id: authData.user.id,
         nombre: nombre.trim(),
         nombre_usuario: nombreUsuario.trim(),
         telefono: telefono.trim(),
@@ -177,10 +177,9 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
         fecha_nacimiento: fechaNacimiento || null,
         ciudad: ciudad.trim() || null,
         sesion_activa: true,
-        sesion_token: authData.session?.access_token || `session-${Date.now()}`,
+        sesion_token: authData.session?.access_token || null,
         sesion_ultimo_acceso: new Date().toISOString(),
         sesion_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        bloqueado: false,
       };
 
       const { data: clienteData, error: clienteError } = await supabase
