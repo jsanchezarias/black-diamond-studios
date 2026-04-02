@@ -1,12 +1,11 @@
 import { useState } from 'react';
-import { User, Phone, Lock, X, Loader2, CheckCircle, AlertCircle, Mail, Calendar, MapPin } from 'lucide-react';
-import { useClientes } from './ClientesContext';
+import { User, Phone, Lock, Loader2, CheckCircle, AlertCircle, Mail, Calendar, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../../components/ui/dialog';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Label } from '../../../components/ui/label';
-import { supabase, projectId, publicAnonKey } from '../../utils/supabase/info'; // ✅ Corregido: ruta correcta
+import { supabase } from '../../utils/supabase/info';
 import { Logo } from './Logo';
 
 interface ClienteLoginModalProps {
@@ -15,17 +14,21 @@ interface ClienteLoginModalProps {
   onLoginSuccess: (cliente: any) => void;
 }
 
+// Convierte teléfono en email sintético para Supabase Auth
+const telefonoToEmail = (telefono: string) =>
+  `${telefono.replace(/\s+/g, '')}@clientes.blackdiamond.app`;
+
 export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLoginModalProps) {
   const [modo, setModo] = useState<'login' | 'registro'>('login');
   const [procesando, setProcesando] = useState(false);
   const [error, setError] = useState('');
   const [exitoso, setExitoso] = useState(false);
 
-  // Estados para login
+  // Login
   const [loginTelefono, setLoginTelefono] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
 
-  // Estados para registro
+  // Registro
   const [nombre, setNombre] = useState('');
   const [nombreUsuario, setNombreUsuario] = useState('');
   const [telefono, setTelefono] = useState('');
@@ -63,75 +66,60 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
     setError('');
 
     try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-9dadc017/clientes/login`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${publicAnonKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            telefono: loginTelefono,
-            password: loginPassword
-          }),
-        }
-      );
+      const emailSintetico = telefonoToEmail(loginTelefono);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        // Mensaje de error amigable y limpio
-        if (errorData.error?.toLowerCase().includes('credenciales') || 
-            errorData.error?.toLowerCase().includes('contraseña') ||
-            errorData.error?.toLowerCase().includes('incorrecta')) {
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: emailSintetico,
+        password: loginPassword,
+      });
+
+      if (authError) {
+        if (authError.message.includes('Invalid login credentials')) {
           setError('Teléfono o contraseña incorrectos. Por favor verifica tus datos.');
         } else {
           setError('Error al iniciar sesión. Por favor intenta nuevamente.');
         }
-        setProcesando(false);
         return;
       }
 
-      const { cliente, token } = await response.json();
+      // Obtener datos completos del cliente desde la tabla
+      const { data: clienteData, error: clienteError } = await supabase
+        .from('clientes')
+        .select('*')
+        .eq('auth_user_id', authData.user.id)
+        .single();
 
-      // ✅ ÚNICA FUENTE DE VERDAD: Actualizar sesión en tabla clientes
-      try {
-        const { error: sesionError } = await supabase
-          .from('clientes')
-          .update({
-            sesion_activa: true,
-            sesion_token: token || `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            sesion_ultimo_acceso: new Date().toISOString(),
-            sesion_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 días
-          })
-          .eq('id', cliente.id);
-
-        if (sesionError) {
-          console.error('❌ Error actualizando sesión:', sesionError);
-          setError('Error al crear la sesión. Por favor intenta de nuevo.');
-          setProcesando(false);
-          return;
-        }
-
-        console.log('✅ Sesión iniciada correctamente');
-
-        // ✅ Realtime detectará automáticamente la actualización en clientes
-        
-      } catch (err) {
-        console.error('❌ Error completo actualizando sesión:', err);
-        setError('Error al crear la sesión. Por favor intenta de nuevo.');
-        setProcesando(false);
+      if (clienteError || !clienteData) {
+        setError('No se encontró tu perfil de cliente. Contacta al administrador.');
+        await supabase.auth.signOut();
         return;
       }
+
+      if (clienteData.bloqueado) {
+        setError('Tu cuenta ha sido bloqueada. Contacta al administrador.');
+        await supabase.auth.signOut();
+        return;
+      }
+
+      // Actualizar sesión activa
+      await supabase
+        .from('clientes')
+        .update({
+          sesion_activa: true,
+          sesion_token: authData.session.access_token,
+          sesion_ultimo_acceso: new Date().toISOString(),
+          sesion_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        })
+        .eq('id', clienteData.id);
 
       setExitoso(true);
       setTimeout(() => {
-        onLoginSuccess(cliente);
+        onLoginSuccess(clienteData);
         handleClose();
       }, 1500);
     } catch (err: any) {
-      console.error('Error en login:', err);
       setError('Error al iniciar sesión. Por favor verifica tu conexión e intenta nuevamente.');
+    } finally {
       setProcesando(false);
     }
   };
@@ -141,12 +129,10 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
       setError('Nombre, nombre de usuario, teléfono y contraseña son obligatorios');
       return;
     }
-
     if (password.length < 6) {
       setError('La contraseña debe tener al menos 6 caracteres');
       return;
     }
-
     if (password !== confirmPassword) {
       setError('Las contraseñas no coinciden');
       return;
@@ -156,72 +142,68 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
     setError('');
 
     try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-9dadc017/clientes`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${publicAnonKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            nombre,
-            nombreUsuario,
-            telefono,
-            password,
-            email: email || undefined,
-            fechaNacimiento: fechaNacimiento || undefined,
-            ciudad: ciudad || undefined,
-          }),
-        }
-      );
+      const emailSintetico = telefonoToEmail(telefono);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        setError(errorData.error || 'Error al registrarse');
-        setProcesando(false);
+      // 1. Crear usuario en Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: emailSintetico,
+        password,
+        options: {
+          data: { nombre, nombreUsuario, telefono },
+        },
+      });
+
+      if (authError) {
+        if (authError.message.includes('already registered')) {
+          setError('Ya existe una cuenta con ese número de teléfono. Intenta iniciar sesión.');
+        } else {
+          setError('Error al crear la cuenta: ' + authError.message);
+        }
         return;
       }
 
-      const nuevoCliente = await response.json();
+      if (!authData.user) {
+        setError('Error al crear el usuario. Intenta nuevamente.');
+        return;
+      }
 
-      // ✅ ÚNICA FUENTE DE VERDAD: Actualizar sesión en tabla clientes
-      try {
-        const { error: sesionError } = await supabase
-          .from('clientes')
-          .update({
-            sesion_activa: true,
-            sesion_token: `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            sesion_ultimo_acceso: new Date().toISOString(),
-            sesion_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 días
-          })
-          .eq('id', nuevoCliente.id);
+      // 2. Insertar perfil en tabla clientes
+      const nuevoCliente = {
+        auth_user_id: authData.user.id,
+        nombre: nombre.trim(),
+        nombre_usuario: nombreUsuario.trim(),
+        telefono: telefono.trim(),
+        email: email.trim() || null,
+        fecha_nacimiento: fechaNacimiento || null,
+        ciudad: ciudad.trim() || null,
+        sesion_activa: true,
+        sesion_token: authData.session?.access_token || `session-${Date.now()}`,
+        sesion_ultimo_acceso: new Date().toISOString(),
+        sesion_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        bloqueado: false,
+      };
 
-        if (sesionError) {
-          console.error('❌ Error actualizando sesión:', sesionError);
-          setError('Error al crear la sesión. Intenta de nuevo.');
-          setProcesando(false);
-          return;
-        }
+      const { data: clienteData, error: clienteError } = await supabase
+        .from('clientes')
+        .insert(nuevoCliente)
+        .select()
+        .single();
 
-        console.log('✅ Sesión actualizada en Supabase para cliente:', nuevoCliente.nombre);
-
-        // ✅ Realtime detectará automáticamente la actualización en clientes
-        
-      } catch (err) {
-        console.error('❌ Error completo actualizando sesión:', err);
-        setError('Error al crear la sesión. Intenta de nuevo.');
-        setProcesando(false);
+      if (clienteError) {
+        // Si falla la inserción, limpiar el usuario de auth
+        await supabase.auth.signOut();
+        setError('Error al crear tu perfil. Por favor intenta nuevamente.');
         return;
       }
 
       setExitoso(true);
       setTimeout(() => {
-        onLoginSuccess(nuevoCliente);
+        onLoginSuccess(clienteData);
         handleClose();
       }, 1500);
     } catch (err: any) {
       setError(err.message || 'Error al registrarse');
+    } finally {
       setProcesando(false);
     }
   };
@@ -243,19 +225,15 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
             <div className="flex justify-center">
               <Logo variant="horizontal" size="lg" />
             </div>
-
             <div className="w-20 h-20 rounded-full border-2 bg-green-500/20 border-green-500 flex items-center justify-center mx-auto animate-pulse">
               <CheckCircle className="w-12 h-12 text-green-500" />
             </div>
-
             <div>
               <h2 className="text-2xl font-bold mb-2 text-green-500">
                 {modo === 'login' ? '¡Bienvenido de vuelta!' : '¡Registro Exitoso!'}
               </h2>
               <p className="text-muted-foreground">
-                {modo === 'login' 
-                  ? 'Iniciando sesión...' 
-                  : 'Tu cuenta ha sido creada exitosamente'}
+                {modo === 'login' ? 'Iniciando sesión...' : 'Tu cuenta ha sido creada exitosamente'}
               </p>
             </div>
           </div>
@@ -284,7 +262,6 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
           </DialogHeader>
 
           <div className="space-y-4 sm:space-y-6 overflow-x-hidden">
-            {/* Error */}
             {error && (
               <div className="p-2 sm:p-3 bg-red-500/10 border border-red-500/30 rounded-lg flex items-start gap-2 overflow-hidden">
                 <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
@@ -292,7 +269,6 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
               </div>
             )}
 
-            {/* Teléfono */}
             <div className="space-y-2 overflow-hidden">
               <Label htmlFor="loginTelefono" className="flex items-center gap-2 text-xs sm:text-sm flex-wrap">
                 <Phone className="w-4 h-4 text-primary flex-shrink-0" />
@@ -309,7 +285,6 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
               />
             </div>
 
-            {/* Contraseña */}
             <div className="space-y-2 overflow-hidden">
               <Label htmlFor="loginPassword" className="flex items-center gap-2 text-xs sm:text-sm flex-wrap">
                 <Lock className="w-4 h-4 text-primary flex-shrink-0" />
@@ -327,24 +302,22 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
               />
             </div>
 
-            {/* Botones */}
             <div className="space-y-3 w-full overflow-hidden">
               <Button
                 onClick={handleLogin}
                 disabled={procesando}
-                className="w-full !whitespace-normal !h-auto !min-h-[44px] !py-3 !px-3 sm:!px-4 flex items-center justify-center !shrink"
+                className="w-full !whitespace-normal !h-auto !min-h-[44px] !py-3"
                 size="lg"
-                style={{ whiteSpace: 'normal', height: 'auto', minHeight: '44px', flexShrink: 1 }}
               >
                 {procesando ? (
-                  <div className="flex items-center justify-center gap-2 w-full min-w-0">
-                    <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin flex-shrink-0" />
-                    <span className="break-words text-center text-xs sm:text-sm min-w-0">Verificando...</span>
+                  <div className="flex items-center justify-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" />
+                    <span className="text-xs sm:text-sm">Verificando...</span>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-center gap-2 w-full min-w-0">
+                  <div className="flex items-center justify-center gap-2">
                     <User className="w-4 h-4 flex-shrink-0" />
-                    <span className="break-words text-center text-xs sm:text-sm min-w-0">Iniciar Sesión</span>
+                    <span className="text-xs sm:text-sm">Iniciar Sesión</span>
                   </div>
                 )}
               </Button>
@@ -352,10 +325,7 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
               <div className="text-center overflow-hidden px-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    setModo('registro');
-                    setError('');
-                  }}
+                  onClick={() => { setModo('registro'); setError(''); }}
                   className="text-xs sm:text-sm text-primary hover:underline break-words"
                   disabled={procesando}
                 >
@@ -377,16 +347,13 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
           <div className="flex justify-center mb-4">
             <Logo variant="horizontal" size="md" />
           </div>
-          <DialogTitle className="text-2xl text-center">
-            Crear Cuenta Nueva
-          </DialogTitle>
+          <DialogTitle className="text-2xl text-center">Crear Cuenta Nueva</DialogTitle>
           <DialogDescription className="text-center">
             Completa tus datos para registrarte en Black Diamond
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Error */}
           {error && (
             <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg flex items-start gap-2">
               <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
@@ -395,7 +362,6 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Nombre completo */}
             <div className="space-y-2">
               <Label htmlFor="nombre" className="flex items-center gap-2">
                 <User className="w-4 h-4 text-primary" />
@@ -411,7 +377,6 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
               />
             </div>
 
-            {/* Nombre de usuario */}
             <div className="space-y-2">
               <Label htmlFor="nombreUsuario">Nombre de Usuario *</Label>
               <Input
@@ -424,7 +389,6 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
               />
             </div>
 
-            {/* Teléfono */}
             <div className="space-y-2">
               <Label htmlFor="telefono" className="flex items-center gap-2">
                 <Phone className="w-4 h-4 text-primary" />
@@ -441,7 +405,6 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
               />
             </div>
 
-            {/* Email */}
             <div className="space-y-2">
               <Label htmlFor="email" className="flex items-center gap-2">
                 <Mail className="w-4 h-4 text-primary" />
@@ -458,7 +421,6 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
               />
             </div>
 
-            {/* Contraseña */}
             <div className="space-y-2">
               <Label htmlFor="password" className="flex items-center gap-2">
                 <Lock className="w-4 h-4 text-primary" />
@@ -475,7 +437,6 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
               />
             </div>
 
-            {/* Confirmar contraseña */}
             <div className="space-y-2">
               <Label htmlFor="confirmPassword">Confirmar Contraseña *</Label>
               <Input
@@ -489,7 +450,6 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
               />
             </div>
 
-            {/* Fecha de nacimiento */}
             <div className="space-y-2">
               <Label htmlFor="fechaNacimiento" className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-primary" />
@@ -505,7 +465,6 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
               />
             </div>
 
-            {/* Ciudad */}
             <div className="space-y-2">
               <Label htmlFor="ciudad" className="flex items-center gap-2">
                 <MapPin className="w-4 h-4 text-primary" />
@@ -522,7 +481,6 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
             </div>
           </div>
 
-          {/* Botones */}
           <div className="space-y-3 pt-4">
             <Button
               onClick={handleRegistro}
@@ -532,7 +490,7 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
             >
               {procesando ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin mr-2" />
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
                   Creando cuenta...
                 </>
               ) : (
@@ -546,10 +504,7 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
             <div className="text-center">
               <button
                 type="button"
-                onClick={() => {
-                  setModo('login');
-                  setError('');
-                }}
+                onClick={() => { setModo('login'); setError(''); }}
                 className="text-sm text-primary hover:underline"
                 disabled={procesando}
               >

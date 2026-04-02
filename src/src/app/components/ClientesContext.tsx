@@ -1,12 +1,12 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { projectId, publicAnonKey } from '../../utils/supabase/info';
+import { supabase } from '../../utils/supabase/info';
 import { notificarClienteBloqueado } from './NotificacionesHelpers';
 
 export interface ServicioCliente {
   id: string;
   fecha: string;
   modeloNombre: string;
-  modeloEmail?: string; // Email de la modelo que atendió
+  modeloEmail?: string;
   tipoServicio: string;
   tiempoServicio: string;
   duracionMinutos: number;
@@ -24,27 +24,13 @@ export interface ServicioCliente {
   consumo?: string;
   notas?: string;
   notasServicio?: string;
-  observacionModelo?: string; // Observación privada de la modelo sobre el cliente
+  observacionModelo?: string;
   estado?: 'completado' | 'cancelado' | 'no_show';
   motivoCancelacion?: string;
   agendamientoId?: number;
-  tiemposAdicionales?: Array<{
-    tiempo: string;
-    costo: number;
-    timestamp: Date;
-  }>;
-  adicionalesExtra?: Array<{
-    descripcion: string;
-    costo: number;
-    comprobante?: string;
-    timestamp: Date;
-  }>;
-  consumosDetallados?: Array<{
-    descripcion: string;
-    costo: number;
-    cantidad: number;
-    timestamp: Date;
-  }>;
+  tiemposAdicionales?: Array<{ tiempo: string; costo: number; timestamp: Date }>;
+  adicionalesExtra?: Array<{ descripcion: string; costo: number; comprobante?: string; timestamp: Date }>;
+  consumosDetallados?: Array<{ descripcion: string; costo: number; cantidad: number; timestamp: Date }>;
 }
 
 export interface ObservacionModelo {
@@ -53,8 +39,8 @@ export interface ObservacionModelo {
   modeloEmail: string;
   fecha: string;
   observacion: string;
-  rating?: number; // Rating que la modelo le da al cliente (1-5)
-  tipo?: 'positiva' | 'negativa' | 'neutral'; // Tipo de observación
+  rating?: number;
+  tipo?: 'positiva' | 'negativa' | 'neutral';
 }
 
 export interface Cliente {
@@ -66,25 +52,23 @@ export interface Cliente {
   fechaNacimiento?: Date;
   ciudad?: string;
   preferencias?: string;
-  notas?: string; // Notas administrativas internas
-  observaciones?: ObservacionModelo[]; // Observaciones de las modelos
-  rating?: number; // Rating promedio del cliente
+  notas?: string;
+  observaciones?: ObservacionModelo[];
+  rating?: number;
   historialServicios: ServicioCliente[];
   userId?: string;
   fechaRegistro: Date;
   ultimaVisita?: Date;
   totalServicios: number;
   totalGastado: number;
-  // Estadísticas adicionales
-  modelosFrecuentes?: Array<{ modeloNombre: string; cantidad: number }>; // Modelos que más visita
-  serviciosFrecuentes?: Array<{ tipoServicio: string; cantidad: number }>; // Tipos de servicio más frecuentes
-  // 🆕 Sistema de bloqueo y multas
+  modelosFrecuentes?: Array<{ modeloNombre: string; cantidad: number }>;
+  serviciosFrecuentes?: Array<{ tipoServicio: string; cantidad: number }>;
   bloqueado?: boolean;
   motivoBloqueo?: string;
   fechaBloqueo?: string;
-  bloqueadoPor?: string; // Admin que bloqueó
-  multasPendientes?: number; // Total de multas pendientes
-  totalNoShows?: number; // Contador de no-shows
+  bloqueadoPor?: string;
+  multasPendientes?: number;
+  totalNoShows?: number;
 }
 
 interface ClientesContextType {
@@ -111,223 +95,172 @@ interface ClientesContextType {
   isLoading: boolean;
 }
 
+// Convierte fila de Supabase (snake_case) al tipo Cliente (camelCase)
+function dbRowToCliente(row: any): Cliente {
+  return {
+    id: row.id,
+    telefono: row.telefono,
+    nombre: row.nombre,
+    nombreUsuario: row.nombre_usuario ?? row.nombreUsuario ?? '',
+    email: row.email,
+    fechaNacimiento: row.fecha_nacimiento ? new Date(row.fecha_nacimiento) : undefined,
+    ciudad: row.ciudad,
+    preferencias: row.preferencias,
+    notas: row.notas,
+    observaciones: row.observaciones ?? [],
+    rating: row.rating,
+    historialServicios: row.historial_servicios ?? row.historialServicios ?? [],
+    userId: row.auth_user_id ?? row.userId,
+    fechaRegistro: new Date(row.fecha_registro ?? row.fechaRegistro ?? Date.now()),
+    ultimaVisita: row.ultima_visita ? new Date(row.ultima_visita) : (row.ultimaVisita ? new Date(row.ultimaVisita) : undefined),
+    totalServicios: row.total_servicios ?? row.totalServicios ?? 0,
+    totalGastado: row.total_gastado ?? row.totalGastado ?? 0,
+    bloqueado: row.bloqueado ?? false,
+    motivoBloqueo: row.motivo_bloqueo ?? row.motivoBloqueo,
+    fechaBloqueo: row.fecha_bloqueo ?? row.fechaBloqueo,
+    bloqueadoPor: row.bloqueado_por ?? row.bloqueadoPor,
+    multasPendientes: row.multas_pendientes ?? row.multasPendientes ?? 0,
+    totalNoShows: row.total_no_shows ?? row.totalNoShows ?? 0,
+  };
+}
+
+// Convierte Partial<Cliente> a columnas snake_case para Supabase
+function clienteToDbRow(cliente: Partial<Cliente> & { password?: string }): Record<string, any> {
+  const row: Record<string, any> = {};
+  if (cliente.nombre !== undefined) row.nombre = cliente.nombre;
+  if (cliente.nombreUsuario !== undefined) row.nombre_usuario = cliente.nombreUsuario;
+  if (cliente.telefono !== undefined) row.telefono = cliente.telefono;
+  if (cliente.email !== undefined) row.email = cliente.email;
+  if (cliente.fechaNacimiento !== undefined) row.fecha_nacimiento = cliente.fechaNacimiento instanceof Date ? cliente.fechaNacimiento.toISOString() : cliente.fechaNacimiento;
+  if (cliente.ciudad !== undefined) row.ciudad = cliente.ciudad;
+  if (cliente.preferencias !== undefined) row.preferencias = cliente.preferencias;
+  if (cliente.notas !== undefined) row.notas = cliente.notas;
+  if (cliente.observaciones !== undefined) row.observaciones = cliente.observaciones;
+  if (cliente.rating !== undefined) row.rating = cliente.rating;
+  if (cliente.historialServicios !== undefined) row.historial_servicios = cliente.historialServicios;
+  if (cliente.ultimaVisita !== undefined) row.ultima_visita = cliente.ultimaVisita instanceof Date ? cliente.ultimaVisita.toISOString() : cliente.ultimaVisita;
+  if (cliente.totalServicios !== undefined) row.total_servicios = cliente.totalServicios;
+  if (cliente.totalGastado !== undefined) row.total_gastado = cliente.totalGastado;
+  if (cliente.bloqueado !== undefined) row.bloqueado = cliente.bloqueado;
+  if (cliente.motivoBloqueo !== undefined) row.motivo_bloqueo = cliente.motivoBloqueo;
+  if (cliente.fechaBloqueo !== undefined) row.fecha_bloqueo = cliente.fechaBloqueo;
+  if (cliente.bloqueadoPor !== undefined) row.bloqueado_por = cliente.bloqueadoPor;
+  if (cliente.multasPendientes !== undefined) row.multas_pendientes = cliente.multasPendientes;
+  if (cliente.totalNoShows !== undefined) row.total_no_shows = cliente.totalNoShows;
+  return row;
+}
+
 const ClientesContext = createContext<ClientesContextType | undefined>(undefined);
 
 export function ClientesProvider({ children }: { children: ReactNode }) {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // ✅ CORREGIDO: useEffect mejorado para evitar loops
   useEffect(() => {
-    let isMounted = true;
-    
-    const cargarInicial = async () => {
-      if (!isMounted) return;
-      await cargarClientes();
-    };
-    
-    cargarInicial();
-    
-    return () => {
-      isMounted = false;
-    };
-  }, []); // ✅ Array vacío - solo ejecutar una vez al montar
+    cargarClientes();
+  }, []);
 
   const cargarClientes = async () => {
     try {
-      console.log('🔄 Cargando clientes desde Supabase...');
-      
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-9dadc017/clientes`,
-        {
-          headers: {
-            'Authorization': `Bearer ${publicAnonKey}`,
-          },
-        }
-      );
+      const { data, error } = await supabase
+        .from('clientes')
+        .select('*')
+        .order('fecha_registro', { ascending: false });
 
-      if (response.ok) {
-        const data = await response.json();
-        console.log(`📥 Respuesta del servidor recibida:`, data.length, 'clientes');
-        
-        // Si el servidor devuelve array vacío (tabla no existe), mostrar advertencia
-        if (Array.isArray(data) && data.length === 0) {
-          console.warn('⚠️ No hay clientes en la tabla');
-          console.warn('💡 Para agregar clientes, ve al panel "Historial de Clientes" y haz click en "Agregar Cliente"');
-          setClientes([]);
-        } else {
-          // Filtrar clientes null y validar datos requeridos
-          const clientesValidos = data
-            .filter((c: any) => c && c.fechaRegistro && c.telefono)
-            .map((c: any) => ({
-              ...c,
-              fechaRegistro: new Date(c.fechaRegistro),
-              fechaNacimiento: c.fechaNacimiento ? new Date(c.fechaNacimiento) : undefined,
-              ultimaVisita: c.ultimaVisita ? new Date(c.ultimaVisita) : undefined,
-              historialServicios: c.historialServicios || [],
-              observaciones: c.observaciones || [],
-            }));
-          setClientes(clientesValidos);
-          console.log(`✅ ${clientesValidos.length} clientes cargados exitosamente en el frontend`);
-        }
-      } else {
-        console.error('❌ Error al obtener clientes:', response.status);
-        const errorText = await response.text();
-        console.error('📋 Detalles:', errorText);
-        // No cargar clientes si hay error, dejar array vacío
+      if (error) {
+        console.error('❌ Error cargando clientes:', error.message);
         setClientes([]);
+        return;
       }
-    } catch (error) {
-      console.error('❌ Error cargando clientes:', error);
-      // En caso de error de red, inicializar con array vacío
+
+      const clientesValidos = (data ?? []).map(dbRowToCliente);
+      setClientes(clientesValidos);
+      console.log(`✅ ${clientesValidos.length} clientes cargados`);
+    } catch (err) {
+      console.error('❌ Error inesperado cargando clientes:', err);
       setClientes([]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const agregarCliente = async (clienteData: Omit<Cliente, 'id' | 'fechaRegistro' | 'totalServicios' | 'totalGastado' | 'historialServicios' | 'observaciones'> & { password?: string }): Promise<Cliente> => {
-    const MAX_RETRIES = 3;
-    const TIMEOUT_MS = 30000; // 30 segundos
-    
-    for (let intento = 0; intento < MAX_RETRIES; intento++) {
-      try {
-        // Crear un controller para manejar timeout
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const agregarCliente = async (
+    clienteData: Omit<Cliente, 'id' | 'fechaRegistro' | 'totalServicios' | 'totalGastado' | 'historialServicios' | 'observaciones'> & { password?: string }
+  ): Promise<Cliente> => {
+    const dbRow = {
+      ...clienteToDbRow(clienteData),
+      historial_servicios: [],
+      observaciones: [],
+      total_servicios: 0,
+      total_gastado: 0,
+      fecha_registro: new Date().toISOString(),
+      bloqueado: false,
+    };
+    // No guardar password en la tabla directamente
+    delete dbRow.password;
 
-        const response = await fetch(
-          `https://${projectId}.supabase.co/functions/v1/make-server-9dadc017/clientes`,
-          {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${publicAnonKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(clienteData),
-            signal: controller.signal,
-          }
-        );
+    const { data, error } = await supabase
+      .from('clientes')
+      .insert(dbRow)
+      .select()
+      .single();
 
-        clearTimeout(timeoutId);
+    if (error) throw new Error(`Error al agregar cliente: ${error.message}`);
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          
-          // Si es un error 500 de Supabase/Cloudflare, reintentar
-          if (response.status >= 500 && intento < MAX_RETRIES - 1) {
-            console.warn(`Error ${response.status} al agregar cliente, reintentando... (${intento + 1}/${MAX_RETRIES})`);
-            // Esperar un poco antes de reintentar (exponential backoff)
-            await new Promise(resolve => setTimeout(resolve, Math.pow(2, intento) * 1000));
-            continue;
-          }
-          
-          throw new Error(`Error al agregar cliente: ${errorText}`);
-        }
-
-        const nuevoCliente = await response.json();
-        const clienteConFechas = {
-          ...nuevoCliente,
-          fechaRegistro: new Date(nuevoCliente.fechaRegistro),
-          fechaNacimiento: nuevoCliente.fechaNacimiento ? new Date(nuevoCliente.fechaNacimiento) : undefined,
-          ultimaVisita: nuevoCliente.ultimaVisita ? new Date(nuevoCliente.ultimaVisita) : undefined,
-          historialServicios: nuevoCliente.historialServicios || [],
-          observaciones: nuevoCliente.observaciones || [],
-        };
-
-        setClientes(prev => [...prev, clienteConFechas]);
-        return clienteConFechas;
-      } catch (error: any) {
-        // Si es un error de timeout o red y no es el último intento, reintentar
-        if ((error.name === 'AbortError' || error.message?.includes('fetch')) && intento < MAX_RETRIES - 1) {
-          console.warn(`Timeout/Error de red al agregar cliente, reintentando... (${intento + 1}/${MAX_RETRIES})`);
-          await new Promise(resolve => setTimeout(resolve, Math.pow(2, intento) * 1000));
-          continue;
-        }
-        
-        console.error('Error agregando cliente:', error);
-        throw error;
-      }
-    }
-    
-    throw new Error('No se pudo agregar el cliente después de varios intentos');
+    const nuevoCliente = dbRowToCliente(data);
+    setClientes(prev => [nuevoCliente, ...prev]);
+    return nuevoCliente;
   };
 
   const actualizarCliente = async (id: string, clienteData: Partial<Cliente>) => {
-    try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-9dadc017/clientes/${id}`,
-        {
-          method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${publicAnonKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(clienteData),
-        }
-      );
+    const clienteAnterior = clientes.find(c => c.id === id);
+    const dbRow = clienteToDbRow(clienteData);
 
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`Error al actualizar cliente: ${error}`);
-      }
+    const { error } = await supabase
+      .from('clientes')
+      .update(dbRow)
+      .eq('id', id);
 
-      // Obtener cliente antes de actualizar para comparar
-      const clienteAnterior = clientes.find(c => c.id === id);
+    if (error) throw new Error(`Error al actualizar cliente: ${error.message}`);
 
-      setClientes(prev => prev.map(c => 
-        c.id === id ? { ...c, ...clienteData } : c
-      ));
+    setClientes(prev => prev.map(c => c.id === id ? { ...c, ...clienteData } : c));
 
-      // 🔔 NOTIFICACIÓN: Cliente bloqueado (si cambió de no bloqueado a bloqueado)
-      if (clienteData.bloqueado && clienteAnterior && !clienteAnterior.bloqueado && clienteAnterior.email) {
-        notificarClienteBloqueado({
-          clienteEmail: clienteAnterior.email,
-          motivo: clienteData.motivoBloqueo || 'Violación de políticas del establecimiento'
-        }).catch(err => console.error('Error notificando cliente bloqueado:', err));
-      }
-    } catch (error) {
-      console.error('Error actualizando cliente:', error);
-      throw error;
+    if (clienteData.bloqueado && clienteAnterior && !clienteAnterior.bloqueado && clienteAnterior.email) {
+      notificarClienteBloqueado({
+        clienteEmail: clienteAnterior.email,
+        motivo: clienteData.motivoBloqueo || 'Violación de políticas del establecimiento',
+      }).catch(err => console.error('Error notificando cliente bloqueado:', err));
     }
   };
 
-  const buscarPorTelefono = (telefono: string): Cliente | undefined => {
-    return clientes.find(c => c.telefono === telefono);
-  };
+  const buscarPorTelefono = (telefono: string) =>
+    clientes.find(c => c.telefono === telefono);
 
-  const buscarPorEmail = (email: string): Cliente | undefined => {
-    return clientes.find(c => c.email === email);
-  };
+  const buscarPorEmail = (email: string) =>
+    clientes.find(c => c.email === email);
 
-  const buscarClientes = (query: string): Cliente[] => {
-    return clientes.filter(c => 
+  const buscarClientes = (query: string) =>
+    clientes.filter(c =>
       c.nombre.toLowerCase().includes(query.toLowerCase()) ||
       c.telefono.includes(query) ||
       (c.email && c.email.toLowerCase().includes(query.toLowerCase()))
     );
-  };
 
   const obtenerOCrearCliente = async (nombre: string, telefono: string, email?: string): Promise<Cliente> => {
-    const clienteExistente = buscarPorTelefono(telefono);
-    if (clienteExistente) {
-      return clienteExistente;
-    }
+    const existente = buscarPorTelefono(telefono);
+    if (existente) return existente;
 
-    const nuevoClienteData: Omit<Cliente, 'id' | 'fechaRegistro' | 'totalServicios' | 'totalGastado' | 'historialServicios' | 'observaciones'> & { password?: string } = {
+    return agregarCliente({
       nombre,
       telefono,
       nombreUsuario: nombre.toLowerCase().replace(/\s+/g, ''),
       email,
-    };
-
-    return agregarCliente(nuevoClienteData);
+    });
   };
 
   const registrarServicio = async (clienteId: string, monto: number) => {
     const cliente = clientes.find(c => c.id === clienteId);
     if (!cliente) return;
-
     await actualizarCliente(clienteId, {
       totalServicios: cliente.totalServicios + 1,
       totalGastado: cliente.totalGastado + monto,
@@ -371,7 +304,6 @@ export function ClientesProvider({ children }: { children: ReactNode }) {
     };
 
     const historialActualizado = [...cliente.historialServicios, nuevoServicio];
-
     await actualizarCliente(cliente.id, {
       totalServicios: cliente.totalServicios + 1,
       totalGastado: cliente.totalGastado + nuevoServicio.monto,
@@ -380,7 +312,14 @@ export function ClientesProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  const agregarObservacionModelo = async (telefono: string, modeloNombre: string, modeloEmail: string, observacion: string, rating?: number, tipo?: 'positiva' | 'negativa' | 'neutral') => {
+  const agregarObservacionModelo = async (
+    telefono: string,
+    modeloNombre: string,
+    modeloEmail: string,
+    observacion: string,
+    rating?: number,
+    tipo?: 'positiva' | 'negativa' | 'neutral'
+  ) => {
     const cliente = clientes.find(c => c.telefono === telefono);
     if (!cliente) return;
 
@@ -394,64 +333,46 @@ export function ClientesProvider({ children }: { children: ReactNode }) {
       tipo,
     };
 
-    const observacionesActualizadas = [...(cliente.observaciones || []), nuevaObservacion];
-
     await actualizarCliente(cliente.id, {
-      observaciones: observacionesActualizadas,
+      observaciones: [...(cliente.observaciones || []), nuevaObservacion],
     });
   };
 
-  const obtenerHistorialCliente = (clienteId: string) => {
-    const cliente = clientes.find(c => c.id === clienteId);
-    return cliente ? cliente.historialServicios : [];
-  };
+  const obtenerHistorialCliente = (clienteId: string) =>
+    clientes.find(c => c.id === clienteId)?.historialServicios ?? [];
 
-  const obtenerObservacionesCliente = (telefono: string) => {
-    const cliente = clientes.find(c => c.telefono === telefono);
-    return cliente ? (cliente.observaciones || []) : [];
-  };
+  const obtenerObservacionesCliente = (telefono: string) =>
+    clientes.find(c => c.telefono === telefono)?.observaciones ?? [];
 
-  const obtenerNotasServiciosPrevios = (telefono: string) => {
-    const cliente = clientes.find(c => c.telefono === telefono);
-    return cliente ? cliente.historialServicios.map(s => s.notas || '').filter(n => n) : [];
-  };
+  const obtenerNotasServiciosPrevios = (telefono: string) =>
+    clientes.find(c => c.telefono === telefono)
+      ?.historialServicios.map(s => s.notas || '').filter(Boolean) ?? [];
 
   const obtenerEstadisticasCliente = (telefono: string) => {
     const cliente = clientes.find(c => c.telefono === telefono);
-    if (!cliente) return {
-      totalServicios: 0,
-      totalGastado: 0,
-      promedioGasto: 0,
-    };
+    if (!cliente) return { totalServicios: 0, totalGastado: 0, promedioGasto: 0 };
 
-    const totalServicios = cliente.totalServicios;
-    const totalGastado = cliente.totalGastado;
-    
-    // Validar que haya servicios antes de intentar reduce
-    const servicioMasReciente = cliente.historialServicios.length > 0
-      ? cliente.historialServicios.reduce((max, servicio) => {
-          return new Date(servicio.fecha) > new Date(max.fecha) ? servicio : max;
-        }, { fecha: '1970-01-01T00:00:00Z' }).fecha
-      : '1970-01-01T00:00:00Z';
-    
-    const modeloFrecuente = cliente.historialServicios.length > 0
-      ? cliente.historialServicios.reduce((acc, servicio) => {
-          const modelo = servicio.modeloNombre;
-          acc[modelo] = (acc[modelo] || 0) + 1;
-          return acc;
-        }, {} as { [key: string]: number })
-      : {};
-    
-    const promedioGasto = totalGastado / totalServicios || 0;
+    const { totalServicios, totalGastado, historialServicios } = cliente;
+
+    const servicioMasReciente = historialServicios.length > 0
+      ? new Date(historialServicios.reduce((max, s) => new Date(s.fecha) > new Date(max.fecha) ? s : max, historialServicios[0]).fecha)
+      : undefined;
+
+    const conteoModelos = historialServicios.reduce((acc, s) => {
+      acc[s.modeloNombre] = (acc[s.modeloNombre] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const modeloFrecuente = Object.keys(conteoModelos).length > 0
+      ? Object.keys(conteoModelos).reduce((a, b) => conteoModelos[a] > conteoModelos[b] ? a : b)
+      : undefined;
 
     return {
       totalServicios,
       totalGastado,
-      servicioMasReciente: new Date(servicioMasReciente),
-      modeloFrecuente: Object.keys(modeloFrecuente).length > 0
-        ? Object.keys(modeloFrecuente).reduce((a, b) => modeloFrecuente[a] > modeloFrecuente[b] ? a : b)
-        : undefined,
-      promedioGasto,
+      servicioMasReciente,
+      modeloFrecuente,
+      promedioGasto: totalServicios > 0 ? totalGastado / totalServicios : 0,
     };
   };
 
@@ -483,33 +404,21 @@ export function ClientesProvider({ children }: { children: ReactNode }) {
 export function useClientes() {
   const context = useContext(ClientesContext);
   if (context === undefined) {
-    console.warn('⚠️ useClientes debe usarse dentro de ClientesProvider');
-    // Retornar un objeto con valores por defecto en lugar de undefined
     return {
       clientes: [],
-      agregarCliente: async () => { 
-        console.warn('ClientesProvider no disponible'); 
-        throw new Error('ClientesProvider no disponible');
-      },
-      actualizarCliente: async () => { console.warn('ClientesProvider no disponible'); },
+      agregarCliente: async () => { throw new Error('ClientesProvider no disponible'); },
+      actualizarCliente: async () => {},
       buscarPorTelefono: () => undefined,
       buscarPorEmail: () => undefined,
       buscarClientes: () => [],
-      obtenerOCrearCliente: async () => { 
-        console.warn('ClientesProvider no disponible'); 
-        throw new Error('ClientesProvider no disponible');
-      },
-      registrarServicio: async () => { console.warn('ClientesProvider no disponible'); },
-      agregarServicioACliente: async () => { console.warn('ClientesProvider no disponible'); },
-      agregarObservacionModelo: async () => { console.warn('ClientesProvider no disponible'); },
+      obtenerOCrearCliente: async () => { throw new Error('ClientesProvider no disponible'); },
+      registrarServicio: async () => {},
+      agregarServicioACliente: async () => {},
+      agregarObservacionModelo: async () => {},
       obtenerHistorialCliente: () => [],
       obtenerObservacionesCliente: () => [],
       obtenerNotasServiciosPrevios: () => [],
-      obtenerEstadisticasCliente: () => ({
-        totalServicios: 0,
-        totalGastado: 0,
-        promedioGasto: 0,
-      }),
+      obtenerEstadisticasCliente: () => ({ totalServicios: 0, totalGastado: 0, promedioGasto: 0 }),
       isLoading: false,
     };
   }
