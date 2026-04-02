@@ -6,7 +6,7 @@ import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { User, Phone, Mail, MapPin, Calendar, Star, Save, X, Lock, Eye, EyeOff } from 'lucide-react';
 import { useClientes } from '../src/app/components/ClientesContext';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 
 interface AgregarClienteModalProps {
   isOpen: boolean;

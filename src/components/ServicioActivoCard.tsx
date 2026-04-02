@@ -11,7 +11,7 @@ import { Textarea } from './ui/textarea';
 import { Separator } from './ui/separator';
 import { useServicios, Servicio } from '../src/app/components/ServiciosContext';
 import { useInventory } from '../src/app/components/InventoryContext';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { uploadComprobante } from '../src/utils/supabase/uploadComprobante';
 
 interface ServicioActivoCardProps {

@@ -8,6 +8,16 @@ export function HabitacionesPanel() {
   const { habitaciones } = useServicios();
   const { modelos } = useModelos();
 
+  if (!habitaciones || !modelos) {
+    return (
+      <Card>
+        <CardContent className="p-8 text-center text-muted-foreground">
+          Cargando habitaciones...
+        </CardContent>
+      </Card>
+    );
+  }
+
   const formatTiempoRestante = (segundos: number) => {
     const horas = Math.floor(segundos / 3600);
     const minutos = Math.floor((segundos % 3600) / 60);

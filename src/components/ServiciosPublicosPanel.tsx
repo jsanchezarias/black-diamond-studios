@@ -6,7 +6,7 @@ import { Badge } from './ui/badge';
 import { useGastos } from '../src/app/components/GastosContext';
 import { AgregarServicioPublicoModal } from './AgregarServicioPublicoModal';
 import { PagarServicioModal } from './PagarServicioModal';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 
 export function ServiciosPublicosPanel() {
   const { 

@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { useCarrito } from '../src/app/components/CarritoContext';
 import { useInventory } from '../src/app/components/InventoryContext';
 import { Logo } from '../src/app/components/Logo';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { uploadComprobante } from '../src/utils/supabase/uploadComprobante';
 
 interface CheckoutModalProps {

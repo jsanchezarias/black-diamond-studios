@@ -49,7 +49,7 @@ import { DetalleCitaModal } from '../../components/DetalleCitaModal';
 import { LogoIsotipo } from './LogoIsotipo';
 import { NotificacionesPanel } from './NotificacionesPanel';
 import { AnalyticsPanel } from './AnalyticsPanel'; // 📊 Sistema de Analytics
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 
 interface ModeloDashboardProps {
   accessToken: string;

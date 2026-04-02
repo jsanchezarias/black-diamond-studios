@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useVideos } from './VideosContext';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
-import { Badge } from './ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
+import { Button } from '../../../components/ui/button';
+import { Input } from '../../../components/ui/input';
+import { Label } from '../../../components/ui/label';
+import { Badge } from '../../../components/ui/badge';
 import { 
   Upload, 
   Play, 
@@ -21,7 +21,7 @@ import {
   CheckCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 
 export function GestionVideos() {
   const { videos, videosActivos, cargando, agregarVideo, actualizarVideo, eliminarVideo, subirArchivoVideo, reordenarVideos } = useVideos();

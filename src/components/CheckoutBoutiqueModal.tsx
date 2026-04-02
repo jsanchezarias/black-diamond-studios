@@ -4,7 +4,7 @@ import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { useCarrito } from '../src/app/components/CarritoContext';
 import { useInventory } from '../src/app/components/InventoryContext';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { uploadComprobante } from '../src/utils/supabase/uploadComprobante';
 
 interface CheckoutBoutiqueModalProps {

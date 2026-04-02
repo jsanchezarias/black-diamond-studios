@@ -1,8 +1,8 @@
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { X, User, Phone, Calendar, Clock, MapPin, DollarSign, FileText, CheckCircle } from 'lucide-react';
-import { Badge } from '../app/components/ui/badge';
-import { Button } from '../app/components/ui/button';
+import { Badge } from '../../components/ui/badge';
+import { Button } from '../../components/ui/button';
 
 interface Agendamiento {
   id: string;

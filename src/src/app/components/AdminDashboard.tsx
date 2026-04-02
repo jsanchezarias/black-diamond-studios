@@ -32,7 +32,7 @@ import { useModelos, Modelo } from './ModelosContext';
 import { useServicios } from './ServiciosContext';
 import { usePagos } from './PagosContext';
 import { useInventory } from './InventoryContext';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { AsistenciaPanel } from './AsistenciaPanel';
 import { RendimientoModelosPanel } from '../../../components/RendimientoModelosPanel';
 import { ModelosArchivadasPanel } from '../../../components/ModelosArchivadasPanel';

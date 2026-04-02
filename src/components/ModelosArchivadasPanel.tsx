@@ -5,7 +5,7 @@ import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { useModelos } from '../src/app/components/ModelosContext';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 
 export function ModelosArchivadasPanel() {
   const { modelosArchivadas, restaurarModelo } = useModelos();

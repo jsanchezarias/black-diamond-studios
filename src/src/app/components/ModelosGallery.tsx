@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Calendar, Clock, MapPin, Star, Heart, MessageCircle, Filter, X } from 'lucide-react';
-import { Card, CardContent } from './ui/card';
-import { Badge } from './ui/badge';
-import { Button } from './ui/button';
+import { Card, CardContent } from '../../../components/ui/card';
+import { Badge } from '../../../components/ui/badge';
+import { Button } from '../../../components/ui/button';
 import { ImageWithFallback } from '../../../components/figma/ImageWithFallback';
 import { useModelos } from './ModelosContext';
 import { useAgendamientos } from './AgendamientosContext';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../../components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
 
 interface ModelosGalleryProps {
   onSelectModelo: (modeloEmail: string) => void;

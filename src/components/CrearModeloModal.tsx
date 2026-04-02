@@ -2,7 +2,7 @@ import { Switch } from './ui/switch';
 import { UserPlus, Loader2, Upload, X, Image as ImageIcon } from 'lucide-react';
 import { supabase } from '../src/utils/supabase/info'; // ✅ Corregido: ruta correcta
 import { useModelos } from '../src/app/components/ModelosContext';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { CredencialesModal } from './CredencialesModal';
 
 interface CrearModeloModalProps {

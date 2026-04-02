@@ -1,7 +1,7 @@
 import { Label } from './ui/label';
 import { Save, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
 import { supabase } from '../src/utils/supabase/info'; // ✅ Corregido: ruta correcta
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 
 export function ConfiguracionChatPanel() {
   const [username, setUsername] = useState('');

@@ -1,7 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { Send, Users, MessageSquare, LogIn, LogOut, Gem, Trash2 } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Badge } from './ui/badge';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
 import { usePublicUsers } from '../src/app/components/PublicUsersContext';
-import { supabase } from '../src/utils/supabase/info'; // ✅ Corregido: ruta correcta
+import { supabase } from '../src/utils/supabase/info';
 
 export function ChatModeratorPanel() {
   const { currentUser, login, logout, sendMessage, messages, onlineUsers } = usePublicUsers();

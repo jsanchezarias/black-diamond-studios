@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '../../utils/supabase/info'; // ✅ Corregido: ruta correcta
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 
 // ============================================
 // 🎥 TIPOS Y INTERFACES

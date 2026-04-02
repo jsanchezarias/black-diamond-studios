@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useClientes, Cliente } from './ClientesContext';
 import { useServicios, Servicio } from './ServiciosContext';
 import { AlertTriangle, Ban, CheckCircle, DollarSign, X, User, Calendar, Clock, AlertCircle, TrendingUp, XCircle } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 
 export function GestionClientesAdmin() {
   const { clientes, actualizarCliente } = useClientes();

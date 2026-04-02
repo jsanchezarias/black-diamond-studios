@@ -7,7 +7,7 @@ import { Textarea } from './ui/textarea';
 import { Switch } from './ui/switch';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { useModelos, Modelo } from '../src/app/components/ModelosContext';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Badge } from './ui/badge';
 import { Card, CardContent } from './ui/card';
@@ -186,7 +186,6 @@ export function EditarModeloModal({ open, onClose, modelo }: EditarModeloModalPr
     if (!archivos) return;
 
     const archivosValidos: File[] = [];
-    const previsualizaciones: string[] = [];
 
     for (let i = 0; i < archivos.length; i++) {
       const archivo = archivos[i];
@@ -202,14 +201,20 @@ export function EditarModeloModal({ open, onClose, modelo }: EditarModeloModalPr
       }
 
       archivosValidos.push(archivo);
-
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        previsualizaciones.push(reader.result as string);
-        setPrevisualizacionesFotosAdicionales([...previsualizacionesFotosAdicionales, ...previsualizaciones]);
-      };
-      reader.readAsDataURL(archivo);
     }
+
+    if (archivosValidos.length === 0) return;
+
+    const leerArchivo = (archivo: File): Promise<string> =>
+      new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(archivo);
+      });
+
+    Promise.all(archivosValidos.map(leerArchivo)).then((previsualizaciones) => {
+      setPrevisualizacionesFotosAdicionales((prev) => [...prev, ...previsualizaciones]);
+    });
 
     setArchivosFotosAdicionales([...archivosFotosAdicionales, ...archivosValidos]);
   };

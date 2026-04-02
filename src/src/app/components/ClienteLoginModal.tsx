@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { User, Phone, Lock, X, Loader2, CheckCircle, AlertCircle, Mail, Calendar, MapPin } from 'lucide-react';
 import { useClientes } from './ClientesContext';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../../components/ui/dialog';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';

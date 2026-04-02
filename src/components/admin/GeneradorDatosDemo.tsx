@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../src/utils/supabase/info'; // ✅ Corregido: ruta correcta
 import { createClient } from '@supabase/supabase-js';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 
 interface LogEntry {
   tipo: 'success' | 'error' | 'info';

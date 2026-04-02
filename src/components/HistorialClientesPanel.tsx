@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Search, User, Calendar, DollarSign, TrendingUp, Phone, Clock, ArrowLeft, Star, MapPin, Plus } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { useClientes, Cliente, ServicioCliente } from '../src/app/components/ClientesContext';
+import { useClientes, Cliente } from '../src/app/components/ClientesContext';
 import { AgregarClienteModal } from './AgregarClienteModal';
 
 export function HistorialClientesPanel() {

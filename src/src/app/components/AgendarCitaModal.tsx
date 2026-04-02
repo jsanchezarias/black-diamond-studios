@@ -1,17 +1,17 @@
 import { useState, useEffect } from 'react';
 import { Calendar, MapPin, Clock, CreditCard, X, Building2, Home, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
-import { Button } from './ui/button';
-import { Badge } from './ui/badge';
-import { Card, CardContent } from './ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Textarea } from './ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../../components/ui/dialog';
+import { Button } from '../../../components/ui/button';
+import { Badge } from '../../../components/ui/badge';
+import { Card, CardContent } from '../../../components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
+import { Textarea } from '../../../components/ui/textarea';
 import { ImageWithFallback } from '../../../components/figma/ImageWithFallback';
 import { DisponibilidadCalendario } from './DisponibilidadCalendario';
 import { useAgendamientos } from './AgendamientosContext';
 import { useModelos } from './ModelosContext';
 import { usePublicUsers } from './PublicUsersContext';
-import { Alert, AlertDescription } from './ui/alert';
+import { Alert, AlertDescription } from '../../../components/ui/alert';
 
 interface AgendarCitaModalProps {
   open: boolean;

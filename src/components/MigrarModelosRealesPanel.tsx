@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Button } from './ui/button';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { Download, Trash2, CheckCircle, AlertCircle, Loader2, Eye } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { projectId, publicAnonKey } from '../utils/supabase/info';

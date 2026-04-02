@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { UserPlus, Trash2, Mail, Calendar, User, Loader2 } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { supabase } from '../src/utils/supabase/info'; // ✅ Corregido: ruta correcta
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';

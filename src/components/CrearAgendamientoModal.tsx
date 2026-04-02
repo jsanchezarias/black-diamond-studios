@@ -10,7 +10,7 @@ import { useAgendamientos } from '../src/app/components/AgendamientosContext';
 import { useModelos } from '../src/app/components/ModelosContext';
 import { useClientes } from '../src/app/components/ClientesContext';
 import { ClienteStatusChecker } from '../src/app/components/ClienteStatusChecker'; // 🆕 Checker de estado del cliente
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { SelectErrorBoundary } from './SelectErrorBoundary';
 
 interface CrearAgendamientoModalProps {

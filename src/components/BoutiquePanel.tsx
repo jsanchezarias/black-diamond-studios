@@ -6,7 +6,7 @@ import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { useInventory } from '../src/app/components/InventoryContext';
 import { GestionBoutiqueModal } from './GestionBoutiqueModal';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 
 interface Producto {
   id: number;

@@ -6,7 +6,7 @@ import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
 import { useTestimonios } from '../src/app/components/TestimoniosContext';
 import { useState } from 'react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 
 export function GestionTestimoniosPanel() {
   const { getTestimoniosPendientes, aprobarTestimonio, rechazarTestimonio, eliminarTestimonio, testimonios } = useTestimonios();

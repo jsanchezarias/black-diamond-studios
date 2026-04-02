@@ -3,7 +3,7 @@ import { X, DollarSign, Upload, CheckCircle, FileText, Calendar } from 'lucide-r
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Label } from './ui/label';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { useGastos, ServicioPublico } from '../src/app/components/GastosContext';
 
 interface PagarServicioModalProps {

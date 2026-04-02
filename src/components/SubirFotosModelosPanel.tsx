@@ -7,7 +7,7 @@ import { useState } from 'react';
 import { supabase } from '../src/utils/supabase/info'; // ✅ Corregido: ruta correcta
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { Upload, Image, CheckCircle2, AlertCircle } from 'lucide-react';
 
 interface ModeloFotos {
