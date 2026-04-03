@@ -188,42 +188,61 @@ export function LiveChat({ onTipClick, recentTips = [], onLoginClick }: LiveChat
       </div>
 
       {/* Mensajes */}
-      <div 
+      <div
         ref={chatContainerRef}
         className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent"
       >
-        {visibleMessages.map((msg) => (
-          <div 
-            key={msg.id} 
-            className={`flex flex-col gap-1 ${
-              msg.username === 'Sistema' ? 'items-center' : 'items-start'
-            }`}
-          >
-            {msg.username === 'Sistema' ? (
-              <div className="text-xs text-center text-muted-foreground italic bg-background/40 px-3 py-1 rounded-full">
-                {msg.message}
-              </div>
-            ) : (
-              <div className="max-w-[85%]">
-                <div className="flex items-center gap-2 mb-1">
-                  <span 
-                    className="text-xs font-bold"
-                    style={{ color: msg.color || '#d4af37' }}
-                  >
-                    {msg.username}
-                    {msg.isVIP && <Gem className="w-3 h-3 text-primary inline ml-1" />}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {formatTime(msg.timestamp)}
-                  </span>
+        {visibleMessages.map((msg) => {
+          const esMio = currentUser && msg.userId === currentUser.id;
+          const esSistema = msg.username === 'Sistema' || msg.role === 'system';
+          const esProgramador = msg.role === 'programador';
+
+          return (
+            <div
+              key={msg.id}
+              className={`flex flex-col gap-1 ${
+                esSistema ? 'items-center' : esMio ? 'items-end' : 'items-start'
+              }`}
+            >
+              {esSistema ? (
+                <div className="text-xs text-center text-muted-foreground italic bg-background/40 px-3 py-1 rounded-full">
+                  {msg.message}
                 </div>
-                <div className="bg-card/60 backdrop-blur-sm rounded-lg rounded-tl-none px-3 py-2 border border-border/50">
-                  <p className="text-sm text-foreground break-words">{msg.message}</p>
+              ) : (
+                <div className="max-w-[85%]">
+                  {/* Nombre solo si no es el usuario actual */}
+                  {!esMio && (
+                    <div className="flex items-center gap-2 mb-1">
+                      <span
+                        className="text-xs font-bold"
+                        style={{ color: esProgramador ? '#d4af37' : '#aaaaaa' }}
+                      >
+                        {esProgramador ? 'Black Diamond 💎' : msg.username}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {formatTime(msg.timestamp)}
+                      </span>
+                    </div>
+                  )}
+                  <div className={`px-3 py-2 rounded-2xl border text-sm break-words ${
+                    esMio
+                      ? 'bg-primary/20 border-primary/30 rounded-tr-none text-foreground'
+                      : esProgramador
+                      ? 'bg-amber-500/10 border-amber-500/30 rounded-tl-none text-foreground'
+                      : 'bg-card/60 border-border/50 rounded-tl-none text-foreground'
+                  }`}>
+                    <p>{msg.message}</p>
+                    {esMio && (
+                      <p className="text-[10px] text-right text-muted-foreground mt-0.5">
+                        {formatTime(msg.timestamp)}
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
-        ))}
+              )}
+            </div>
+          );
+        })}
         <div ref={messagesEndRef} />
       </div>
 

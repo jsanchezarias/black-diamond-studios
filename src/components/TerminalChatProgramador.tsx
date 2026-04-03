@@ -1,12 +1,21 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Send, Users, MessageSquare, Gem, Phone, Clock, Archive, Search, User, Image as ImageIcon, Loader2, ChevronLeft, Circle } from 'lucide-react';
+import { Send, Users, MessageSquare, Gem, Phone, Clock, Archive, Search, User, Image as ImageIcon, Loader2, ChevronLeft, Circle, X, BellRing } from 'lucide-react';
 import { supabase } from '../src/utils/supabase/info'; // ✅ Corregido: ruta correcta
 import { useClientes } from '../src/app/components/ClientesContext';
 import { ScrollArea } from './ui/scroll-area';
+
+// 🔔 Notificación tipo WhatsApp
+interface ToastNotificacion {
+  id: string;
+  clienteId: string;
+  clienteNombre: string;
+  mensaje: string;
+  timestamp: number;
+}
 
 interface Mensaje {
   id: string;
@@ -52,9 +61,25 @@ export function TerminalChatProgramador({ userId, userEmail }: TerminalChatProgr
   const [busqueda, setBusqueda] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
   const [vistaMovil, setVistaMovil] = useState<'lista' | 'chat'>('lista');
+  const [toasts, setToasts] = useState<ToastNotificacion[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const conversacionActivaRef = useRef<string | null>(null);
+  const programadorChatIdRef = useRef<string | null>(null);
+
+  // Sincronizar refs
+  useEffect(() => { conversacionActivaRef.current = conversacionActiva; }, [conversacionActiva]);
+  useEffect(() => { programadorChatIdRef.current = programadorChatId; }, [programadorChatId]);
+
+  // Auto-dismiss toasts después de 5s
+  useEffect(() => {
+    if (toasts.length === 0) return;
+    const timer = setTimeout(() => {
+      setToasts(prev => prev.filter(t => Date.now() - t.timestamp < 5000));
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [toasts]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -258,7 +283,6 @@ export function TerminalChatProgramador({ userId, userEmail }: TerminalChatProgr
       chatChannelRef.current = null;
     }
 
-    // Use a unique channel name per subscription to avoid conflicts
     const channelName = `chat_updates_${Date.now()}`;
     const channel = supabase
       .channel(channelName)
@@ -269,10 +293,57 @@ export function TerminalChatProgramador({ userId, userEmail }: TerminalChatProgr
           schema: 'public',
           table: 'chat_mensajes_publicos'
         },
-        () => {
+        async (payload: any) => {
+          const nuevoMsg = payload.new;
+
+          // Recargar conversaciones siempre
           loadConversaciones();
-          if (conversacionActiva) {
-            loadMensajesConversacion(conversacionActiva);
+
+          // Si el mensaje viene de un CLIENTE (no del programador)
+          const progId = programadorChatIdRef.current;
+          const convActiva = conversacionActivaRef.current;
+
+          if (nuevoMsg.sender_id && nuevoMsg.sender_id !== progId) {
+            // Recargar mensajes si la conversación activa es la del remitente
+            if (convActiva === nuevoMsg.sender_id) {
+              loadMensajesConversacion(nuevoMsg.sender_id);
+            } else {
+              // 🔔 Mostrar toast WhatsApp si la conversación NO está abierta
+              // Obtener nombre del cliente
+              const { data: clienteData } = await supabase
+                .from('clientes')
+                .select('nombre')
+                .eq('id', nuevoMsg.sender_id)
+                .single();
+
+              const nombre = clienteData?.nombre || 'Cliente';
+              const texto = nuevoMsg.message || '';
+
+              setToasts(prev => {
+                // Si ya hay toast de este cliente, actualizar en vez de agregar
+                const existe = prev.find(t => t.clienteId === nuevoMsg.sender_id);
+                if (existe) {
+                  return prev.map(t =>
+                    t.clienteId === nuevoMsg.sender_id
+                      ? { ...t, mensaje: texto, timestamp: Date.now() }
+                      : t
+                  );
+                }
+                return [
+                  ...prev,
+                  {
+                    id: `${nuevoMsg.sender_id}_${Date.now()}`,
+                    clienteId: nuevoMsg.sender_id,
+                    clienteNombre: nombre,
+                    mensaje: texto,
+                    timestamp: Date.now(),
+                  }
+                ];
+              });
+            }
+          } else if (nuevoMsg.sender_id === progId && convActiva) {
+            // Mensaje enviado por el programador - recargar chat activo
+            loadMensajesConversacion(convActiva);
           }
         }
       )
@@ -439,13 +510,60 @@ export function TerminalChatProgramador({ userId, userEmail }: TerminalChatProgr
     );
   }
 
+  // 🔔 Total mensajes no leídos para badge en header
+  const totalNoLeidos = conversaciones.reduce((acc, c) => acc + c.mensajesNoLeidos, 0);
+
   return (
-    <div className="h-[calc(100vh-140px)] sm:h-[calc(100vh-160px)] lg:h-[calc(100vh-180px)] flex flex-col w-full max-w-full overflow-hidden" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}>
+    <div className="h-[calc(100vh-140px)] sm:h-[calc(100vh-160px)] lg:h-[calc(100vh-180px)] flex flex-col w-full max-w-full overflow-hidden relative" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}>
+
+      {/* 🔔 TOASTS ESTILO WHATSAPP */}
+      <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none" style={{ maxWidth: 320 }}>
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className="pointer-events-auto flex items-start gap-3 bg-card border border-primary/30 shadow-2xl rounded-2xl p-3 pr-2 animate-in slide-in-from-right-4 duration-300"
+            style={{ minWidth: 260, maxWidth: 320 }}
+          >
+            {/* Avatar */}
+            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-primary to-amber-500 flex items-center justify-center text-background font-bold text-sm">
+              {toast.clienteNombre.charAt(0).toUpperCase()}
+            </div>
+            {/* Contenido */}
+            <div className="flex-1 min-w-0" onClick={() => {
+              setConversacionActiva(toast.clienteId);
+              setVistaMovil('chat');
+              setToasts(prev => prev.filter(t => t.id !== toast.id));
+            }} style={{ cursor: 'pointer' }}>
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <BellRing className="w-3 h-3 text-primary animate-pulse flex-shrink-0" />
+                <span className="text-xs font-semibold text-primary truncate">{toast.clienteNombre}</span>
+              </div>
+              <p className="text-xs text-foreground/90 truncate leading-relaxed">{toast.mensaje}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">Toca para responder</p>
+            </div>
+            {/* Cerrar */}
+            <button
+              onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
+              className="flex-shrink-0 p-1 rounded-full hover:bg-muted/60 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ))}
+      </div>
+
       <Card className="border-primary/20 shadow-sm flex-1 flex flex-col min-h-0 max-w-full overflow-hidden">
         <CardHeader className="border-b border-border/50 px-3 py-2.5 sm:px-4 sm:py-3 flex-shrink-0">
           <div className="flex items-center justify-between gap-2">
             <CardTitle className="flex items-center gap-2 sm:gap-3 text-base sm:text-lg font-medium tracking-normal truncate">
-              <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5 text-primary/60 flex-shrink-0" strokeWidth={2} />
+              <div className="relative flex-shrink-0">
+                <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5 text-primary/60" strokeWidth={2} />
+                {totalNoLeidos > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 bg-primary text-background text-[9px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-0.5 animate-bounce">
+                    {totalNoLeidos > 99 ? '99+' : totalNoLeidos}
+                  </span>
+                )}
+              </div>
               <span className="truncate">Terminal de Chat</span>
             </CardTitle>
             <Badge className="bg-primary/10 text-primary border-primary/20 font-medium text-xs flex-shrink-0">
