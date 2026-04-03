@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
-import { LiveStreamPlayer } from '../components/LiveStreamPlayer';
+import { BoutiqueStreamPlayer } from '../components/BoutiqueStreamPlayer';
 import { 
   Radio, 
   Users, 
@@ -125,10 +125,10 @@ export function StreamingPage() {
 
         {/* Player */}
         <div className="container mx-auto px-4 py-8 max-w-6xl">
-          <LiveStreamPlayer
+          <BoutiqueStreamPlayer
             modelId={selectedSession.modelId}
             modelName={selectedSession.modelName}
-            modelPhoto={modelInfo?.photo}
+            streamUrl={selectedSession.streamUrl}
           />
         </div>
       </div>

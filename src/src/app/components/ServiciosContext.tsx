@@ -1,122 +1,170 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { projectId, publicAnonKey } from '../../utils/supabase/info';
+import { supabase } from '../../utils/supabase/info';
 
-// 🎯 SERVICIO: Registro inmutable de un servicio realizado (o no realizado)
 export interface Servicio {
   id: string;
-  
-  // 📅 Información temporal
   fecha: string;
   hora: string;
   duracionEstimadaMinutos: number;
-  duracionRealMinutos?: number; // Duración real del servicio
-  
-  // 👤 Información del CLIENTE (snapshot del momento)
+  duracionRealMinutos?: number;
   clienteId: string;
   clienteNombre: string;
   clienteTelefono: string;
   clienteEmail?: string;
-  
-  // 💃 Información de la MODELO (snapshot del momento)
   modeloEmail: string;
   modeloNombre: string;
   modeloId?: string;
-  
-  // 💰 Información de TARIFA y SERVICIO
   tipoServicio: 'sede' | 'domicilio';
   tarifaNombre: string;
   tarifaDescripcion?: string;
-  montoPactado: number; // Monto original pactado
-  
-  // 💳 Información de PAGO
+  montoPactado: number;
   estadoPago: 'pendiente' | 'pagado' | 'reembolsado';
   metodoPago?: string;
   transaccionId?: string;
   fechaPago?: string;
   comprobantePago?: string;
-  montoPagado?: number; // Puede ser diferente al pactado (descuentos, propinas, etc)
+  montoPagado?: number;
   propina?: number;
-  
-  // 📊 ESTADO del servicio
   estado: 'completado' | 'cancelado' | 'no_show';
-  
-  // 📝 Notas y detalles
-  notasPreServicio?: string; // Notas del agendamiento original
-  notasPostServicio?: string; // Notas después del servicio
-  
-  // ⭐ Calificación (opcional)
-  calificacionCliente?: number; // 1-5 estrellas
+  notasPreServicio?: string;
+  notasPostServicio?: string;
+  calificacionCliente?: number;
   reviewCliente?: string;
-  calificacionModelo?: number; // La modelo califica al cliente
+  calificacionModelo?: number;
   reviewModelo?: string;
-  
-  // ❌ Información de CANCELACIÓN o NO_SHOW
   motivoCancelacion?: string;
-  canceladoPor?: string; // 'cliente' | 'modelo' | 'admin' | 'sistema'
+  canceladoPor?: string;
   fechaCancelacion?: string;
-  
-  // 💸 MULTA (si aplica por no_show)
   multaAplicada?: boolean;
   montoMulta?: number;
   motivoMulta?: string;
   multaPagada?: boolean;
-  
-  // 🕐 Metadatos
-  fechaCreacion: string; // Cuándo se creó este registro de servicio
-  creadoPor: string; // Quién lo creó (sistema, admin, etc)
-  agendamientoId: string; // Referencia al agendamiento original
+  fechaCreacion: string;
+  creadoPor: string;
+  agendamientoId: string;
 }
 
-// 📊 POLÍTICA DE PENALIZACIÓN
 export interface PoliticaPenalizacion {
-  noShowsParaMulta: number; // Número de no_shows para aplicar multa
-  noShowsParaBloqueo: number; // Número de no_shows para bloquear
-  montoMultaBase: number; // Multa base por no_show
-  porcentajeMultaSobreTarifa: number; // % de la tarifa como multa (ej: 50%)
-  diasParaPagarMulta: number; // Días para pagar antes de bloqueo
+  noShowsParaMulta: number;
+  noShowsParaBloqueo: number;
+  montoMultaBase: number;
+  porcentajeMultaSobreTarifa: number;
+  diasParaPagarMulta: number;
 }
 
 interface ServiciosContextType {
   servicios: Servicio[];
   politicaPenalizacion: PoliticaPenalizacion;
-  
-  // CRUD de servicios
   crearServicio: (servicio: Omit<Servicio, 'id' | 'fechaCreacion' | 'creadoPor'>) => Promise<{ success: boolean, error?: any, data?: any }>;
   actualizarServicio: (id: string, servicio: Partial<Servicio>) => Promise<void>;
   obtenerServicioPorId: (id: string) => Servicio | undefined;
-  
-  // Consultas por cliente
   obtenerServiciosPorCliente: (clienteId: string) => Servicio[];
   obtenerNoShowsPorCliente: (clienteId: string) => Servicio[];
   contarNoShowsCliente: (clienteId: string) => number;
   obtenerMultasPendientesCliente: (clienteId: string) => Servicio[];
   calcularTotalMultasCliente: (clienteId: string) => number;
-  
-  // Consultas por modelo
   obtenerServiciosPorModelo: (modeloEmail: string) => Servicio[];
   obtenerIngresosModelo: (modeloEmail: string, fechaInicio?: string, fechaFin?: string) => number;
-  
-  // Conversión de agendamiento a servicio
   crearServicioDesdeAgendamiento: (agendamientoId: string, estado: 'completado' | 'cancelado' | 'no_show', datos?: Partial<Servicio>) => Promise<{ success: boolean, error?: any, data?: any }>;
-  
-  // Sistema de multas
   aplicarMultaPorNoShow: (servicioId: string) => Promise<void>;
   marcarMultaComoPagada: (servicioId: string) => Promise<void>;
-  
-  // Utilidades
   recargarServicios: () => Promise<void>;
 }
 
 const ServiciosContext = createContext<ServiciosContextType | undefined>(undefined);
 
-// 🎯 Política de penalización por defecto
 const POLITICA_DEFAULT: PoliticaPenalizacion = {
-  noShowsParaMulta: 2, // Al 2do no_show se aplica multa
-  noShowsParaBloqueo: 4, // Al 4to no_show se bloquea
-  montoMultaBase: 50000, // $50k multa base
-  porcentajeMultaSobreTarifa: 30, // 30% de la tarifa
-  diasParaPagarMulta: 7, // 7 días para pagar
+  noShowsParaMulta: 2,
+  noShowsParaBloqueo: 4,
+  montoMultaBase: 50000,
+  porcentajeMultaSobreTarifa: 30,
+  diasParaPagarMulta: 7,
 };
+
+// Mapper: DB row → Servicio
+function rowToServicio(row: any): Servicio {
+  return {
+    id: row.id,
+    fecha: row.fecha ?? '',
+    hora: row.hora ?? '',
+    duracionEstimadaMinutos: row.duracion_estimada_minutos ?? row.duracion ?? 60,
+    duracionRealMinutos: row.duracion_real_minutos,
+    clienteId: row.cliente_id ?? '',
+    clienteNombre: row.cliente_nombre ?? '',
+    clienteTelefono: row.cliente_telefono ?? '',
+    clienteEmail: row.cliente_email,
+    modeloEmail: row.modelo_email ?? '',
+    modeloNombre: row.modelo_nombre ?? '',
+    modeloId: row.modelo_id,
+    tipoServicio: row.tipo_servicio ?? 'sede',
+    tarifaNombre: row.tarifa_nombre ?? row.servicio ?? '',
+    tarifaDescripcion: row.tarifa_descripcion,
+    montoPactado: row.monto_pactado ?? row.monto ?? 0,
+    estadoPago: row.estado_pago ?? 'pendiente',
+    metodoPago: row.metodo_pago,
+    transaccionId: row.transaccion_id,
+    fechaPago: row.fecha_pago,
+    comprobantePago: row.comprobante_pago,
+    montoPagado: row.monto_pagado,
+    propina: row.propina,
+    estado: row.estado ?? 'completado',
+    notasPreServicio: row.notas_pre_servicio ?? row.notas,
+    notasPostServicio: row.notas_post_servicio,
+    calificacionCliente: row.calificacion_cliente,
+    reviewCliente: row.review_cliente,
+    calificacionModelo: row.calificacion_modelo ?? row.calificacion,
+    reviewModelo: row.review_modelo,
+    motivoCancelacion: row.motivo_cancelacion,
+    canceladoPor: row.cancelado_por,
+    fechaCancelacion: row.fecha_cancelacion,
+    multaAplicada: row.multa_aplicada ?? false,
+    montoMulta: row.monto_multa,
+    motivoMulta: row.motivo_multa,
+    multaPagada: row.multa_pagada ?? false,
+    fechaCreacion: row.fecha_creacion ?? row.created_at ?? new Date().toISOString(),
+    creadoPor: row.creado_por ?? 'sistema',
+    agendamientoId: row.agendamiento_id ?? '',
+  };
+}
+
+// Mapper: Servicio → DB row
+function servicioToRow(s: Partial<Servicio>): Record<string, any> {
+  const row: Record<string, any> = {};
+  if (s.fecha !== undefined) row.fecha = s.fecha;
+  if (s.hora !== undefined) row.hora = s.hora;
+  if (s.duracionEstimadaMinutos !== undefined) row.duracion_estimada_minutos = s.duracionEstimadaMinutos;
+  if (s.duracionRealMinutos !== undefined) row.duracion_real_minutos = s.duracionRealMinutos;
+  if (s.clienteId !== undefined) row.cliente_id = s.clienteId;
+  if (s.clienteNombre !== undefined) row.cliente_nombre = s.clienteNombre;
+  if (s.clienteTelefono !== undefined) row.cliente_telefono = s.clienteTelefono;
+  if (s.clienteEmail !== undefined) row.cliente_email = s.clienteEmail;
+  if (s.modeloEmail !== undefined) row.modelo_email = s.modeloEmail;
+  if (s.modeloNombre !== undefined) row.modelo_nombre = s.modeloNombre;
+  if (s.modeloId !== undefined) row.modelo_id = s.modeloId;
+  if (s.tipoServicio !== undefined) row.tipo_servicio = s.tipoServicio;
+  if (s.tarifaNombre !== undefined) row.tarifa_nombre = s.tarifaNombre;
+  if (s.tarifaDescripcion !== undefined) row.tarifa_descripcion = s.tarifaDescripcion;
+  if (s.montoPactado !== undefined) row.monto_pactado = s.montoPactado;
+  if (s.estadoPago !== undefined) row.estado_pago = s.estadoPago;
+  if (s.metodoPago !== undefined) row.metodo_pago = s.metodoPago;
+  if (s.montoPagado !== undefined) row.monto_pagado = s.montoPagado;
+  if (s.propina !== undefined) row.propina = s.propina;
+  if (s.estado !== undefined) row.estado = s.estado;
+  if (s.notasPreServicio !== undefined) row.notas_pre_servicio = s.notasPreServicio;
+  if (s.notasPostServicio !== undefined) row.notas_post_servicio = s.notasPostServicio;
+  if (s.calificacionCliente !== undefined) row.calificacion_cliente = s.calificacionCliente;
+  if (s.calificacionModelo !== undefined) row.calificacion_modelo = s.calificacionModelo;
+  if (s.motivoCancelacion !== undefined) row.motivo_cancelacion = s.motivoCancelacion;
+  if (s.canceladoPor !== undefined) row.cancelado_por = s.canceladoPor;
+  if (s.fechaCancelacion !== undefined) row.fecha_cancelacion = s.fechaCancelacion;
+  if (s.multaAplicada !== undefined) row.multa_aplicada = s.multaAplicada;
+  if (s.montoMulta !== undefined) row.monto_multa = s.montoMulta;
+  if (s.motivoMulta !== undefined) row.motivo_multa = s.motivoMulta;
+  if (s.multaPagada !== undefined) row.multa_pagada = s.multaPagada;
+  if (s.agendamientoId !== undefined) row.agendamiento_id = s.agendamientoId;
+  if (s.creadoPor !== undefined) row.creado_por = s.creadoPor;
+  return row;
+}
 
 export function ServiciosProvider({ children }: { children: ReactNode }) {
   const [servicios, setServicios] = useState<Servicio[]>([]);
@@ -128,77 +176,49 @@ export function ServiciosProvider({ children }: { children: ReactNode }) {
 
   const cargarServicios = async () => {
     try {
-      console.log('🔄 Cargando servicios desde servidor...');
-      
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-9dadc017/servicios`,
-        {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${publicAnonKey}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      // Intentar desde servicios_modelo (tabla existente en Supabase)
+      const { data, error } = await supabase
+        .from('servicios_modelo')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Error en respuesta del servidor:', errorText);
+      if (error) {
+        console.error('❌ Error cargando servicios:', error.message);
         setServicios([]);
         return;
       }
 
-      const result = await response.json();
-
-      if (result.success && result.data) {
-        const serviciosOrdenados = result.data.sort((a: Servicio, b: Servicio) => {
-          return new Date(b.fechaCreacion).getTime() - new Date(a.fechaCreacion).getTime();
-        });
-
-        setServicios(serviciosOrdenados);
-        console.log(`✅ ${serviciosOrdenados.length} servicios cargados desde servidor`);
-      } else {
-        setServicios([]);
-        console.log('📋 No hay servicios registrados');
-      }
+      const formateados = (data ?? []).map(rowToServicio);
+      setServicios(formateados);
+      console.log(`✅ ${formateados.length} servicios cargados`);
     } catch (error) {
-      console.error('❌ Error cargando servicios:', error);
+      console.error('❌ Error inesperado cargando servicios:', error);
       setServicios([]);
     }
   };
 
   const crearServicio = async (servicio: Omit<Servicio, 'id' | 'fechaCreacion' | 'creadoPor'>) => {
     try {
-      console.log('📝 Creando servicio...');
-      
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-9dadc017/servicios`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${publicAnonKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(servicio),
-        }
-      );
+      const row = {
+        ...servicioToRow(servicio),
+        creado_por: 'sistema',
+        fecha_creacion: new Date().toISOString(),
+      };
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('❌ Error guardando servicio:', errorData);
-        return { success: false, error: errorData };
+      const { data, error } = await supabase
+        .from('servicios_modelo')
+        .insert(row)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ Error creando servicio:', error.message);
+        return { success: false, error };
       }
 
-      const result = await response.json();
-
-      if (result.success) {
-        console.log('✅ Servicio creado exitosamente');
-        await cargarServicios();
-        return { success: true, data: result.data };
-      } else {
-        console.error('❌ Error en respuesta del servidor:', result);
-        return { success: false, error: result.error };
-      }
+      const nuevo = rowToServicio(data);
+      setServicios(prev => [nuevo, ...prev]);
+      return { success: true, data: nuevo };
     } catch (error) {
       console.error('❌ Error en crearServicio:', error);
       return { success: false, error };
@@ -207,134 +227,91 @@ export function ServiciosProvider({ children }: { children: ReactNode }) {
 
   const actualizarServicio = async (id: string, servicio: Partial<Servicio>) => {
     try {
-      console.log('🔄 Actualizando servicio:', id);
-      
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-9dadc017/servicios/${id}`,
-        {
-          method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${publicAnonKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(servicio),
-        }
-      );
+      const row = servicioToRow(servicio);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('❌ Error actualizando servicio:', errorData);
-        throw new Error(errorData.error || 'Error actualizando servicio');
-      }
+      const { error } = await supabase
+        .from('servicios_modelo')
+        .update(row)
+        .eq('id', id);
 
-      const result = await response.json();
+      if (error) throw new Error(error.message);
 
-      if (result.success) {
-        console.log('✅ Servicio actualizado exitosamente');
-        await cargarServicios();
-      } else {
-        throw new Error(result.error || 'Error actualizando servicio');
-      }
+      setServicios(prev => prev.map(s => s.id === id ? { ...s, ...servicio } : s));
     } catch (error) {
       console.error('❌ Error en actualizarServicio:', error);
       throw error;
     }
   };
 
-  const obtenerServicioPorId = (id: string) => {
-    return servicios.find(s => s.id === id);
-  };
+  const obtenerServicioPorId = (id: string) => servicios.find(s => s.id === id);
 
-  const obtenerServiciosPorCliente = (clienteId: string) => {
-    return servicios
-      .filter(s => s.clienteId === clienteId)
+  const obtenerServiciosPorCliente = (clienteId: string) =>
+    servicios.filter(s => s.clienteId === clienteId)
       .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
-  };
 
-  const obtenerNoShowsPorCliente = (clienteId: string) => {
-    return servicios.filter(s => s.clienteId === clienteId && s.estado === 'no_show');
-  };
+  const obtenerNoShowsPorCliente = (clienteId: string) =>
+    servicios.filter(s => s.clienteId === clienteId && s.estado === 'no_show');
 
-  const contarNoShowsCliente = (clienteId: string) => {
-    return obtenerNoShowsPorCliente(clienteId).length;
-  };
+  const contarNoShowsCliente = (clienteId: string) =>
+    obtenerNoShowsPorCliente(clienteId).length;
 
-  const obtenerMultasPendientesCliente = (clienteId: string) => {
-    return servicios.filter(s => 
-      s.clienteId === clienteId && 
-      s.multaAplicada === true && 
-      s.multaPagada !== true
-    );
-  };
+  const obtenerMultasPendientesCliente = (clienteId: string) =>
+    servicios.filter(s => s.clienteId === clienteId && s.multaAplicada && !s.multaPagada);
 
-  const calcularTotalMultasCliente = (clienteId: string) => {
-    const multasPendientes = obtenerMultasPendientesCliente(clienteId);
-    return multasPendientes.reduce((total, s) => total + (s.montoMulta || 0), 0);
-  };
+  const calcularTotalMultasCliente = (clienteId: string) =>
+    obtenerMultasPendientesCliente(clienteId).reduce((t, s) => t + (s.montoMulta || 0), 0);
 
-  const obtenerServiciosPorModelo = (modeloEmail: string) => {
-    return servicios
-      .filter(s => s.modeloEmail === modeloEmail)
+  const obtenerServiciosPorModelo = (modeloEmail: string) =>
+    servicios.filter(s => s.modeloEmail === modeloEmail)
       .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
-  };
 
   const obtenerIngresosModelo = (modeloEmail: string, fechaInicio?: string, fechaFin?: string) => {
-    let serviciosModelo = servicios.filter(s => 
-      s.modeloEmail === modeloEmail && 
-      s.estado === 'completado' &&
-      s.estadoPago === 'pagado'
+    let lista = servicios.filter(s =>
+      s.modeloEmail === modeloEmail && s.estado === 'completado' && s.estadoPago === 'pagado'
     );
-
-    if (fechaInicio) {
-      serviciosModelo = serviciosModelo.filter(s => s.fecha >= fechaInicio);
-    }
-    if (fechaFin) {
-      serviciosModelo = serviciosModelo.filter(s => s.fecha <= fechaFin);
-    }
-
-    return serviciosModelo.reduce((total, s) => total + (s.montoPagado || s.montoPactado), 0);
+    if (fechaInicio) lista = lista.filter(s => s.fecha >= fechaInicio);
+    if (fechaFin) lista = lista.filter(s => s.fecha <= fechaFin);
+    return lista.reduce((t, s) => t + (s.montoPagado ?? s.montoPactado), 0);
   };
 
   const crearServicioDesdeAgendamiento = async (
-    agendamientoId: string, 
+    agendamientoId: string,
     estado: 'completado' | 'cancelado' | 'no_show',
     datos?: Partial<Servicio>
   ) => {
     try {
-      console.log(`📝 Creando servicio desde agendamiento ${agendamientoId} con estado ${estado}`);
-      
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-9dadc017/servicios/desde-agendamiento`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${publicAnonKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            agendamientoId,
-            estado,
-            ...datos,
-          }),
-        }
-      );
+      // Obtener datos del agendamiento
+      const { data: ag, error: agError } = await supabase
+        .from('agendamientos')
+        .select('*')
+        .eq('id', agendamientoId)
+        .single();
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('❌ Error creando servicio desde agendamiento:', errorData);
-        return { success: false, error: errorData };
+      if (agError || !ag) {
+        return { success: false, error: 'Agendamiento no encontrado' };
       }
 
-      const result = await response.json();
+      const servicio: Omit<Servicio, 'id' | 'fechaCreacion' | 'creadoPor'> = {
+        fecha: ag.fecha,
+        hora: ag.hora,
+        duracionEstimadaMinutos: ag.duracion_minutos ?? ag.duracion ?? 60,
+        clienteId: ag.cliente_id ?? '',
+        clienteNombre: ag.cliente_nombre ?? '',
+        clienteTelefono: ag.cliente_telefono ?? '',
+        modeloEmail: ag.modelo_email ?? '',
+        modeloNombre: ag.modelo_nombre ?? '',
+        tipoServicio: ag.tipo_servicio ?? 'sede',
+        tarifaNombre: ag.tarifa_nombre ?? ag.servicio ?? 'Servicio',
+        montoPactado: ag.monto_pago ?? ag.precio ?? 0,
+        estadoPago: ag.estado_pago ?? 'pendiente',
+        estado,
+        agendamientoId,
+        motivoCancelacion: estado !== 'completado' ? ag.motivo_cancelacion : undefined,
+        canceladoPor: estado !== 'completado' ? ag.cancelado_por : undefined,
+        ...datos,
+      };
 
-      if (result.success) {
-        console.log('✅ Servicio creado desde agendamiento exitosamente');
-        await cargarServicios();
-        return { success: true, data: result.data };
-      } else {
-        console.error('❌ Error en respuesta del servidor:', result);
-        return { success: false, error: result.error };
-      }
+      return await crearServicio(servicio);
     } catch (error) {
       console.error('❌ Error en crearServicioDesdeAgendamiento:', error);
       return { success: false, error };
@@ -342,70 +319,34 @@ export function ServiciosProvider({ children }: { children: ReactNode }) {
   };
 
   const aplicarMultaPorNoShow = async (servicioId: string) => {
-    try {
-      const servicio = obtenerServicioPorId(servicioId);
-      if (!servicio) {
-        throw new Error('Servicio no encontrado');
-      }
-
-      // Calcular multa
-      const montoMulta = Math.max(
-        politicaPenalizacion.montoMultaBase,
-        servicio.montoPactado * (politicaPenalizacion.porcentajeMultaSobreTarifa / 100)
-      );
-
-      await actualizarServicio(servicioId, {
-        multaAplicada: true,
-        montoMulta,
-        motivoMulta: `Multa por no presentarse al servicio. Política: ${politicaPenalizacion.porcentajeMultaSobreTarifa}% de la tarifa o mínimo $${politicaPenalizacion.montoMultaBase.toLocaleString()}`,
-        multaPagada: false,
-      });
-
-      console.log(`💸 Multa de $${montoMulta.toLocaleString()} aplicada al servicio ${servicioId}`);
-    } catch (error) {
-      console.error('❌ Error aplicando multa:', error);
-      throw error;
-    }
+    const servicio = obtenerServicioPorId(servicioId);
+    if (!servicio) throw new Error('Servicio no encontrado');
+    const montoMulta = Math.max(
+      politicaPenalizacion.montoMultaBase,
+      servicio.montoPactado * (politicaPenalizacion.porcentajeMultaSobreTarifa / 100)
+    );
+    await actualizarServicio(servicioId, {
+      multaAplicada: true,
+      montoMulta,
+      motivoMulta: `No-show. Multa: ${politicaPenalizacion.porcentajeMultaSobreTarifa}% o mínimo $${politicaPenalizacion.montoMultaBase.toLocaleString()}`,
+      multaPagada: false,
+    });
   };
 
   const marcarMultaComoPagada = async (servicioId: string) => {
-    try {
-      await actualizarServicio(servicioId, {
-        multaPagada: true,
-      });
-
-      console.log(`✅ Multa del servicio ${servicioId} marcada como pagada`);
-    } catch (error) {
-      console.error('❌ Error marcando multa como pagada:', error);
-      throw error;
-    }
+    await actualizarServicio(servicioId, { multaPagada: true });
   };
 
-  const recargarServicios = async () => {
-    await cargarServicios();
-  };
+  const recargarServicios = async () => { await cargarServicios(); };
 
   return (
-    <ServiciosContext.Provider
-      value={{
-        servicios,
-        politicaPenalizacion,
-        crearServicio,
-        actualizarServicio,
-        obtenerServicioPorId,
-        obtenerServiciosPorCliente,
-        obtenerNoShowsPorCliente,
-        contarNoShowsCliente,
-        obtenerMultasPendientesCliente,
-        calcularTotalMultasCliente,
-        obtenerServiciosPorModelo,
-        obtenerIngresosModelo,
-        crearServicioDesdeAgendamiento,
-        aplicarMultaPorNoShow,
-        marcarMultaComoPagada,
-        recargarServicios,
-      }}
-    >
+    <ServiciosContext.Provider value={{
+      servicios, politicaPenalizacion, crearServicio, actualizarServicio,
+      obtenerServicioPorId, obtenerServiciosPorCliente, obtenerNoShowsPorCliente,
+      contarNoShowsCliente, obtenerMultasPendientesCliente, calcularTotalMultasCliente,
+      obtenerServiciosPorModelo, obtenerIngresosModelo, crearServicioDesdeAgendamiento,
+      aplicarMultaPorNoShow, marcarMultaComoPagada, recargarServicios,
+    }}>
       {children}
     </ServiciosContext.Provider>
   );
@@ -414,7 +355,23 @@ export function ServiciosProvider({ children }: { children: ReactNode }) {
 export function useServicios() {
   const context = useContext(ServiciosContext);
   if (context === undefined) {
-    throw new Error('useServicios debe usarse dentro de ServiciosProvider');
+    return {
+      servicios: [], politicaPenalizacion: POLITICA_DEFAULT,
+      crearServicio: async () => ({ success: false }),
+      actualizarServicio: async () => {},
+      obtenerServicioPorId: () => undefined,
+      obtenerServiciosPorCliente: () => [],
+      obtenerNoShowsPorCliente: () => [],
+      contarNoShowsCliente: () => 0,
+      obtenerMultasPendientesCliente: () => [],
+      calcularTotalMultasCliente: () => 0,
+      obtenerServiciosPorModelo: () => [],
+      obtenerIngresosModelo: () => 0,
+      crearServicioDesdeAgendamiento: async () => ({ success: false }),
+      aplicarMultaPorNoShow: async () => {},
+      marcarMultaComoPagada: async () => {},
+      recargarServicios: async () => {},
+    } as ServiciosContextType;
   }
   return context;
 }

@@ -9,7 +9,7 @@ import { Logo } from './Logo';
 import { TestimoniosSection } from './TestimoniosSection';
 import { AgregarTestimonioModal } from './AgregarTestimonioModal';
 import { ClienteLoginModal } from './ClienteLoginModal';
-import { LiveVideoStream } from './LiveVideoStream'; // ✅ Agregar LiveVideoStream
+import { BoutiqueStreamPlayer } from './BoutiqueStreamPlayer';
 import { TipNotification } from './TipNotification'; // ✅ Agregar TipNotification
 import { Gem, Calendar, Clock, MapPin, Shield, Award, Star, ChevronRight, Menu as MenuIcon, X, User as UserIcon, Phone, Mail, MessageSquare, Instagram, Twitter, Facebook, Sparkles, Crown, Globe, Heart, Send, LogOut } from 'lucide-react'; // ✅ Consolidar todos los icons
 import { useLanguage } from './LanguageContext';
@@ -574,9 +574,8 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
         <div className="w-full h-[calc(100vh-4rem)] flex flex-col lg:flex-row">
           {/* Video Stream - Ocupa 70% en desktop, reducido en mobile para dar más espacio al chat */}
           <div className="w-full lg:w-[70%] h-[40vh] lg:h-full relative">
-            <LiveVideoStream 
-              streamUrl={streamUrl}
-              title="Transmisión en Vivo Exclusiva"
+            <BoutiqueStreamPlayer 
+              modelId="hq-stream"
               modelName="Black Diamond"
               onTimeExpired={() => setShowAppointmentModal(true)}
               onTipClick={handleTipClick}

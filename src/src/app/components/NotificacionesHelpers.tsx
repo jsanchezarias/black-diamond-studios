@@ -1,4 +1,4 @@
-import { projectId, publicAnonKey } from '../../utils/supabase/info';
+import { supabase } from '../../utils/supabase/info';
 import { TipoNotificacion } from './NotificacionesContext';
 
 // 🔔 HELPER PARA CREAR NOTIFICACIONES AUTOMÁTICAS
@@ -37,39 +37,33 @@ export async function crearNotificacionAutomatica(params: CrearNotificacionParam
       creadoPor = 'sistema'
     } = params;
 
-    console.log('🔔 Creando notificación automática:', tipo, 'para', usuarioEmail);
+    console.log('🔔 Creando notificación:', tipo, 'para', usuarioEmail);
 
-    const API_URL = `https://${projectId}.supabase.co/functions/v1/make-server-9dadc017`;
+    // Intentar insertar en tabla notificaciones si existe
+    const { error } = await supabase
+      .from('notificaciones' as any)
+      .insert({
+        usuario_id: usuarioEmail,
+        usuario_email: usuarioEmail,
+        tipo,
+        titulo,
+        mensaje,
+        icono,
+        leida: false,
+        prioridad,
+        accion: accion ? JSON.stringify(accion) : null,
+        url_destino: urlDestino,
+        creado_por: creadoPor,
+        fecha_creacion: new Date().toISOString(),
+      });
 
-    const notificacion = {
-      usuarioId: usuarioEmail,
-      usuarioEmail,
-      tipo,
-      titulo,
-      mensaje,
-      icono,
-      leida: false,
-      prioridad,
-      accion,
-      urlDestino,
-      creadoPor
-    };
-
-    const response = await fetch(`${API_URL}/notificaciones`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${publicAnonKey}`
-      },
-      body: JSON.stringify(notificacion)
-    });
-
-    if (!response.ok) {
-      console.error('❌ Error creando notificación automática:', await response.text());
+    if (error) {
+      // Si la tabla no existe, loguear silenciosamente y continuar
+      console.warn('⚠️ Notificación no guardada (tabla puede no existir):', error.message);
       return false;
     }
 
-    console.log('✅ Notificación automática creada');
+    console.log('✅ Notificación creada');
     return true;
   } catch (error) {
     console.error('❌ Error en crearNotificacionAutomatica:', error);

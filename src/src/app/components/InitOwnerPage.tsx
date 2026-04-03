@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { supabase, projectId, publicAnonKey } from '../../utils/supabase/info'; // ✅ Corregido: ruta correcta
+import { useState, useEffect } from 'react';
+import { supabase } from '../../utils/supabase/info'; // ✅ Corregido: ruta correcta
 
 export function InitOwnerPage() {
   const [estado, setEstado] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
@@ -56,42 +56,27 @@ export function InitOwnerPage() {
 
       console.log('👤 Usuario autenticado:', user.id, user.email);
 
-      // Obtener el access token de la sesión
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
-      if (sessionError || !session) {
-        throw new Error('No se pudo obtener la sesión activa.');
+      console.log('🔑 Sesión activa, iniciando setup de owner...');
+
+      // Insertar o actualizar directamente en la tabla usuarios
+      const { error: upsertError } = await supabase
+        .from('usuarios')
+        .upsert({
+          id: user.id,
+          email: user.email,
+          role: 'owner',
+          nombre: 'Julian',
+          activo: true,
+          fecha_creacion: new Date().toISOString(),
+        }, { onConflict: 'id' });
+
+      if (upsertError) {
+        throw new Error(upsertError.message || 'Error al inicializar Owner');
       }
 
-      console.log('🔑 Token obtenido');
-
-      // Llamar al endpoint de inicialización con el nombre y el token
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-9dadc017/init-owner`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
-            'apikey': publicAnonKey,
-          },
-          body: JSON.stringify({
-            userId: user.id,
-            email: user.email,
-            nombre: 'Julian', // ✅ Nombre pre-configurado
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Error al inicializar Owner');
-      }
-
-      console.log('✅ Owner inicializado:', data);
+      console.log('✅ Owner inicializado en tabla usuarios');
       setEstado('success');
-      setMensaje(data.message || '¡Owner inicializado correctamente!');
+      setMensaje('¡Owner inicializado correctamente! Redirigiendo...');
       
       // Esperar 2 segundos y recargar
       setTimeout(() => {

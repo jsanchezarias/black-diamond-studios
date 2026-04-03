@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { projectId, publicAnonKey } from '../../utils/supabase/info';
+import { supabase } from '../../utils/supabase/info';
 
 // 🔔 NOTIFICACIÓN: Alerta o mensaje para el usuario
 export interface Notificacion {
@@ -125,78 +125,85 @@ export const NotificacionesProvider = ({ children }: { children: ReactNode }) =>
   const [cargando, setCargando] = useState(true);
   const [usuarioActual, setUsuarioActual] = useState<string | null>(null);
 
-  const API_URL = `https://${projectId}.supabase.co/functions/v1/make-server-9dadc017`;
-
   // 🔄 Cargar notificaciones del usuario actual
   const cargarNotificaciones = useCallback(async (usuarioId: string) => {
     if (!usuarioId) return;
-    
+
     try {
       console.log('🔄 Cargando notificaciones del usuario:', usuarioId);
-      
-      const response = await fetch(`${API_URL}/notificaciones?usuarioId=${usuarioId}`, {
-        headers: {
-          'Authorization': `Bearer ${publicAnonKey}`
-        }
-      });
 
-      if (!response.ok) {
-        throw new Error('Error al cargar notificaciones');
+      const { data, error } = await (supabase as any)
+        .from('notificaciones')
+        .select('*')
+        .or(`usuario_id.eq.${usuarioId},usuario_email.eq.${usuarioId}`)
+        .order('fecha_creacion', { ascending: false })
+        .limit(50);
+
+      if (error) {
+        console.warn('⚠️ No se pudieron cargar notificaciones:', error.message);
+        setCargando(false);
+        return;
       }
 
-      const data = await response.json();
-      setNotificaciones(data.notificaciones || []);
-      console.log(`✅ ${data.notificaciones?.length || 0} notificaciones cargadas`);
+      const mapped = (data ?? []).map((row: any): Notificacion => ({
+        id: row.id,
+        usuarioId: row.usuario_id ?? row.usuario_email ?? usuarioId,
+        usuarioEmail: row.usuario_email ?? usuarioId,
+        tipo: row.tipo,
+        titulo: row.titulo,
+        mensaje: row.mensaje,
+        icono: row.icono,
+        leida: row.leida ?? false,
+        fechaLectura: row.fecha_lectura,
+        accion: row.accion ? (typeof row.accion === 'string' ? JSON.parse(row.accion) : row.accion) : undefined,
+        urlDestino: row.url_destino,
+        prioridad: row.prioridad ?? 'media',
+        fechaCreacion: row.fecha_creacion ?? row.created_at ?? new Date().toISOString(),
+        creadoPor: row.creado_por ?? 'sistema',
+        expiraEn: row.expira_en,
+      }));
+
+      setNotificaciones(mapped);
+      console.log(`✅ ${mapped.length} notificaciones cargadas`);
     } catch (error) {
       console.error('❌ Error cargando notificaciones:', error);
     } finally {
       setCargando(false);
     }
-  }, [API_URL, publicAnonKey]);
+  }, []);
 
-  // 🔄 Cargar preferencias del usuario
+  // 🔄 Cargar preferencias del usuario (usa estado local, sin tabla dedicada)
   const obtenerPreferencias = useCallback(async (usuarioId: string): Promise<PreferenciasNotificacion | null> => {
     if (!usuarioId) return null;
-    
+
+    const preferenciasPorDefecto: PreferenciasNotificacion = {
+      usuarioId,
+      enApp: true,
+      push: false,
+      email: false,
+      sms: false,
+      notificarAgendamientos: true,
+      notificarPagos: true,
+      notificarMultas: true,
+      notificarServicios: true,
+      notificarSistema: true,
+      notificarMarketing: false,
+      fechaActualizacion: new Date().toISOString(),
+    };
+
+    // Intentar leer desde localStorage
     try {
-      console.log('🔄 Cargando preferencias de notificación:', usuarioId);
-      
-      const response = await fetch(`${API_URL}/notificaciones/preferencias?usuarioId=${usuarioId}`, {
-        headers: {
-          'Authorization': `Bearer ${publicAnonKey}`
-        }
-      });
-
-      if (!response.ok) {
-        // Si no existen preferencias, crear las por defecto
-        const preferenciasPorDefecto: PreferenciasNotificacion = {
-          usuarioId,
-          enApp: true,
-          push: false,
-          email: false,
-          sms: false,
-          notificarAgendamientos: true,
-          notificarPagos: true,
-          notificarMultas: true,
-          notificarServicios: true,
-          notificarSistema: true,
-          notificarMarketing: false,
-          fechaActualizacion: new Date().toISOString()
-        };
-        
-        await actualizarPreferencias(preferenciasPorDefecto);
-        return preferenciasPorDefecto;
+      const stored = localStorage.getItem(`notif_prefs_${usuarioId}`);
+      if (stored) {
+        const prefs = JSON.parse(stored) as PreferenciasNotificacion;
+        setPreferencias(prefs);
+        return prefs;
       }
+    } catch {}
 
-      const data = await response.json();
-      setPreferencias(data.preferencias);
-      console.log('✅ Preferencias cargadas');
-      return data.preferencias;
-    } catch (error) {
-      console.error('❌ Error cargando preferencias:', error);
-      return null;
-    }
-  }, [API_URL, publicAnonKey]);
+    setPreferencias(preferenciasPorDefecto);
+    return preferenciasPorDefecto;
+  }, []);
 
   // 📝 Crear nueva notificación
   const crearNotificacion = async (notificacion: Omit<Notificacion, 'id' | 'fechaCreacion'>) => {
@@ -212,23 +219,38 @@ export const NotificacionesProvider = ({ children }: { children: ReactNode }) =>
         }
       }
 
-      const response = await fetch(`${API_URL}/notificaciones`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${publicAnonKey}`
-        },
-        body: JSON.stringify(notificacion)
-      });
+      const nuevaLocal: Notificacion = {
+        ...notificacion,
+        id: crypto.randomUUID(),
+        fechaCreacion: new Date().toISOString(),
+      };
 
-      if (!response.ok) {
-        throw new Error('Error al crear notificación');
-      }
+      // Intentar persistir en Supabase (silencioso si tabla no existe)
+      const { data, error } = await (supabase as any)
+        .from('notificaciones')
+        .insert({
+          usuario_id: notificacion.usuarioId,
+          usuario_email: notificacion.usuarioEmail,
+          tipo: notificacion.tipo,
+          titulo: notificacion.titulo,
+          mensaje: notificacion.mensaje,
+          icono: notificacion.icono,
+          leida: false,
+          prioridad: notificacion.prioridad,
+          accion: notificacion.accion ? JSON.stringify(notificacion.accion) : null,
+          url_destino: notificacion.urlDestino,
+          creado_por: notificacion.creadoPor ?? 'sistema',
+          fecha_creacion: nuevaLocal.fechaCreacion,
+        })
+        .select()
+        .single();
 
-      const data = await response.json();
-      
-      // Agregar a la lista local
-      setNotificaciones(prev => [data.notificacion, ...prev]);
+      const notificacionFinal = error ? nuevaLocal : {
+        ...nuevaLocal,
+        id: data?.id ?? nuevaLocal.id,
+      };
+
+      setNotificaciones(prev => [notificacionFinal, ...prev]);
       console.log('✅ Notificación creada exitosamente');
     } catch (error) {
       console.error('❌ Error creando notificación:', error);
@@ -238,26 +260,16 @@ export const NotificacionesProvider = ({ children }: { children: ReactNode }) =>
   // ✅ Marcar notificación como leída
   const marcarComoLeida = async (id: string) => {
     try {
-      console.log('✅ Marcando notificación como leída:', id);
+      const fechaLectura = new Date().toISOString();
 
-      const response = await fetch(`${API_URL}/notificaciones/${id}/marcar-leida`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${publicAnonKey}`
-        }
-      });
+      await (supabase as any)
+        .from('notificaciones')
+        .update({ leida: true, fecha_lectura: fechaLectura })
+        .eq('id', id);
 
-      if (!response.ok) {
-        throw new Error('Error al marcar notificación como leída');
-      }
-
-      // Actualizar en lista local
-      setNotificaciones(prev => prev.map(n => 
-        n.id === id 
-          ? { ...n, leida: true, fechaLectura: new Date().toISOString() }
-          : n
+      setNotificaciones(prev => prev.map(n =>
+        n.id === id ? { ...n, leida: true, fechaLectura } : n
       ));
-      console.log('✅ Notificación marcada como leída');
     } catch (error) {
       console.error('❌ Error marcando notificación como leída:', error);
     }
@@ -266,30 +278,17 @@ export const NotificacionesProvider = ({ children }: { children: ReactNode }) =>
   // ✅ Marcar todas como leídas
   const marcarTodasComoLeidas = async () => {
     if (!usuarioActual) return;
-    
+
     try {
-      console.log('✅ Marcando todas las notificaciones como leídas');
+      const fechaLectura = new Date().toISOString();
 
-      const response = await fetch(`${API_URL}/notificaciones/marcar-todas-leidas`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${publicAnonKey}`
-        },
-        body: JSON.stringify({ usuarioId: usuarioActual })
-      });
+      await (supabase as any)
+        .from('notificaciones')
+        .update({ leida: true, fecha_lectura: fechaLectura })
+        .or(`usuario_id.eq.${usuarioActual},usuario_email.eq.${usuarioActual}`)
+        .eq('leida', false);
 
-      if (!response.ok) {
-        throw new Error('Error al marcar todas como leídas');
-      }
-
-      // Actualizar en lista local
-      setNotificaciones(prev => prev.map(n => ({
-        ...n,
-        leida: true,
-        fechaLectura: new Date().toISOString()
-      })));
-      console.log('✅ Todas las notificaciones marcadas como leídas');
+      setNotificaciones(prev => prev.map(n => ({ ...n, leida: true, fechaLectura })));
     } catch (error) {
       console.error('❌ Error marcando todas como leídas:', error);
     }
@@ -298,22 +297,12 @@ export const NotificacionesProvider = ({ children }: { children: ReactNode }) =>
   // 🗑️ Eliminar notificación
   const eliminarNotificacion = async (id: string) => {
     try {
-      console.log('🗑️ Eliminando notificación:', id);
+      await (supabase as any)
+        .from('notificaciones')
+        .delete()
+        .eq('id', id);
 
-      const response = await fetch(`${API_URL}/notificaciones/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${publicAnonKey}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Error al eliminar notificación');
-      }
-
-      // Remover de lista local
       setNotificaciones(prev => prev.filter(n => n.id !== id));
-      console.log('✅ Notificación eliminada');
     } catch (error) {
       console.error('❌ Error eliminando notificación:', error);
     }
@@ -322,65 +311,50 @@ export const NotificacionesProvider = ({ children }: { children: ReactNode }) =>
   // 🧹 Limpiar notificaciones antiguas (más de 30 días)
   const limpiarNotificacionesAntiguas = async () => {
     if (!usuarioActual) return;
-    
+
     try {
-      console.log('🧹 Limpiando notificaciones antiguas');
+      const fechaLimite = new Date();
+      fechaLimite.setDate(fechaLimite.getDate() - 30);
 
-      const response = await fetch(`${API_URL}/notificaciones/limpiar-antiguas`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${publicAnonKey}`
-        },
-        body: JSON.stringify({ usuarioId: usuarioActual, diasAntiguedad: 30 })
-      });
+      await (supabase as any)
+        .from('notificaciones')
+        .delete()
+        .or(`usuario_id.eq.${usuarioActual},usuario_email.eq.${usuarioActual}`)
+        .lt('fecha_creacion', fechaLimite.toISOString());
 
-      if (!response.ok) {
-        throw new Error('Error al limpiar notificaciones antiguas');
-      }
-
-      const data = await response.json();
-      console.log(`✅ ${data.eliminadas} notificaciones antiguas eliminadas`);
-      
-      // Recargar notificaciones
       await cargarNotificaciones(usuarioActual);
     } catch (error) {
       console.error('❌ Error limpiando notificaciones antiguas:', error);
     }
   };
 
-  // ⚙️ Actualizar preferencias
+  // ⚙️ Actualizar preferencias (persistidas en localStorage)
   const actualizarPreferencias = async (nuevasPreferencias: Partial<PreferenciasNotificacion>) => {
-    if (!usuarioActual) return;
-    
+    const uid = usuarioActual ?? nuevasPreferencias.usuarioId;
+    if (!uid) return;
+
+    const preferenciasFinal: PreferenciasNotificacion = {
+      usuarioId: uid,
+      enApp: true,
+      push: false,
+      email: false,
+      sms: false,
+      notificarAgendamientos: true,
+      notificarPagos: true,
+      notificarMultas: true,
+      notificarServicios: true,
+      notificarSistema: true,
+      notificarMarketing: false,
+      ...preferencias,
+      ...nuevasPreferencias,
+      fechaActualizacion: new Date().toISOString(),
+    };
+
     try {
-      console.log('⚙️ Actualizando preferencias de notificación');
+      localStorage.setItem(`notif_prefs_${uid}`, JSON.stringify(preferenciasFinal));
+    } catch {}
 
-      const preferenciasFinal = {
-        ...preferencias,
-        ...nuevasPreferencias,
-        usuarioId: usuarioActual,
-        fechaActualizacion: new Date().toISOString()
-      };
-
-      const response = await fetch(`${API_URL}/notificaciones/preferencias`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${publicAnonKey}`
-        },
-        body: JSON.stringify(preferenciasFinal)
-      });
-
-      if (!response.ok) {
-        throw new Error('Error al actualizar preferencias');
-      }
-
-      setPreferencias(preferenciasFinal);
-      console.log('✅ Preferencias actualizadas');
-    } catch (error) {
-      console.error('❌ Error actualizando preferencias:', error);
-    }
+    setPreferencias(preferenciasFinal);
   };
 
   // 🔍 Obtener notificaciones por tipo

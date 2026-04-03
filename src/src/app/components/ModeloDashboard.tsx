@@ -23,7 +23,8 @@ import {
   ChevronDown,
   MapPin,
   Bell,
-  PieChart // 📊 Icono para Analytics
+  PieChart, // 📊 Icono para Analytics
+  Video
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs';
@@ -49,6 +50,7 @@ import { DetalleCitaModal } from '../../components/DetalleCitaModal';
 import { LogoIsotipo } from './LogoIsotipo';
 import { NotificacionesPanel } from './NotificacionesPanel';
 import { AnalyticsPanel } from './AnalyticsPanel'; // 📊 Sistema de Analytics
+import { StreamingControl } from './StreamingControl';
 import { toast } from 'sonner';
 
 interface ModeloDashboardProps {
@@ -85,44 +87,44 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
   // Obtener servicio activo de la modelo
   const servicioActivo = modeloActual ? obtenerServicioActivo(modeloActual.email) : undefined;
 
-  // Estadísticas - Filtrar servicios por modelo
-  const serviciosActivosModelo = serviciosActivos.filter(s => s.modeloId === modeloActual?.id);
-  
+  // Estadísticas - Filtrar servicios por modelo (usando modeloEmail)
+  const serviciosActivosModelo = serviciosActivos.filter(s => s.modeloEmail === modeloActual?.email);
+
   // Obtener servicios de hoy
   const serviciosHoyModelo = serviciosFinalizados.filter(s => {
-    const esHoy = s.horaFin && new Date(s.horaFin).toDateString() === new Date().toDateString();
-    const esDeModelo = s.modeloId === modeloActual?.id;
+    const esHoy = s.fecha && new Date(s.fecha).toDateString() === new Date().toDateString();
+    const esDeModelo = s.modeloEmail === modeloActual?.email;
     return esHoy && esDeModelo;
   });
-  
-  const serviciosFinalizadosModelo = serviciosFinalizados.filter(s => s.modeloId === modeloActual?.id);
-  const multasModelo = multas.filter(m => m.modeloId === modeloActual?.id);
+
+  const serviciosFinalizadosModelo = serviciosFinalizados.filter(s => s.modeloEmail === modeloActual?.email);
+  const multasModelo = multas.filter(m => m.modeloEmail === modeloActual?.email);
   const multasPendientes = obtenerTotalMultasPendientes(modeloActual?.id || 0);
   const adelantosPendientes = obtenerAdelantosPendientes(modeloActual?.id || 0);
-  
+
   // Obtener citas próximas usando el email de la modelo
   const citasProximas = modeloActual ? obtenerAgendamientosPendientes(modeloActual.email) : [];
-  
-  // Obtener citas de hoy
+
+  // Obtener citas de hoy (usa cita.fecha en vez de cita.fechaInicio)
   const citasHoy = citasProximas.filter(cita => {
-    const citaDate = new Date(cita.fechaInicio);
+    const citaDate = new Date(cita.fecha);
     const today = new Date();
     return citaDate.toDateString() === today.toDateString();
-  }).sort((a, b) => new Date(a.fechaInicio).getTime() - new Date(b.fechaInicio).getTime());
+  }).sort((a, b) => (a.hora ?? '').localeCompare(b.hora ?? ''));
 
   // Obtener citas de mañana
   const citasManana = citasProximas.filter(cita => {
-    const citaDate = new Date(cita.fechaInicio);
+    const citaDate = new Date(cita.fecha);
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     return citaDate.toDateString() === tomorrow.toDateString();
-  }).sort((a, b) => new Date(a.fechaInicio).getTime() - new Date(b.fechaInicio).getTime());
+  }).sort((a, b) => (a.hora ?? '').localeCompare(b.hora ?? ''));
   
   // Obtener asistencia del día actual
   const asistenciaHoy = modeloActual ? obtenerRegistroActual(modeloActual.email) : undefined;
 
-  const ingresosHoy = serviciosHoyModelo.reduce((sum, s) => sum + s.totalPagado, 0);
-  const ingresosMes = serviciosFinalizadosModelo.reduce((sum, s) => sum + s.totalPagado, 0);
+  const ingresosHoy = serviciosHoyModelo.reduce((sum, s) => sum + (s.montoPagado ?? s.montoPactado ?? 0), 0);
+  const ingresosMes = serviciosFinalizadosModelo.reduce((sum, s) => sum + (s.montoPagado ?? s.montoPactado ?? 0), 0);
 
   if (!modeloActual) {
     return (
@@ -209,6 +211,10 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
               <PieChart className="w-4 h-4 mr-2" />
               Analytics
             </TabsTrigger>
+            <TabsTrigger value="transmision" className="data-[state=active]:bg-primary">
+              <Video className="w-4 h-4 mr-2" />
+              Transmisión
+            </TabsTrigger>
           </TabsList>
 
           {/* Navegación en Móvil - Select desplegable */}
@@ -224,6 +230,7 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
                   {selectedTab === 'perfil' && <><User className="w-4 h-4" /> <span>Mi Perfil</span></>}
                   {selectedTab === 'notificaciones' && <><Bell className="w-4 h-4" /> <span>Notificaciones</span></>}
                   {selectedTab === 'analytics' && <><PieChart className="w-4 h-4" /> <span>Analytics</span></>}
+                  {selectedTab === 'transmision' && <><Video className="w-4 h-4" /> <span>Transmisión</span></>}
                 </div>
               </SelectTrigger>
               <SelectContent className="bg-black/95 border-white/10">
@@ -273,6 +280,12 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
                   <div className="flex items-center gap-2">
                     <PieChart className="w-4 h-4" />
                     <span>Analytics</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="transmision" className="text-white hover:bg-white/10">
+                  <div className="flex items-center gap-2">
+                    <Video className="w-4 h-4" />
+                    <span>Transmisión</span>
                   </div>
                 </SelectItem>
               </SelectContent>
@@ -658,17 +671,17 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
                       <div key={servicio.id} className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg hover:bg-secondary transition-colors">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
-                            <p className="font-medium text-white">{servicio.cliente}</p>
+                            <p className="font-medium text-white">{servicio.clienteNombre}</p>
                             <Badge variant="outline" className="text-xs">
-                              {servicio.habitacion}
+                              {servicio.tipoServicio}
                             </Badge>
                           </div>
                           <p className="text-xs text-muted-foreground">
-                            {servicio.fecha} • {servicio.horaInicio} - {servicio.horaFin} • {servicio.duracion} min
+                            {servicio.fecha} • {servicio.hora} • {servicio.duracionEstimadaMinutos} min
                           </p>
                         </div>
                         <div className="text-right">
-                          <p className="font-bold text-white">${servicio.totalPagado}</p>
+                          <p className="font-bold text-white">${(servicio.montoPagado ?? servicio.montoPactado ?? 0).toLocaleString()}</p>
                           <p className="text-xs text-muted-foreground">{servicio.metodoPago}</p>
                         </div>
                       </div>
@@ -1143,6 +1156,11 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
           {/* Tab: Analytics */}
           <TabsContent value="analytics" className="space-y-6">
             <AnalyticsPanel modeloEmail={userEmail} />
+          </TabsContent>
+
+          {/* Tab: Transmisión */}
+          <TabsContent value="transmision" className="space-y-6">
+            <StreamingControl modelId={modeloActual.id || ""} modelName={modeloActual.nombreArtistico || modeloActual.nombre} />
           </TabsContent>
         </Tabs>
       </div>

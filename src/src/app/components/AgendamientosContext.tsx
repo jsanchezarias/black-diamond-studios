@@ -1,46 +1,98 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { supabase, projectId, publicAnonKey } from '../../utils/supabase/info'; // ✅ Agregamos projectId y publicAnonKey
-import { 
-  notificarNuevoAgendamiento, 
-  notificarAgendamientoConfirmado, 
-  notificarAgendamientoCancelado,
-  notificarServicioCompletado 
-} from './NotificacionesHelpers';
+import { supabase } from '../../utils/supabase/info';
 import { configurarVerificacionPeriodica, AgendamientoParaRecordatorio } from './NotificacionesRecordatorios';
 
 export interface Agendamiento {
-  id: string; // ✅ UUID de Supabase
+  id: string;
   modeloEmail: string;
   modeloNombre: string;
-  clienteId: string; // ✅ CORREGIDO: ID del cliente (FK)
-  clienteNombre: string; // ✅ Campo calculado (para display) - se obtiene del JOIN
-  clienteTelefono: string; // ✅ Campo calculado (para display) - se obtiene del JOIN
+  clienteId: string;
+  clienteNombre: string;
+  clienteTelefono: string;
   fecha: string;
   hora: string;
   duracionMinutos: number;
-  tipoServicio: string; // 'sede' | 'domicilio'
+  tipoServicio: string;
   estado: 'pendiente' | 'confirmado' | 'completado' | 'cancelado' | 'no_show';
   notas?: string;
-  creadoPor?: string; // ✅ Opcional porque puede no existir en la tabla
-  fechaCreacion?: string; // ✅ Opcional porque puede no existir en la tabla
+  creadoPor?: string;
+  fechaCreacion?: string;
   motivoCancelacion?: string;
   canceladoPor?: string;
   fechaCancelacion?: string;
-  // 🆕 CAMPOS DE PAGO
-  montoPago: number; // Monto total del servicio
-  estadoPago: 'pendiente' | 'pagado' | 'reembolsado'; // Estado del pago
-  metodoPago?: string; // 'PSE' | 'Nequi' | 'Tarjeta' | etc.
-  transaccionId?: string; // ID de la transacción de la pasarela
-  fechaPago?: string; // Fecha en que se realizó el pago
-  comprobantePago?: string; // URL del comprobante si aplica
-  // 🆕 CAMPOS DE TARIFA - Para sincronización con el perfil de la modelo
-  tarifaNombre?: string; // Nombre de la tarifa (ej: "1 hora", "2 horas")
-  tarifaDescripcion?: string; // Descripción de la tarifa
+  montoPago: number;
+  estadoPago: 'pendiente' | 'pagado' | 'reembolsado';
+  metodoPago?: string;
+  transaccionId?: string;
+  fechaPago?: string;
+  comprobantePago?: string;
+  tarifaNombre?: string;
+  tarifaDescripcion?: string;
+}
+
+// Mapper: DB row (snake_case) → Agendamiento (camelCase)
+function rowToAgendamiento(row: any): Agendamiento {
+  return {
+    id: row.id,
+    modeloEmail: row.modelo_email ?? row.modeloEmail ?? '',
+    modeloNombre: row.modelo_nombre ?? row.modeloNombre ?? '',
+    clienteId: row.cliente_id ?? row.clienteId ?? '',
+    clienteNombre: row.cliente_nombre ?? row.clienteNombre ?? (row.clientes?.nombre ?? ''),
+    clienteTelefono: row.cliente_telefono ?? row.clienteTelefono ?? (row.clientes?.telefono ?? ''),
+    fecha: row.fecha ?? '',
+    hora: row.hora ?? '',
+    duracionMinutos: row.duracion_minutos ?? row.duracion ?? row.duracionMinutos ?? 60,
+    tipoServicio: row.tipo_servicio ?? row.tipoServicio ?? 'sede',
+    estado: row.estado ?? 'pendiente',
+    notas: row.notas,
+    creadoPor: row.creado_por ?? row.creadoPor,
+    fechaCreacion: row.fecha_creacion ?? row.created_at,
+    motivoCancelacion: row.motivo_cancelacion ?? row.motivoCancelacion,
+    canceladoPor: row.cancelado_por ?? row.canceladoPor,
+    fechaCancelacion: row.fecha_cancelacion ?? row.fechaCancelacion,
+    montoPago: row.monto_pago ?? row.precio ?? row.montoPago ?? 0,
+    estadoPago: row.estado_pago ?? row.estadoPago ?? 'pendiente',
+    metodoPago: row.metodo_pago ?? row.metodoPago,
+    transaccionId: row.transaccion_id ?? row.transaccionId,
+    fechaPago: row.fecha_pago ?? row.fechaPago,
+    comprobantePago: row.comprobante_pago ?? row.comprobantePago,
+    tarifaNombre: row.tarifa_nombre ?? row.tarifaNombre ?? row.servicio,
+    tarifaDescripcion: row.tarifa_descripcion ?? row.tarifaDescripcion,
+  };
+}
+
+// Mapper: Agendamiento → DB row (snake_case)
+function agendamientoToRow(a: Partial<Agendamiento>): Record<string, any> {
+  const row: Record<string, any> = {};
+  if (a.modeloEmail !== undefined) row.modelo_email = a.modeloEmail;
+  if (a.modeloNombre !== undefined) row.modelo_nombre = a.modeloNombre;
+  if (a.clienteId !== undefined) row.cliente_id = a.clienteId;
+  if (a.clienteNombre !== undefined) row.cliente_nombre = a.clienteNombre;
+  if (a.clienteTelefono !== undefined) row.cliente_telefono = a.clienteTelefono;
+  if (a.fecha !== undefined) row.fecha = a.fecha;
+  if (a.hora !== undefined) row.hora = a.hora;
+  if (a.duracionMinutos !== undefined) row.duracion_minutos = a.duracionMinutos;
+  if (a.tipoServicio !== undefined) row.tipo_servicio = a.tipoServicio;
+  if (a.estado !== undefined) row.estado = a.estado;
+  if (a.notas !== undefined) row.notas = a.notas;
+  if (a.creadoPor !== undefined) row.creado_por = a.creadoPor;
+  if (a.motivoCancelacion !== undefined) row.motivo_cancelacion = a.motivoCancelacion;
+  if (a.canceladoPor !== undefined) row.cancelado_por = a.canceladoPor;
+  if (a.fechaCancelacion !== undefined) row.fecha_cancelacion = a.fechaCancelacion;
+  if (a.montoPago !== undefined) row.monto_pago = a.montoPago;
+  if (a.estadoPago !== undefined) row.estado_pago = a.estadoPago;
+  if (a.metodoPago !== undefined) row.metodo_pago = a.metodoPago;
+  if (a.transaccionId !== undefined) row.transaccion_id = a.transaccionId;
+  if (a.fechaPago !== undefined) row.fecha_pago = a.fechaPago;
+  if (a.comprobantePago !== undefined) row.comprobante_pago = a.comprobantePago;
+  if (a.tarifaNombre !== undefined) row.tarifa_nombre = a.tarifaNombre;
+  if (a.tarifaDescripcion !== undefined) row.tarifa_descripcion = a.tarifaDescripcion;
+  return row;
 }
 
 interface AgendamientosContextType {
   agendamientos: Agendamiento[];
-  agregarAgendamiento: (agendamiento: Omit<Agendamiento, 'id' | 'fechaCreacion' | 'creadoPor'>) => Promise<{ success: boolean, error?: any, data?: any }>; // ✅ clienteNombre y clienteTelefono ya NO se excluyen
+  agregarAgendamiento: (agendamiento: Omit<Agendamiento, 'id' | 'fechaCreacion' | 'creadoPor'>) => Promise<{ success: boolean, error?: any, data?: any }>;
   actualizarAgendamiento: (id: string, agendamiento: Partial<Agendamiento>) => Promise<void>;
   eliminarAgendamiento: (id: string) => Promise<void>;
   obtenerAgendamientosPorModelo: (modeloEmail: string) => Agendamiento[];
@@ -55,94 +107,55 @@ const AgendamientosContext = createContext<AgendamientosContextType | undefined>
 
 export function AgendamientosProvider({ children }: { children: ReactNode }) {
   const [agendamientos, setAgendamientos] = useState<Agendamiento[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  // ✅ Cargar agendamientos desde Supabase al inicializar
   useEffect(() => {
     cargarAgendamientos();
   }, []);
 
   const cargarAgendamientos = async () => {
     try {
-      console.log('🔄 Cargando agendamientos desde servidor...');
-      
-      // ✅ SOLUCIÓN: Usar el endpoint del servidor que tiene permisos SERVICE_ROLE
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-9dadc017/agendamientos`,
-        {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${publicAnonKey}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      const { data, error } = await supabase
+        .from('agendamientos')
+        .select('*')
+        .order('fecha', { ascending: true });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Error en respuesta del servidor:', errorText);
-        console.warn('⚠️ Usando MODO FALLBACK - Sin agendamientos iniciales');
+      if (error) {
+        console.error('❌ Error cargando agendamientos:', error.message);
         setAgendamientos([]);
         return;
       }
 
-      const result = await response.json();
-
-      if (result.success && result.data) {
-        const agendamientosFormateados = result.data
-          .sort((a: Agendamiento, b: Agendamiento) => {
-            const dateA = new Date(`${a.fecha}T${a.hora || '00:00'}`);
-            const dateB = new Date(`${b.fecha}T${b.hora || '00:00'}`);
-            return dateA.getTime() - dateB.getTime();
-          });
-
-        setAgendamientos(agendamientosFormateados);
-        console.log(`✅ ${agendamientosFormateados.length} agendamientos cargados desde servidor`);
-      } else {
-        setAgendamientos([]);
-        console.log('📋 No hay agendamientos guardados');
-      }
+      const formateados = (data ?? []).map(rowToAgendamiento);
+      setAgendamientos(formateados);
+      console.log(`✅ ${formateados.length} agendamientos cargados`);
     } catch (error) {
-      console.error('❌ Error cargando agendamientos:', error);
+      console.error('❌ Error inesperado cargando agendamientos:', error);
       setAgendamientos([]);
-    } finally {
-      setLoading(false);
     }
   };
 
   const agregarAgendamiento = async (agendamiento: Omit<Agendamiento, 'id' | 'fechaCreacion' | 'creadoPor'>) => {
     try {
-      console.log('📝 Creando agendamiento...');
-      
-      // ✅ SOLUCIÓN: Usar el endpoint del servidor en lugar de acceso directo a KV Store
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-9dadc017/agendamientos`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${publicAnonKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(agendamiento),
-        }
-      );
+      const row = agendamientoToRow(agendamiento);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('❌ Error guardando agendamiento:', errorData);
-        return { success: false, error: errorData };
+      const { data, error } = await supabase
+        .from('agendamientos')
+        .insert(row)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ Error creando agendamiento:', error.message);
+        return { success: false, error };
       }
 
-      const result = await response.json();
+      const nuevo = rowToAgendamiento(data);
+      setAgendamientos(prev => [...prev, nuevo].sort((a, b) =>
+        new Date(`${a.fecha}T${a.hora}`).getTime() - new Date(`${b.fecha}T${b.hora}`).getTime()
+      ));
 
-      if (result.success) {
-        console.log('✅ Agendamiento creado exitosamente');
-        await cargarAgendamientos(); // Recargar lista
-        return { success: true, data: result.data };
-      } else {
-        console.error('❌ Error en respuesta del servidor:', result);
-        return { success: false, error: result.error };
-      }
+      console.log('✅ Agendamiento creado:', nuevo.id);
+      return { success: true, data: nuevo };
     } catch (error) {
       console.error('❌ Error en agregarAgendamiento:', error);
       return { success: false, error };
@@ -151,34 +164,20 @@ export function AgendamientosProvider({ children }: { children: ReactNode }) {
 
   const actualizarAgendamiento = async (id: string, agendamiento: Partial<Agendamiento>) => {
     try {
-      console.log('🔄 Actualizando agendamiento:', id);
-      
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-9dadc017/agendamientos/${id}`,
-        {
-          method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${publicAnonKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(agendamiento),
-        }
-      );
+      const row = agendamientoToRow(agendamiento);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('❌ Error actualizando agendamiento:', errorData);
-        throw new Error(errorData.error || 'Error actualizando agendamiento');
+      const { error } = await supabase
+        .from('agendamientos')
+        .update(row)
+        .eq('id', id);
+
+      if (error) {
+        console.error('❌ Error actualizando agendamiento:', error.message);
+        throw new Error(error.message);
       }
 
-      const result = await response.json();
-
-      if (result.success) {
-        console.log('✅ Agendamiento actualizado exitosamente');
-        await cargarAgendamientos(); // Recargar lista
-      } else {
-        throw new Error(result.error || 'Error actualizando agendamiento');
-      }
+      setAgendamientos(prev => prev.map(a => a.id === id ? { ...a, ...agendamiento } : a));
+      console.log('✅ Agendamiento actualizado:', id);
     } catch (error) {
       console.error('❌ Error en actualizarAgendamiento:', error);
       throw error;
@@ -187,230 +186,101 @@ export function AgendamientosProvider({ children }: { children: ReactNode }) {
 
   const eliminarAgendamiento = async (id: string) => {
     try {
-      console.log('🗑️ Eliminando agendamiento:', id);
-      
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-9dadc017/agendamientos/${id}`,
-        {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${publicAnonKey}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      const { error } = await supabase
+        .from('agendamientos')
+        .delete()
+        .eq('id', id);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('❌ Error eliminando agendamiento:', errorData);
-        throw new Error(errorData.error || 'Error eliminando agendamiento');
+      if (error) {
+        console.error('❌ Error eliminando agendamiento:', error.message);
+        throw new Error(error.message);
       }
 
-      console.log('✅ Agendamiento eliminado exitosamente');
-      await cargarAgendamientos(); // Recargar lista
+      setAgendamientos(prev => prev.filter(a => a.id !== id));
+      console.log('✅ Agendamiento eliminado:', id);
     } catch (error) {
       console.error('❌ Error en eliminarAgendamiento:', error);
       throw error;
     }
   };
 
-  const obtenerAgendamientosPorModelo = (modeloEmail: string) => {
-    return agendamientos.filter(a => a.modeloEmail === modeloEmail);
-  };
+  const obtenerAgendamientosPorModelo = (modeloEmail: string) =>
+    agendamientos.filter(a => a.modeloEmail === modeloEmail);
 
   const obtenerAgendamientosPendientes = (modeloEmail: string) => {
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
-    
     return agendamientos.filter(a => {
-      const fechaAgendamiento = new Date(a.fecha);
-      return a.modeloEmail === modeloEmail && 
-             a.estado !== 'completado' && 
-             a.estado !== 'cancelado' &&
-             fechaAgendamiento >= hoy;
-    }).sort((a, b) => {
-      const dateA = new Date(`${a.fecha}T${a.hora}`);
-      const dateB = new Date(`${b.fecha}T${b.hora}`);
-      return dateA.getTime() - dateB.getTime();
-    });
+      const fechaA = new Date(a.fecha);
+      return a.modeloEmail === modeloEmail &&
+        a.estado !== 'completado' &&
+        a.estado !== 'cancelado' &&
+        fechaA >= hoy;
+    }).sort((a, b) =>
+      new Date(`${a.fecha}T${a.hora}`).getTime() - new Date(`${b.fecha}T${b.hora}`).getTime()
+    );
   };
 
   const marcarComoCompletado = async (id: string) => {
-    try {
-      // Obtener datos del agendamiento antes de actualizarlo
-      const agendamiento = agendamientos.find(a => a.id === id);
-      if (!agendamiento) {
-        throw new Error('Agendamiento no encontrado');
-      }
+    await actualizarAgendamiento(id, { estado: 'completado' });
 
-      // 1. Actualizar el agendamiento
-      await actualizarAgendamiento(id, { estado: 'completado' });
-      
-      // 2. Enviar notificación
-      await notificarServicioCompletado({
-        modeloEmail: agendamiento.modeloEmail,
-        clienteNombre: agendamiento.clienteNombre,
-        monto: agendamiento.montoPago,
-        duracion: agendamiento.duracionMinutos
-      });
-      
-      // 3. Crear servicio desde el agendamiento
-      console.log(`📝 Creando servicio completado para agendamiento ${id}`);
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-9dadc017/servicios/desde-agendamiento`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${publicAnonKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            agendamientoId: id,
-            estado: 'completado',
-          }),
-        }
-      );
-
-      if (response.ok) {
-        console.log('✅ Servicio completado creado exitosamente');
-      } else {
-        console.error('⚠️ Error creando servicio completado:', await response.text());
-      }
-    } catch (error) {
-      console.error('❌ Error en marcarComoCompletado:', error);
-      throw error;
+    // Crear registro en servicios_modelo si existe
+    const ag = agendamientos.find(a => a.id === id);
+    if (ag) {
+      await supabase.from('servicios_modelo').insert({
+        agendamiento_id: id,
+        modelo_email: ag.modeloEmail,
+        cliente_id: ag.clienteId,
+        fecha: ag.fecha,
+        hora: ag.hora,
+        tipo_servicio: ag.tipoServicio,
+        monto: ag.montoPago,
+        estado: 'completado',
+        created_at: new Date().toISOString(),
+      }).select().maybeSingle();
     }
   };
 
   const cancelarAgendamiento = async (id: string, motivo: string, canceladoPor: string) => {
-    try {
-      // Obtener datos del agendamiento antes de cancelarlo
-      const agendamiento = agendamientos.find(a => a.id === id);
-      if (!agendamiento) {
-        throw new Error('Agendamiento no encontrado');
-      }
-
-      // 1. Actualizar el agendamiento
-      await actualizarAgendamiento(id, {
-        estado: 'cancelado',
-        motivoCancelacion: motivo,
-        canceladoPor: canceladoPor,
-        fechaCancelacion: new Date().toISOString(),
-      });
-      
-      // 2. Enviar notificación
-      await notificarAgendamientoCancelado({
-        modeloEmail: agendamiento.modeloEmail,
-        clienteNombre: agendamiento.clienteNombre,
-        fecha: agendamiento.fecha,
-        hora: agendamiento.hora,
-        motivo
-      });
-      
-      // 3. Crear servicio cancelado
-      console.log(`📝 Creando servicio cancelado para agendamiento ${id}`);
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-9dadc017/servicios/desde-agendamiento`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${publicAnonKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            agendamientoId: id,
-            estado: 'cancelado',
-          }),
-        }
-      );
-
-      if (response.ok) {
-        console.log('✅ Servicio cancelado creado exitosamente');
-      } else {
-        console.error('⚠️ Error creando servicio cancelado:', await response.text());
-      }
-    } catch (error) {
-      console.error('❌ Error en cancelarAgendamiento:', error);
-      throw error;
-    }
+    await actualizarAgendamiento(id, {
+      estado: 'cancelado',
+      motivoCancelacion: motivo,
+      canceladoPor,
+      fechaCancelacion: new Date().toISOString(),
+    });
   };
 
   const marcarComoNoShow = async (id: string, motivo: string, marcadoPor: string) => {
-    try {
-      // 1. Actualizar el agendamiento
-      await actualizarAgendamiento(id, {
-        estado: 'no_show',
-        motivoCancelacion: motivo,
-        canceladoPor: marcadoPor,
-        fechaCancelacion: new Date().toISOString(),
-      });
-      
-      // 2. Crear servicio no_show (el servidor aplicará multa automática si corresponde)
-      console.log(`📝 Creando servicio no_show para agendamiento ${id}`);
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-9dadc017/servicios/desde-agendamiento`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${publicAnonKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            agendamientoId: id,
-            estado: 'no_show',
-          }),
-        }
-      );
-
-      if (response.ok) {
-        const result = await response.json();
-        console.log('✅ Servicio no_show creado exitosamente:', result);
-        
-        if (result.data?.multaAplicada) {
-          console.log(`💸 Multa automática aplicada: $${result.data.montoMulta?.toLocaleString()}`);
-        }
-      } else {
-        console.error('⚠️ Error creando servicio no_show:', await response.text());
-      }
-    } catch (error) {
-      console.error('❌ Error en marcarComoNoShow:', error);
-      throw error;
-    }
+    await actualizarAgendamiento(id, {
+      estado: 'no_show',
+      motivoCancelacion: motivo,
+      canceladoPor: marcadoPor,
+      fechaCancelacion: new Date().toISOString(),
+    });
   };
 
   const recargarAgendamientos = async () => {
     await cargarAgendamientos();
   };
 
-  // 🔔 SISTEMA DE RECORDATORIOS AUTOMÁTICOS
-  // Verificar cada hora si hay agendamientos próximos (24h antes) y enviar recordatorios
+  // Recordatorios automáticos
   useEffect(() => {
     if (agendamientos.length === 0) return;
-
-    console.log('⏰ Configurando verificación de recordatorios automáticos...');
-
-    // Convertir agendamientos al formato requerido por el sistema de recordatorios
-    const agendamientosParaRecordatorio: AgendamientoParaRecordatorio[] = agendamientos
+    const activos: AgendamientoParaRecordatorio[] = agendamientos
       .filter(a => a.estado === 'confirmado' || a.estado === 'pendiente')
       .map(a => ({
         id: a.id,
         modeloEmail: a.modeloEmail,
         modeloNombre: a.modeloNombre,
         clienteNombre: a.clienteNombre,
-        fecha: a.fecha, // Ya debe estar en formato ISO
+        fecha: a.fecha,
         hora: a.hora,
         tipoServicio: a.tipoServicio,
-        estado: a.estado
+        estado: a.estado,
       }));
-
-    // Configurar verificación periódica (cada 60 minutos)
-    const cleanup = configurarVerificacionPeriodica(agendamientosParaRecordatorio, 60);
-
-    console.log(`✅ Sistema de recordatorios configurado para ${agendamientosParaRecordatorio.length} agendamientos activos`);
-
-    // Limpiar al desmontar
+    const cleanup = configurarVerificacionPeriodica(activos, 60);
     return cleanup;
-  }, [agendamientos]); // Re-configurar cuando cambien los agendamientos
+  }, [agendamientos]);
 
   return (
     <AgendamientosContext.Provider
@@ -435,23 +305,18 @@ export function AgendamientosProvider({ children }: { children: ReactNode }) {
 export function useAgendamientos() {
   const context = useContext(AgendamientosContext);
   if (context === undefined) {
-    console.warn('⚠️ useAgendamientos debe usarse dentro de AgendamientosProvider');
-    // Retornar un objeto con valores por defecto en lugar de undefined
     return {
       agendamientos: [],
-      agregarAgendamiento: async () => { 
-        console.warn('AgendamientosProvider no disponible'); 
-        return { success: false, error: { message: 'Provider no disponible' } };
-      },
-      actualizarAgendamiento: async () => { console.warn('AgendamientosProvider no disponible'); },
-      eliminarAgendamiento: async () => { console.warn('AgendamientosProvider no disponible'); },
+      agregarAgendamiento: async () => ({ success: false, error: 'Provider no disponible' }),
+      actualizarAgendamiento: async () => {},
+      eliminarAgendamiento: async () => {},
       obtenerAgendamientosPorModelo: () => [],
       obtenerAgendamientosPendientes: () => [],
-      marcarComoCompletado: async () => { console.warn('AgendamientosProvider no disponible'); },
-      cancelarAgendamiento: async () => { console.warn('AgendamientosProvider no disponible'); },
-      marcarComoNoShow: async () => { console.warn('AgendamientosProvider no disponible'); },
-      recargarAgendamientos: async () => { console.warn('AgendamientosProvider no disponible'); },
-    };
+      marcarComoCompletado: async () => {},
+      cancelarAgendamiento: async () => {},
+      marcarComoNoShow: async () => {},
+      recargarAgendamientos: async () => {},
+    } as AgendamientosContextType;
   }
   return context;
 }
