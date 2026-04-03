@@ -361,7 +361,7 @@ export function PublicUsersProvider({ children }: { children: ReactNode }) {
 
     // ✅ REALTIME: Suscripción a cambios en tabla clientes (sesiones)
     const clientesChannel = supabase
-      .channel('clientes_sesiones_changes')
+      .channel(`clientes_sesiones_changes_${Date.now()}`)
       .on(
         'postgres_changes',
         {
@@ -429,7 +429,7 @@ export function PublicUsersProvider({ children }: { children: ReactNode }) {
 
     // ✅ REALTIME: Suscripción a nuevos mensajes
     const mensajesChannel = supabase
-      .channel('chat_mensajes_publicos_changes')
+      .channel(`chat_mensajes_publicos_changes_${Date.now()}`)
       .on(
         'postgres_changes',
         {
@@ -684,9 +684,9 @@ export function PublicUsersProvider({ children }: { children: ReactNode }) {
       }
 
       // 2. Formatear conversación para el historial
-      const conversacionTexto = mensajes.map(msg => {
+      const conversacionTexto = mensajes.map((msg: any) => {
         const fecha = new Date(msg.created_at).toLocaleString('es-CO');
-        const remitente = msg.sender?.nombre || 'Usuario';
+        const remitente = (msg.sender as any)?.nombre || 'Usuario';
         return `[${fecha}] ${remitente}: ${msg.message}`;
       }).join('\\n');
 
@@ -871,20 +871,15 @@ export function usePublicUsers() {
   
   if (context === undefined) {
     console.warn('usePublicUsers debe usarse dentro de PublicUsersProvider');
-    // Retornar un contexto vacío seguro en lugar de lanzar error
     return {
+      currentUser: null,
       loginUser: () => {},
-      users: [],
-      loading: false,
-      error: null,
-      adminUsers: [],
-      programadorUsers: [],
-      ownerUsers: [],
-      modeloUsers: [],
-      addUser: async () => {},
-      updateUser: async () => {},
-      deleteUser: async () => {},
-      refreshUsers: async () => {},
+      logout: async () => {},
+      sendMessage: async () => {},
+      messages: [],
+      onlineUsers: 0,
+      getVisibleMessages: () => [],
+      logoutRef: { current: undefined },
     } as PublicUsersContextType;
   }
   

@@ -34,8 +34,9 @@ export function ProgramadorChatPanel({ userId, userEmail }: ProgramadorChatPanel
   // Cargar mensajes desde Supabase
   useEffect(() => {
     loadMessages();
-    subscribeToMessages();
+    const cleanup = subscribeToMessages();
     loadOnlineUsers();
+    return cleanup;
   }, []);
 
   const loadMessages = async () => {
@@ -91,7 +92,7 @@ export function ProgramadorChatPanel({ userId, userEmail }: ProgramadorChatPanel
 
   const subscribeToMessages = () => {
     const channel = supabase
-      .channel('chat_mensajes_publicos_changes')
+      .channel(`chat_programador_panel_${Date.now()}`)
       .on(
         'postgres_changes',
         {
