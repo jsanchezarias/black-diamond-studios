@@ -54,6 +54,7 @@ export function TerminalChatProgramador({ userId, userEmail }: TerminalChatProgr
   const [vistaMovil, setVistaMovil] = useState<'lista' | 'chat'>('lista');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -66,7 +67,8 @@ export function TerminalChatProgramador({ userId, userEmail }: TerminalChatProgr
   useEffect(() => {
     if (programadorChatId) {
       loadConversaciones();
-      subscribeToMessages();
+      const cleanup = subscribeToMessages();
+      return cleanup;
     }
   }, [programadorChatId, filtroEstado]);
 
@@ -250,8 +252,16 @@ export function TerminalChatProgramador({ userId, userEmail }: TerminalChatProgr
   };
 
   const subscribeToMessages = () => {
+    // Remove any existing channel before creating a new one
+    if (chatChannelRef.current) {
+      supabase.removeChannel(chatChannelRef.current);
+      chatChannelRef.current = null;
+    }
+
+    // Use a unique channel name per subscription to avoid conflicts
+    const channelName = `chat_updates_${Date.now()}`;
     const channel = supabase
-      .channel('chat_updates')
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
@@ -279,8 +289,13 @@ export function TerminalChatProgramador({ userId, userEmail }: TerminalChatProgr
       )
       .subscribe();
 
+    chatChannelRef.current = channel;
+
     return () => {
-      supabase.removeChannel(channel);
+      if (chatChannelRef.current) {
+        supabase.removeChannel(chatChannelRef.current);
+        chatChannelRef.current = null;
+      }
     };
   };
 
