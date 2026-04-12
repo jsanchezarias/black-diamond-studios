@@ -42,6 +42,10 @@ export interface Servicio {
   fechaCreacion: string;
   creadoPor: string;
   agendamientoId: string;
+  // Métricas financieras
+  costoServicio: number;
+  costoAdicionales: number;
+  costoConsumo: number;
 }
 
 export interface PoliticaPenalizacion {
@@ -54,6 +58,7 @@ export interface PoliticaPenalizacion {
 
 interface ServiciosContextType {
   servicios: Servicio[];
+  serviciosFinalizados: Servicio[];
   politicaPenalizacion: PoliticaPenalizacion;
   crearServicio: (servicio: Omit<Servicio, 'id' | 'fechaCreacion' | 'creadoPor'>) => Promise<{ success: boolean, error?: any, data?: any }>;
   actualizarServicio: (id: string, servicio: Partial<Servicio>) => Promise<void>;
@@ -125,6 +130,9 @@ function rowToServicio(row: any): Servicio {
     fechaCreacion: row.fecha_creacion ?? row.created_at ?? new Date().toISOString(),
     creadoPor: row.creado_por ?? 'sistema',
     agendamientoId: row.agendamiento_id ?? '',
+    costoServicio: row.monto_pactado ?? row.monto ?? 0,
+    costoAdicionales: row.total_adicionales ?? 0,
+    costoConsumo: row.total_consumos ?? 0,
   };
 }
 
@@ -353,9 +361,11 @@ export function ServiciosProvider({ children }: { children: ReactNode }) {
 
   const recargarServicios = async () => { await cargarServicios(); };
 
+  const serviciosFinalizados = servicios.filter(s => s.estado === 'completado');
+
   return (
     <ServiciosContext.Provider value={{
-      servicios, politicaPenalizacion, crearServicio, actualizarServicio,
+      servicios, serviciosFinalizados, politicaPenalizacion, crearServicio, actualizarServicio,
       obtenerServicioPorId, obtenerServiciosPorCliente, obtenerNoShowsPorCliente,
       contarNoShowsCliente, obtenerMultasPendientesCliente, calcularTotalMultasCliente,
       obtenerServiciosPorModelo, obtenerIngresosModelo, crearServicioDesdeAgendamiento,
@@ -370,7 +380,7 @@ export function useServicios() {
   const context = useContext(ServiciosContext);
   if (context === undefined) {
     return {
-      servicios: [], politicaPenalizacion: POLITICA_DEFAULT,
+      servicios: [], serviciosFinalizados: [], politicaPenalizacion: POLITICA_DEFAULT,
       crearServicio: async () => ({ success: false }),
       actualizarServicio: async () => {},
       obtenerServicioPorId: () => undefined,

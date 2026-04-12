@@ -318,9 +318,10 @@ export function SupervisorDashboard({ userEmail, onLogout }: SupervisorDashboard
   useEffect(() => {
     let mounted = true;
     supabase
-      .from('modelos')
+      .from('usuarios')
       .select('*', { count: 'exact', head: true })
-      .eq('activa', true)
+      .eq('role', 'modelo')
+      .eq('estado', 'activo')
       .then(({ count }) => { if (mounted && count !== null) setModelosActivas(count); });
     return () => { mounted = false; };
   }, []);
