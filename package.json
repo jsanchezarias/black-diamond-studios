@@ -58,14 +58,14 @@
     "sonner": "^2.0.3",
     "tailwind-merge": "*",
     "tailwindcss": "^4.0.0",
-    "vaul": "^1.1.2"
+    "vaul": "^1.1.2",
+    "@tailwindcss/vite": "^4.0.0",
+    "@vitejs/plugin-react-swc": "^3.10.2",
+    "vite": "^6.3.5"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "^4.0.0",
     "@types/node": "^20.10.0",
-    "@vitejs/plugin-react-swc": "^3.10.2",
-    "cssnano": "^7.1.4",
-    "vite": "6.3.5"
+    "cssnano": "^7.1.4"
   },
   "scripts": {
     "dev": "vite",
