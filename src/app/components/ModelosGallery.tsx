@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState } from 'react';
 import { Calendar, Clock, MapPin, Star, Heart, MessageCircle, Filter, X, Sparkles } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
@@ -23,66 +23,7 @@ const TARIFAS_DOMICILIO = [
   { horas: 24, precio: 2500000 },
 ];
 
-const GOLD = ['#d4af37', '#e5c158', '#ffd700', '#f0d060', '#c9a227'];
-
-interface GoldSparkle {
-  id: string;
-  x: number;
-  y: number;
-  size: number;
-  tx: number;
-  ty: number;
-  color: string;
-  duration: number;
-}
-
-// Hook de lucetas doradas
-function useGoldSparkles() {
-  const [sparkles, setSparkles] = useState<GoldSparkle[]>([]);
-  const lastTime = useRef(0);
-
-  const onMouseMove = useCallback((e: React.MouseEvent<HTMLElement>) => {
-    const now = Date.now();
-    if (now - lastTime.current < 90) return;
-    lastTime.current = now;
-
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    const s: GoldSparkle = {
-      id: `${now}-${Math.random()}`,
-      x: x + (Math.random() - 0.5) * 40,
-      y: y + (Math.random() - 0.5) * 40,
-      size: Math.random() * 16 + 8,
-      tx: (Math.random() - 0.5) * 60,
-      ty: -(Math.random() * 55 + 20),
-      color: GOLD[Math.floor(Math.random() * GOLD.length)],
-      duration: Math.random() * 300 + 550,
-    };
-
-    setSparkles(prev => [...prev.slice(-12), s]);
-    setTimeout(() => setSparkles(prev => prev.filter(p => p.id !== s.id)), s.duration);
-  }, []);
-
-  const onMouseLeave = useCallback(() => setSparkles([]), []);
-
-  return { sparkles, onMouseMove, onMouseLeave };
-}
-
-// SVG luceta (estrella de 4 puntas)
-function SparkleIcon({ size, color }: { size: number; color: string }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 160 160" fill="none">
-      <path
-        d="M80 7C80 7 74 36 68 56C62 76 40 92 7 80C40 68 62 84 68 104C74 124 80 153 80 153C80 153 86 124 92 104C98 84 120 68 153 80C120 92 98 76 92 56C86 36 80 7 80 7Z"
-        fill={color}
-      />
-    </svg>
-  );
-}
-
-// Tarjeta de modelo con lucetas
+// Tarjeta de modelo
 function ModeloCardItem({
   modelo,
   proximasCitas,
@@ -92,30 +33,11 @@ function ModeloCardItem({
   proximasCitas: any[];
   onSelectModelo: (email: string) => void;
 }) {
-  const { sparkles, onMouseMove, onMouseLeave } = useGoldSparkles();
-
   return (
     <Card
-      className="group relative bd-gold-card bg-gradient-to-br from-neutral-900 via-black to-neutral-950 border border-amber-500/20 overflow-hidden cursor-pointer bd-card-enter"
+      className="relative bg-gradient-to-br from-neutral-900 via-black to-neutral-950 border border-amber-500/20 overflow-hidden cursor-default"
       onClick={() => onSelectModelo(modelo.email)}
-      onMouseMove={onMouseMove}
-      onMouseLeave={onMouseLeave}
     >
-      {/* Lucetas */}
-      {sparkles.map(s => (
-        <div
-          key={s.id}
-          className="bd-sparkle"
-          style={{
-            left: s.x,
-            top: s.y,
-            '--s-tx': `${s.tx}px`,
-            '--s-ty': `${s.ty}px`,
-          } as React.CSSProperties}
-        >
-          <SparkleIcon size={s.size} color={s.color} />
-        </div>
-      ))}
 
       <CardContent className="p-0">
         {/* Imagen principal */}
@@ -123,22 +45,17 @@ function ModeloCardItem({
           <ImageWithFallback
             src={modelo.fotoPerfil}
             alt={modelo.nombreArtistico}
-            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
+            className="w-full h-full object-cover"
           />
 
           {/* Overlay gold */}
           <div className="absolute inset-0 bd-gold-overlay" />
 
-          {/* Halo dorado en hover */}
-          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-            style={{ background: 'radial-gradient(ellipse at 50% 0%, rgba(212,175,55,0.18) 0%, transparent 65%)' }}
-          />
-
           {/* Badge disponibilidad */}
           <div className="absolute top-4 right-4 z-10">
             {modelo.disponible ? (
               <Badge className="bg-black/70 text-amber-400 border border-amber-500/60 backdrop-blur-sm font-semibold shadow-lg shadow-amber-500/20">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mr-1.5 animate-pulse inline-block" />
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mr-1.5 inline-block" />
                 Disponible
               </Badge>
             ) : (
@@ -217,7 +134,7 @@ function ModeloCardItem({
 
           <Button
             onClick={(e) => { e.stopPropagation(); onSelectModelo(modelo.email); }}
-            className="w-full bg-gradient-to-r from-amber-700 via-yellow-600 to-amber-700 hover:from-amber-600 hover:via-yellow-500 hover:to-amber-600 text-black font-bold gap-2 shadow-lg shadow-amber-900/40 transition-all duration-300 hover:shadow-amber-500/30 hover:scale-[1.02]"
+            className="w-full bg-gradient-to-r from-amber-700 via-yellow-600 to-amber-700 hover:from-amber-600 hover:via-yellow-500 hover:to-amber-600 text-black font-bold gap-2 shadow-lg shadow-amber-900/40 transition-colors hover:shadow-amber-500/30"
           >
             <Calendar className="w-4 h-4" />
             Agendar Cita
@@ -229,11 +146,11 @@ function ModeloCardItem({
 }
 
 export function ModelosGallery({ onSelectModelo }: ModelosGalleryProps) {
-  const { modelos } = useModelos();
+  const { modelos, loading } = useModelos();
   const { agendamientos } = useAgendamientos();
   const [selectedModelo, setSelectedModelo] = useState<any>(null);
   const [showFilters, setShowFilters] = useState(false);
-  const [filterDisponibilidad, setFilterDisponibilidad] = useState<'todas' | 'disponibles' | 'ocupadas'>('disponibles');
+  const [filterDisponibilidad, setFilterDisponibilidad] = useState<'todas' | 'disponibles' | 'ocupadas'>('todas');
   const [filterServicio, setFilterServicio] = useState<'todos' | 'sede' | 'domicilio'>('todos');
 
   const modelosActivas = modelos.filter(m => m.activa && !m.fechaArchivado);
@@ -256,6 +173,12 @@ export function ModelosGallery({ onSelectModelo }: ModelosGalleryProps) {
 
   const formatPrecio = (precio: number) =>
     new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(precio);
+
+  if (loading && modelos.length === 0) return (
+    <div className="w-full min-h-screen bg-black flex items-center justify-center">
+      <p className="text-amber-500/60 text-sm">Cargando modelos...</p>
+    </div>
+  );
 
   return (
     <div className="w-full min-h-screen bg-black p-4 md:p-8">
@@ -285,7 +208,7 @@ export function ModelosGallery({ onSelectModelo }: ModelosGalleryProps) {
 
           <Button
             onClick={() => setShowFilters(!showFilters)}
-            className="bg-gradient-to-r from-amber-700 to-yellow-600 hover:from-amber-600 hover:to-yellow-500 text-black font-bold gap-2 shadow-lg shadow-amber-900/30 transition-all duration-300"
+            className="bg-gradient-to-r from-amber-700 to-yellow-600 hover:from-amber-600 hover:to-yellow-500 text-black font-bold gap-2 shadow-lg shadow-amber-900/30 transition-colors"
           >
             <Filter className="w-4 h-4" />
             Filtros
@@ -332,8 +255,8 @@ export function ModelosGallery({ onSelectModelo }: ModelosGalleryProps) {
 
       {/* Grid de modelos */}
       <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 relative z-10">
-        {modelosFiltradas.map((modelo, idx) => (
-          <div key={modelo.id} style={{ animationDelay: `${idx * 60}ms` }}>
+        {modelosFiltradas.map((modelo) => (
+          <div key={modelo.id}>
             <ModeloCardItem
               modelo={modelo}
               proximasCitas={getProximasCitas(modelo.email)}
@@ -372,7 +295,7 @@ export function ModelosGallery({ onSelectModelo }: ModelosGalleryProps) {
                         <ImageWithFallback
                           src={foto}
                           alt={`${selectedModelo.nombreArtistico} ${idx + 1}`}
-                          className="w-full h-full object-cover hover:scale-110 transition-transform duration-500 cursor-pointer"
+                          className="w-full h-full object-cover cursor-default"
                         />
                       </div>
                     ))}
@@ -445,15 +368,15 @@ export function ModelosGallery({ onSelectModelo }: ModelosGalleryProps) {
                 <div className="flex gap-3">
                   <Button
                     onClick={() => { onSelectModelo(selectedModelo.email); setSelectedModelo(null); }}
-                    className="flex-1 bg-gradient-to-r from-amber-700 via-yellow-600 to-amber-700 hover:from-amber-600 hover:via-yellow-500 hover:to-amber-600 text-black font-bold gap-2 shadow-lg shadow-amber-900/30 transition-all duration-300"
+                    className="flex-1 bg-gradient-to-r from-amber-700 via-yellow-600 to-amber-700 hover:from-amber-600 hover:via-yellow-500 hover:to-amber-600 text-black font-bold gap-2 shadow-lg shadow-amber-900/30 transition-colors"
                   >
                     <Calendar className="w-4 h-4" />
                     Agendar Cita
                   </Button>
-                  <Button variant="outline" className="border-amber-500/40 hover:bg-amber-500/10 text-amber-400 hover:border-amber-400 transition-all">
+                  <Button variant="outline" className="border-amber-500/40 hover:bg-amber-500/10 text-amber-400 hover:border-amber-400 transition-colors">
                     <MessageCircle className="w-4 h-4" />
                   </Button>
-                  <Button variant="outline" className="border-amber-500/40 hover:bg-amber-500/10 text-amber-400 hover:border-amber-400 transition-all">
+                  <Button variant="outline" className="border-amber-500/40 hover:bg-amber-500/10 text-amber-400 hover:border-amber-400 transition-colors">
                     <Heart className="w-4 h-4" />
                   </Button>
                 </div>

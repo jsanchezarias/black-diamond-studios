@@ -7,11 +7,22 @@ import { Label } from './ui/label';
 import { useTestimonios } from '../app/components/TestimoniosContext';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "./ui/alert-dialog";
 
 export function GestionTestimoniosPanel() {
   const { getTestimoniosPendientes, aprobarTestimonio, rechazarTestimonio, eliminarTestimonio, testimonios } = useTestimonios();
   const pendientes = getTestimoniosPendientes();
   const [respuestas, setRespuestas] = useState<{ [key: string]: string }>({});
+  const [accionConfirmar, setAccionConfirmar] = useState<{tipo: 'rechazar' | 'eliminar', id: string} | null>(null);
 
   const handleAprobar = (id: string) => {
     aprobarTestimonio(id, respuestas[id] || undefined);
@@ -20,17 +31,23 @@ export function GestionTestimoniosPanel() {
   };
 
   const handleRechazar = (id: string) => {
-    if (confirm('¿Estás seguro de rechazar este testimonio?')) {
-      rechazarTestimonio(id);
-      toast.warning('❌ Testimonio rechazado');
-    }
+    setAccionConfirmar({ tipo: 'rechazar', id });
   };
 
   const handleEliminar = (id: string) => {
-    if (confirm('¿Estás seguro de eliminar permanentemente este testimonio?')) {
-      eliminarTestimonio(id);
+    setAccionConfirmar({ tipo: 'eliminar', id });
+  };
+
+  const confirmarAccion = () => {
+    if (!accionConfirmar) return;
+    if (accionConfirmar.tipo === 'rechazar') {
+      rechazarTestimonio(accionConfirmar.id);
+      toast.warning('❌ Testimonio rechazado');
+    } else {
+      eliminarTestimonio(accionConfirmar.id);
       toast.error('🗑️ Testimonio eliminado');
     }
+    setAccionConfirmar(null);
   };
 
   const renderStars = (rating: number) => {
@@ -268,6 +285,31 @@ export function GestionTestimoniosPanel() {
           </CardContent>
         </Card>
       )}
+
+      {/* Alerta de confirmación */}
+      <AlertDialog open={!!accionConfirmar} onOpenChange={(open) => !open && setAccionConfirmar(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {accionConfirmar?.tipo === 'rechazar' ? '¿Rechazar testimonio?' : '¿Eliminar testimonio?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {accionConfirmar?.tipo === 'rechazar' 
+                ? 'El testimonio será movido a la lista de rechazados y no será visible para los clientes.' 
+                : 'Esta acción no se puede deshacer. Se eliminará permanentemente de la base de datos.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              className="bg-red-500 hover:bg-red-600 text-white" 
+              onClick={confirmarAccion}
+            >
+              {accionConfirmar?.tipo === 'rechazar' ? 'Sí, rechazar' : 'Sí, eliminar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

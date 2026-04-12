@@ -6,6 +6,16 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { usePublicUsers } from '../app/components/PublicUsersContext';
 import { supabase } from '../utils/supabase/info';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "./ui/alert-dialog";
 
 export function ChatModeratorPanel() {
   const { currentUser, login, logout, sendMessage, messages, onlineUsers } = usePublicUsers();
@@ -16,6 +26,7 @@ export function ChatModeratorPanel() {
   const [selectedUserId, setSelectedUserId] = useState<string>(''); // Usuario seleccionado para responder
   const [users, setUsers] = useState<any[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [mostrarLimpiarDialog, setMostrarLimpiarDialog] = useState(false);
 
   // Auto-scroll al final cuando hay nuevos mensajes
   useEffect(() => {
@@ -104,18 +115,20 @@ export function ChatModeratorPanel() {
   };
 
   const clearAllMessages = () => {
-    if (confirm('¿Estás seguro de que quieres eliminar TODOS los mensajes del chat?')) {
-      localStorage.setItem('chat_messages_db', JSON.stringify([
-        {
-          id: '1',
-          username: 'Sistema',
-          message: '¡Bienvenidos al chat! 💬 Regístrate para participar',
-          timestamp: new Date().toISOString(),
-          color: '#d4af37'
-        }
-      ]));
-      window.location.reload();
-    }
+    setMostrarLimpiarDialog(true);
+  };
+
+  const confirmarLimpiar = () => {
+    localStorage.setItem('chat_messages_db', JSON.stringify([
+      {
+        id: '1',
+        username: 'Sistema',
+        message: '¡Bienvenidos al chat! 💬 Regístrate para participar',
+        timestamp: new Date().toISOString(),
+        color: '#d4af37'
+      }
+    ]));
+    window.location.reload();
   };
 
   const formatTime = (date: Date) => {
@@ -333,6 +346,24 @@ export function ChatModeratorPanel() {
           )}
         </CardContent>
       </Card>
+
+      {/* Alerta Limpiar Chat */}
+      <AlertDialog open={mostrarLimpiarDialog} onOpenChange={setMostrarLimpiarDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Limpiar Chat?</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Estás seguro de que quieres eliminar TODOS los mensajes del chat? Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction className="bg-red-500 hover:bg-red-600 text-white" onClick={confirmarLimpiar}>
+              Limpiar Chat
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

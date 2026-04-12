@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { 
@@ -40,21 +40,22 @@ import { useModelos } from './ModelosContext';
 import { useServicios } from './ServiciosContext';
 import { useMultas } from './MultasContext';
 import { usePagos } from './PagosContext';
-import { useAgendamientos } from './AgendamientosContext';
-import { useAsistencia } from './AsistenciaContext';
-import { useInventory } from './InventoryContext';
-import { useCarrito } from './CarritoContext';
-import { RegistroEntradaModal } from '../../components/RegistroEntradaModal';
-import { IniciarServicioModal } from '../../components/IniciarServicioModal';
-import { ServicioActivoCard } from '../../components/ServicioActivoCard';
-import { CarritoBoutiqueModal } from '../../components/CarritoBoutiqueModal';
-import { CheckoutBoutiqueModal } from '../../components/CheckoutBoutiqueModal';
-import { CalendarioModeloView } from '../../components/CalendarioModeloView';
-import { CalendarioPanel } from '../../components/CalendarioPanel';
-import { DetalleCitaModal } from '../../components/DetalleCitaModal';
-import { NotificacionesPanel } from './NotificacionesPanel';
-import { AnalyticsPanel } from './AnalyticsPanel'; // 📊 Sistema de Analytics
-import { StreamingControl } from './StreamingControl';
+import { useAgendamientos, formatearHora } from './AgendamientosContext';
+// Lazy loading de paneles y modales pesados
+const AgendamientosPanel = lazy(() => import('./AgendamientosPanel').then(m => ({ default: m.AgendamientosPanel })));
+const AgendamientosMetrics = lazy(() => import('./AgendamientosMetrics').then(m => ({ default: m.AgendamientosMetrics })));
+const RegistroEntradaModal = lazy(() => import('../../components/RegistroEntradaModal').then(m => ({ default: m.RegistroEntradaModal })));
+const IniciarServicioModal = lazy(() => import('../../components/IniciarServicioModal').then(m => ({ default: m.IniciarServicioModal })));
+const ServicioActivoCard = lazy(() => import('../../components/ServicioActivoCard').then(m => ({ default: m.ServicioActivoCard })));
+const CarritoBoutiqueModal = lazy(() => import('../../components/CarritoBoutiqueModal').then(m => ({ default: m.CarritoBoutiqueModal })));
+const CheckoutBoutiqueModal = lazy(() => import('../../components/CheckoutBoutiqueModal').then(m => ({ default: m.CheckoutBoutiqueModal })));
+const CalendarioModeloView = lazy(() => import('../../components/CalendarioModeloView').then(m => ({ default: m.CalendarioModeloView })));
+const CalendarioPanel = lazy(() => import('../../components/CalendarioPanel').then(m => ({ default: m.CalendarioPanel })));
+const DetalleCitaModal = lazy(() => import('../../components/DetalleCitaModal').then(m => ({ default: m.DetalleCitaModal })));
+const NotificacionesPanel = lazy(() => import('./NotificacionesPanel').then(m => ({ default: m.NotificacionesPanel })));
+const AnalyticsPanel = lazy(() => import('./AnalyticsPanel').then(m => ({ default: m.AnalyticsPanel })));
+const StreamingControl = lazy(() => import('./StreamingControl').then(m => ({ default: m.StreamingControl })));
+
 import { toast } from 'sonner';
 
 interface ModeloDashboardProps {
@@ -303,6 +304,10 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
               <Video className="w-4 h-4 mr-2" />
               Transmisión
             </TabsTrigger>
+            <TabsTrigger value="mis-citas" className="data-[state=active]:bg-primary">
+              <Calendar className="w-4 h-4 mr-2" />
+              Mis Citas
+            </TabsTrigger>
           </TabsList>
 
           {/* Navegación en Móvil - Select desplegable */}
@@ -319,6 +324,7 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
                   {selectedTab === 'notificaciones' && <><Bell className="w-4 h-4" /> <span>Notificaciones</span></>}
                   {selectedTab === 'analytics' && <><PieChart className="w-4 h-4" /> <span>Analytics</span></>}
                   {selectedTab === 'transmision' && <><Video className="w-4 h-4" /> <span>Transmisión</span></>}
+                  {selectedTab === 'mis-citas' && <><Calendar className="w-4 h-4" /> <span>Mis Citas</span></>}
                 </div>
               </SelectTrigger>
               <SelectContent className="bg-black/95 border-white/10">
@@ -374,6 +380,12 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
                   <div className="flex items-center gap-2">
                     <Video className="w-4 h-4" />
                     <span>Transmisión</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="mis-citas" className="text-white hover:bg-white/10">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4" />
+                    <span>Mis Citas</span>
                   </div>
                 </SelectItem>
               </SelectContent>
@@ -541,13 +553,13 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
                       {citasHoy.map((cita) => (
                         <div 
                           key={cita.id} 
-                          className="p-4 bg-black/40 rounded-lg border border-purple-500/20 hover:border-purple-500/40 transition-all"
+                          className="p-4 bg-black/40 rounded-lg border border-purple-500/20 hover:border-purple-500/40 transition-colors"
                         >
                           <div className="flex items-start justify-between mb-2">
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-1">
                                 <Clock className="w-4 h-4 text-purple-400" />
-                                <p className="font-bold text-white">{cita.hora}</p>
+                                <p className="font-bold text-white">{formatearHora(cita.hora)}</p>
                               </div>
                               <p className="text-sm font-medium text-white">{cita.clienteNombre}</p>
                               <p className="text-xs text-muted-foreground">{cita.clienteTelefono}</p>
@@ -594,13 +606,13 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
                       {citasManana.map((cita) => (
                         <div 
                           key={cita.id} 
-                          className="p-4 bg-black/40 rounded-lg border border-blue-500/20 hover:border-blue-500/40 transition-all"
+                          className="p-4 bg-black/40 rounded-lg border border-blue-500/20 hover:border-blue-500/40 transition-colors"
                         >
                           <div className="flex items-start justify-between mb-2">
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-1">
                                 <Clock className="w-4 h-4 text-blue-400" />
-                                <p className="font-bold text-white">{cita.hora}</p>
+                                <p className="font-bold text-white">{formatearHora(cita.hora)}</p>
                               </div>
                               <p className="text-sm font-medium text-white">{cita.clienteNombre}</p>
                               <p className="text-xs text-muted-foreground">{cita.clienteTelefono}</p>
@@ -708,26 +720,28 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {servicioActivo ? (
-                  <ServicioActivoCard 
-                    servicio={servicioActivo}
-                    onFinalizar={() => {
-                      // Actualizar la vista después de finalizar
-                      toast.success('Servicio finalizado correctamente');
-                    }}
-                  />
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <CheckCircle className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                    <p>No tienes servicios activos en este momento</p>
-                    {puedeIniciarServicio && (
-                      <Button onClick={() => setMostrarIniciarServicio(true)} className="mt-4">
-                        <Play className="w-4 h-4 mr-2" />
-                        Iniciar Nuevo Servicio
-                      </Button>
-                    )}
-                  </div>
-                )}
+                <Suspense fallback={<div className="h-20 animate-pulse bg-secondary/50 rounded-lg"></div>}>
+                  {servicioActivo ? (
+                    <ServicioActivoCard 
+                      servicio={servicioActivo}
+                      onFinalizar={() => {
+                        // Actualizar la vista después de finalizar
+                        toast.success('Servicio finalizado correctamente');
+                      }}
+                    />
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <CheckCircle className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                      <p>No tienes servicios activos en este momento</p>
+                      {puedeIniciarServicio && (
+                        <Button onClick={() => setMostrarIniciarServicio(true)} className="mt-4">
+                          <Play className="w-4 h-4 mr-2" />
+                          Iniciar Nuevo Servicio
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </Suspense>
               </CardContent>
             </Card>
           </TabsContent>
@@ -735,17 +749,19 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
           {/* Tab: Servicios */}
           <TabsContent value="servicios" className="space-y-6">
             {/* Servicio Activo en el Tab de Servicios */}
-            {servicioActivo && (
-              <div>
-                <h2 className="text-lg font-semibold mb-4">Servicio en Curso</h2>
-                <ServicioActivoCard 
-                  servicio={servicioActivo}
-                  onFinalizar={() => {
-                    toast.success('Servicio finalizado correctamente');
-                  }}
-                />
-              </div>
-            )}
+            <Suspense fallback={null}>
+              {servicioActivo && (
+                <div>
+                  <h2 className="text-lg font-semibold mb-4">Servicio en Curso</h2>
+                  <ServicioActivoCard 
+                    servicio={servicioActivo}
+                    onFinalizar={() => {
+                      toast.success('Servicio finalizado correctamente');
+                    }}
+                  />
+                </div>
+              )}
+            </Suspense>
 
             <Card>
               <CardHeader>
@@ -949,14 +965,14 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
                     {inventario.filter(item => item.stock > 0).map((item) => (
                       <div 
                         key={item.id}
-                        className="bg-secondary rounded-lg overflow-hidden border border-border/50 hover:border-primary/50 transition-all hover:shadow-lg group"
+                        className="bg-secondary rounded-lg overflow-hidden border border-border/50 hover:border-primary/50 transition-colors hover:shadow-lg group"
                       >
                         {/* Imagen del producto */}
                         <div className="aspect-square overflow-hidden relative">
                           <img 
                             src={item.imagen} 
                             alt={item.nombre}
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                            className="w-full h-full object-cover"
                           />
                           {/* Badge de categoría sobre la imagen */}
                           <div className="absolute top-2 right-2">
@@ -1096,10 +1112,12 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
             </Card>
 
             {/* Calendario visual mensual */}
-            <CalendarioModeloView 
-              citas={citasProximas} 
-              onCitaClick={(cita) => setCitaSeleccionada(cita)}
-            />
+            <Suspense fallback={<div className="h-96 animate-pulse bg-secondary/50 rounded-xl border-2 border-dashed border-primary/20"></div>}>
+              <CalendarioModeloView 
+                citas={citasProximas} 
+                onCitaClick={(cita) => setCitaSeleccionada(cita)}
+              />
+            </Suspense>
 
             {/* Lista de citas próximas */}
             <Card>
@@ -1116,7 +1134,7 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
                     {citasProximas.slice(0, 10).map((cita) => (
                       <div 
                         key={cita.id} 
-                        className="p-4 bg-secondary rounded-lg border border-primary/20 hover:border-primary/40 transition-all cursor-pointer"
+                        className="p-4 bg-secondary rounded-lg border border-primary/20 hover:border-primary/40 transition-colors cursor-pointer"
                         onClick={() => setCitaSeleccionada(cita)}
                       >
                         <div className="flex items-start justify-between mb-2">
@@ -1160,10 +1178,12 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
             </Card>
 
             {/* Historial de Servicios en Calendario */}
-            <CalendarioPanel
-              modeloEmail={modeloActual.email}
-              userRole="modelo"
-            />
+            <Suspense fallback={null}>
+              <CalendarioPanel
+                modeloEmail={modeloActual.email}
+                userRole="modelo"
+              />
+            </Suspense>
           </TabsContent>
 
           {/* Tab: Mi Perfil */}
@@ -1244,17 +1264,30 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
 
           {/* Tab: Notificaciones */}
           <TabsContent value="notificaciones" className="space-y-6">
-            <NotificacionesPanel />
+            <Suspense fallback={<div className="h-64 animate-pulse bg-secondary/50 rounded-lg"></div>}>
+              <NotificacionesPanel />
+            </Suspense>
           </TabsContent>
 
           {/* Tab: Analytics */}
           <TabsContent value="analytics" className="space-y-6">
-            <AnalyticsPanel rol="modelo" />
+            <Suspense fallback={<div className="h-64 animate-pulse bg-secondary/50 rounded-lg"></div>}>
+              <AnalyticsPanel rol="modelo" />
+            </Suspense>
           </TabsContent>
 
           {/* Tab: Transmisión */}
           <TabsContent value="transmision" className="space-y-6">
-            <StreamingControl modelId={String(modeloActual.id || "")} modelName={modeloActual.nombreArtistico || modeloActual.nombre} />
+            <Suspense fallback={<div className="h-64 animate-pulse bg-secondary/50 rounded-lg"></div>}>
+              <StreamingControl modelId={String(modeloActual.id || "")} modelName={modeloActual.nombreArtistico || modeloActual.nombre} />
+            </Suspense>
+          </TabsContent>
+
+          <TabsContent value="mis-citas" className="space-y-4">
+            <Suspense fallback={<div className="h-48 animate-pulse bg-secondary/50 rounded-lg"></div>}>
+              <AgendamientosMetrics rol="modelo" modeloEmail={modeloActual.email} />
+              <AgendamientosPanel rol="modelo" userEmail={modeloActual.email} modeloEmail={modeloActual.email} />
+            </Suspense>
           </TabsContent>
         </Tabs>
 
@@ -1262,11 +1295,11 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
       {carrito.length > 0 && (
         <button
           onClick={() => setMostrarCarritoBoutique(true)}
-          className="fixed bottom-6 right-6 z-40 bg-primary hover:bg-primary/90 text-primary-foreground rounded-full p-4 shadow-2xl transition-all hover:scale-110 group"
+          className="fixed bottom-6 right-6 z-40 bg-primary hover:bg-primary/90 text-primary-foreground rounded-full p-4 shadow-2xl transition-colors group"
         >
           <div className="relative">
             <ShoppingCart className="w-6 h-6" />
-            <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse">
+            <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
               {carrito.length}
             </div>
           </div>
@@ -1277,34 +1310,36 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
       )}
 
       {/* Modales */}
-      <RegistroEntradaModal
-        isOpen={mostrarRegistroEntrada}
-        onClose={() => setMostrarRegistroEntrada(false)}
-        modeloEmail={modeloActual.email}
-        modeloNombre={modeloActual.nombre}
-      />
-      <IniciarServicioModal
-        isOpen={mostrarIniciarServicio}
-        onClose={() => setMostrarIniciarServicio(false)}
-        modeloEmail={modeloActual.email}
-        modeloNombre={modeloActual.nombre}
-      />
-      <CarritoBoutiqueModal
-        isOpen={mostrarCarritoBoutique}
-        onClose={() => setMostrarCarritoBoutique(false)}
-        onProcederCheckout={() => setMostrarCheckoutBoutique(true)}
-      />
-      <CheckoutBoutiqueModal
-        isOpen={mostrarCheckoutBoutique}
-        onClose={() => setMostrarCheckoutBoutique(false)}
-        modeloEmail={modeloActual.email}
-        modeloNombre={modeloActual.nombre}
-      />
-      <DetalleCitaModal
-        isOpen={!!citaSeleccionada}
-        onClose={() => setCitaSeleccionada(null)}
-        cita={citaSeleccionada}
-      />
+      <Suspense fallback={null}>
+        <RegistroEntradaModal
+          isOpen={mostrarRegistroEntrada}
+          onClose={() => setMostrarRegistroEntrada(false)}
+          modeloEmail={modeloActual.email}
+          modeloNombre={modeloActual.nombre}
+        />
+        <IniciarServicioModal
+          isOpen={mostrarIniciarServicio}
+          onClose={() => setMostrarIniciarServicio(false)}
+          modeloEmail={modeloActual.email}
+          modeloNombre={modeloActual.nombre}
+        />
+        <CarritoBoutiqueModal
+          isOpen={mostrarCarritoBoutique}
+          onClose={() => setMostrarCarritoBoutique(false)}
+          onProcederCheckout={() => setMostrarCheckoutBoutique(true)}
+        />
+        <CheckoutBoutiqueModal
+          isOpen={mostrarCheckoutBoutique}
+          onClose={() => setMostrarCheckoutBoutique(false)}
+          modeloEmail={modeloActual.email}
+          modeloNombre={modeloActual.nombre}
+        />
+        <DetalleCitaModal
+          isOpen={!!citaSeleccionada}
+          onClose={() => setCitaSeleccionada(null)}
+          cita={citaSeleccionada}
+        />
+      </Suspense>
       </main>
     </div>
   );

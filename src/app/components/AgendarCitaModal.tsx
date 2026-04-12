@@ -212,7 +212,7 @@ export function AgendarCitaModal({ open, onClose, modeloEmail }: AgendarCitaModa
                       setPaso(2);
                     }}
                     className={`
-                      cursor-pointer transition-all duration-200 hover:scale-105
+                      cursor-default transition-colors
                       ${tipoServicio === 'sede' ? 'border-2 border-amber-500 bg-amber-500/10' : 'border border-amber-500/20 bg-neutral-900/50'}
                     `}
                   >
@@ -241,7 +241,7 @@ export function AgendarCitaModal({ open, onClose, modeloEmail }: AgendarCitaModa
                       setPaso(2);
                     }}
                     className={`
-                      cursor-pointer transition-all duration-200 hover:scale-105
+                      cursor-default transition-colors
                       ${tipoServicio === 'domicilio' ? 'border-2 border-amber-500 bg-amber-500/10' : 'border border-amber-500/20 bg-neutral-900/50'}
                     `}
                   >
@@ -296,7 +296,7 @@ export function AgendarCitaModal({ open, onClose, modeloEmail }: AgendarCitaModa
                       setPaso(3);
                     }}
                     className={`
-                      cursor-pointer transition-all duration-200 hover:scale-102
+                      cursor-default transition-colors
                       ${servicioSedeSeleccionado?.name === servicio.name ? 'border-2 border-amber-500 bg-amber-500/10' : 'border border-amber-500/20 bg-neutral-900/50'}
                     `}
                   >
@@ -342,7 +342,7 @@ export function AgendarCitaModal({ open, onClose, modeloEmail }: AgendarCitaModa
                       setPaso(3);
                     }}
                     className={`
-                      cursor-pointer transition-all duration-200 hover:scale-105
+                      cursor-default transition-colors
                       ${duracionSeleccionada === tarifa.minutos ? 'border-2 border-amber-500 bg-amber-500/10' : 'border border-amber-500/20 bg-neutral-900/50'}
                     `}
                   >

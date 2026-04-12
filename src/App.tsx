@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { supabase } from './utils/supabase/info';
 import { LanguageProvider } from './app/components/LanguageContext';
 import { PublicUsersProvider } from './app/components/PublicUsersContext';
@@ -21,14 +21,16 @@ import { ErrorBoundary } from './app/components/ErrorBoundary';
 import { LoginForm } from './app/components/LoginForm';
 import { Toaster } from 'sonner';
 import { LandingPage } from './app/components/LandingPage';
-import { ProgramadorDashboard } from './app/components/ProgramadorDashboard';
-import { OwnerDashboard } from './app/components/OwnerDashboard';
-import { AdminDashboard } from './app/components/AdminDashboard';
-import { ModeloDashboard } from './app/components/ModeloDashboard';
-import { ModeradorDashboard } from './app/components/ModeradorDashboard';
-import { ContadorDashboard } from './app/components/ContadorDashboard';
-import { RecepcionistaDashboard } from './app/components/RecepcionistaDashboard';
-import { SupervisorDashboard } from './app/components/SupervisorDashboard';
+
+// Lazy loading de dashboards — solo se cargan cuando el usuario los necesita
+const ProgramadorDashboard = lazy(() => import('./app/components/ProgramadorDashboard').then(m => ({ default: m.ProgramadorDashboard })));
+const OwnerDashboard = lazy(() => import('./app/components/OwnerDashboard').then(m => ({ default: m.OwnerDashboard })));
+const AdminDashboard = lazy(() => import('./app/components/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
+const ModeloDashboard = lazy(() => import('./app/components/ModeloDashboard').then(m => ({ default: m.ModeloDashboard })));
+const ModeradorDashboard = lazy(() => import('./app/components/ModeradorDashboard').then(m => ({ default: m.ModeradorDashboard })));
+const ContadorDashboard = lazy(() => import('./app/components/ContadorDashboard').then(m => ({ default: m.ContadorDashboard })));
+const RecepcionistaDashboard = lazy(() => import('./app/components/RecepcionistaDashboard').then(m => ({ default: m.RecepcionistaDashboard })));
+const SupervisorDashboard = lazy(() => import('./app/components/SupervisorDashboard').then(m => ({ default: m.SupervisorDashboard })));
 
 // ✅ Componente que envuelve todos los providers en un solo lugar
 function AllProvidersWrapper({ children }: { children: React.ReactNode }) {
@@ -331,10 +333,31 @@ export default function App() {
     return <GlobalLoadingScreen />;
   }
 
+  // ✅ Fallback premium para Suspense
+  const GlobalLoader = (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-[#0f1014] gap-6">
+      <div className="relative">
+        <div className="w-16 h-16 border-2 border-primary/20 rounded-full"></div>
+        <div className="w-16 h-16 border-t-2 border-primary rounded-full animate-spin absolute top-0 left-0"></div>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
+        </div>
+      </div>
+      <div className="flex flex-col items-center gap-2">
+        <h2 className="text-primary font-bold tracking-[0.2em] text-xs uppercase animate-pulse">
+          Black Diamond
+        </h2>
+        <div className="h-[1px] w-24 bg-gradient-to-r from-transparent via-primary/50 to-transparent"></div>
+      </div>
+    </div>
+  );
+
+  // Si hay usuario autenticado, mostrar su dashboard correspondiente
   if (currentUser) {
     return (
       <ErrorBoundary>
         <AllProvidersWrapper>
+          <Suspense fallback={GlobalLoader}>
           <div className="min-h-screen w-full" style={{ backgroundColor: '#0f1014', color: '#e8e6e3' }}>
             {currentUser.role === 'programador' && (
               <ProgramadorDashboard
@@ -418,7 +441,7 @@ export default function App() {
                 </button>
               </div>
             )}
-            <Toaster 
+            <Toaster
               theme="dark"
               position="top-right"
               toastOptions={{
@@ -430,6 +453,7 @@ export default function App() {
               }}
             />
           </div>
+          </Suspense>
         </AllProvidersWrapper>
       </ErrorBoundary>
     );

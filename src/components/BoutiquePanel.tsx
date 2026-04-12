@@ -7,6 +7,16 @@ import { Badge } from './ui/badge';
 import { useInventory } from '../app/components/InventoryContext';
 import { GestionBoutiqueModal } from './GestionBoutiqueModal';
 import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "./ui/alert-dialog";
 
 interface Producto {
   id: number;
@@ -26,6 +36,7 @@ export function BoutiquePanel() {
   const [modoModal, setModoModal] = useState<'crear' | 'editar'>('crear');
   const [busqueda, setBusqueda] = useState('');
   const [categoriaFiltro, setCategoriaFiltro] = useState('Todas');
+  const [productoEliminar, setProductoEliminar] = useState<Producto | null>(null);
 
   const categorias = [
     'Todas',
@@ -61,9 +72,14 @@ export function BoutiquePanel() {
   };
 
   const handleEliminarProducto = (producto: Producto) => {
-    if (confirm(`¿Estás seguro de eliminar "${producto.nombre}"?`)) {
-      eliminarProducto(producto.id);
+    setProductoEliminar(producto);
+  };
+
+  const confirmarEliminar = () => {
+    if (productoEliminar) {
+      eliminarProducto(productoEliminar.id);
       toast.success('Producto eliminado');
+      setProductoEliminar(null);
     }
   };
 
@@ -312,6 +328,24 @@ export function BoutiquePanel() {
         producto={productoEditar}
         modo={modoModal}
       />
+
+      {/* Alerta de Eliminación */}
+      <AlertDialog open={!!productoEliminar} onOpenChange={(open) => !open && setProductoEliminar(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar producto?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminará permanentemente "{productoEliminar?.nombre}" del inventario de la boutique.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction className="bg-red-500 hover:bg-red-600 text-white" onClick={confirmarEliminar}>
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

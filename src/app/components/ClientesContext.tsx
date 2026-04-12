@@ -166,7 +166,8 @@ export function ClientesProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase
         .from('clientes')
         .select('*')
-        .order('created_at', { ascending: false }); // ✅ CAMBIO: Usar created_at que es estándar
+        .order('created_at', { ascending: false })
+        .limit(100); // ✅ CAMBIO: Usar created_at que es estándar
 
       if (error) {
         if (process.env.NODE_ENV === 'development') console.error('❌ Error cargando clientes:', error.message);

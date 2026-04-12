@@ -1,42 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { Star, MapPin, Clock, ChevronRight, Check, X, Heart, MessageCircle, ZoomIn, ChevronLeft, Send, Building2, Home } from 'lucide-react';
-
-// ── Lucetas doradas ──────────────────────────────────────────
-const GOLD_COLORS = ['#d4af37', '#e5c158', '#ffd700', '#f0d060', '#c9a227'];
-
-interface GoldSparkle { id: string; x: number; y: number; size: number; tx: number; ty: number; color: string; }
-
-function useGoldSparkles() {
-  const [sparkles, setSparkles] = useState<GoldSparkle[]>([]);
-  const lastTime = useRef(0);
-  const onMouseMove = useCallback((e: React.MouseEvent<HTMLElement>) => {
-    const now = Date.now();
-    if (now - lastTime.current < 85) return;
-    lastTime.current = now;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const s: GoldSparkle = {
-      id: `${now}-${Math.random()}`,
-      x: (e.clientX - rect.left) + (Math.random() - 0.5) * 50,
-      y: (e.clientY - rect.top) + (Math.random() - 0.5) * 50,
-      size: Math.random() * 14 + 7,
-      tx: (Math.random() - 0.5) * 60,
-      ty: -(Math.random() * 55 + 20),
-      color: GOLD_COLORS[Math.floor(Math.random() * GOLD_COLORS.length)],
-    };
-    setSparkles(prev => [...prev.slice(-12), s]);
-    setTimeout(() => setSparkles(prev => prev.filter(p => p.id !== s.id)), 750);
-  }, []);
-  const onMouseLeave = useCallback(() => setSparkles([]), []);
-  return { sparkles, onMouseMove, onMouseLeave };
-}
-
-function SparkleIcon({ size, color }: { size: number; color: string }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 160 160" fill="none">
-      <path d="M80 7C80 7 74 36 68 56C62 76 40 92 7 80C40 68 62 84 68 104C74 124 80 153 80 153C80 153 86 124 92 104C98 84 120 68 153 80C120 92 98 76 92 56C86 36 80 7 80 7Z" fill={color} />
-    </svg>
-  );
-}
+import { useState, useEffect, useRef } from 'react';
+import { Star, MapPin, Clock, ChevronRight, X, ZoomIn, ChevronLeft, Send, Building2, Home } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
@@ -75,7 +38,6 @@ interface ModelCardProps {
 }
 
 export function ModelCard({ model, onContact }: ModelCardProps) {
-  const { sparkles, onMouseMove: onPhotoMouseMove, onMouseLeave: onPhotoMouseLeave } = useGoldSparkles();
   const [showGallery, setShowGallery] = useState(false);
   const [selectedImage, setSelectedImage] = useState(0);
   const [showFullDescription, setShowFullDescription] = useState(false);
@@ -220,7 +182,7 @@ export function ModelCard({ model, onContact }: ModelCardProps) {
 
   return (
     <>
-      <Card className="border-primary/15 bg-gradient-card shadow-card hover:shadow-premium hover:border-primary/25 transition-all duration-500 overflow-hidden w-full group">
+      <Card className="border-primary/15 bg-gradient-card shadow-card overflow-hidden w-full">
         <CardContent className="p-0">
           {/* Layout Vertical optimizado para cuadrícula (Grid) */}
           <div className="flex flex-col">
@@ -230,27 +192,19 @@ export function ModelCard({ model, onContact }: ModelCardProps) {
               <div
                 ref={headerRef}
                 className="relative bg-gradient-to-br from-black to-neutral-950 p-6 backdrop-blur-sm flex-shrink-0 overflow-hidden"
-                onMouseMove={onPhotoMouseMove}
-                onMouseLeave={onPhotoMouseLeave}
               >
-                {/* Lucetas en el header */}
-                {sparkles.map(s => (
-                  <div key={s.id} className="bd-sparkle" style={{ left: s.x, top: s.y, '--s-tx': `${s.tx}px`, '--s-ty': `${s.ty}px` } as React.CSSProperties}>
-                    <SparkleIcon size={s.size} color={s.color} />
-                  </div>
-                ))}
                 <div className="flex items-start gap-5">
                   {/* Foto de perfil circular */}
                   <div className="relative flex-shrink-0">
-                    <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-amber-500/30 shadow-lg shadow-amber-500/20 bd-gold-photo-border group-hover:border-amber-500/60 transition-all duration-500">
+                    <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-amber-500/30 shadow-lg shadow-amber-500/20 bd-gold-photo-border">
                       <ImageWithFallback
                         src={model.photo}
                         alt={model.name}
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        className="w-full h-full object-cover"
                       />
                     </div>
                     {model.available && (
-                      <div className="absolute bottom-1 right-1 w-7 h-7 bg-amber-400 rounded-full border-4 border-black animate-pulse shadow-lg shadow-amber-400/60"></div>
+                      <div className="absolute bottom-1 right-1 w-7 h-7 bg-amber-400 rounded-full border-4 border-black shadow-lg shadow-amber-400/60"></div>
                     )}
                   </div>
 
@@ -335,7 +289,7 @@ export function ModelCard({ model, onContact }: ModelCardProps) {
                       return (
                         <div
                           key={idx}
-                          className={`rounded-lg overflow-hidden cursor-pointer transition-all hover:scale-[1.02] transform shadow-md hover:shadow-xl relative group ${
+                          className={`rounded-lg overflow-hidden cursor-default shadow-md hover:shadow-xl relative group ${
                             // Fotos horizontales ocupan 2 columnas
                             orientation === 'horizontal' && model.gallery.length > 2 
                               ? 'col-span-2' 
@@ -411,7 +365,7 @@ export function ModelCard({ model, onContact }: ModelCardProps) {
                       className="text-xs text-primary hover:text-primary/80 font-medium mt-1 flex items-center gap-1 transition-colors"
                     >
                       {showFullDescription ? 'Ver menos' : 'Leer más'}
-                      <ChevronRight className={`w-3 h-3 transition-transform ${showFullDescription ? 'rotate-90' : ''}`} />
+                      <ChevronRight className={`w-3 h-3 ${showFullDescription ? 'rotate-90' : ''}`} />
                     </button>
                   )}
                 </div>
@@ -451,26 +405,26 @@ export function ModelCard({ model, onContact }: ModelCardProps) {
                   <div className="flex gap-2 mb-3 p-1 bg-gradient-to-r from-primary/10 to-primary/5 rounded-lg border border-primary/20">
                     <button
                       onClick={() => setSelectedLocation('sede')}
-                      className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-[11px] font-semibold tracking-wide transition-all duration-300 ${
+                      className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-[11px] font-semibold tracking-wide transition-colors ${
                         selectedLocation === 'sede'
                           ? 'bg-primary text-background shadow-sm shadow-primary/30 border border-primary'
                           : 'bg-transparent text-muted-foreground hover:bg-primary/10 hover:text-foreground border border-transparent'
                       }`}
                     >
-                      <Building2 className={`w-3.5 h-3.5 transition-all ${
+                      <Building2 className={`w-3.5 h-3.5 ${
                         selectedLocation === 'sede' ? 'text-background' : 'text-primary'
                       }`} />
                       <span>En Sede</span>
                     </button>
                     <button
                       onClick={() => setSelectedLocation('domicilio')}
-                      className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-[11px] font-semibold tracking-wide transition-all duration-300 ${
+                      className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-[11px] font-semibold tracking-wide transition-colors ${
                         selectedLocation === 'domicilio'
                           ? 'bg-primary text-background shadow-sm shadow-primary/30 border border-primary'
                           : 'bg-transparent text-muted-foreground hover:bg-primary/10 hover:text-foreground border border-transparent'
                       }`}
                     >
-                      <Home className={`w-3.5 h-3.5 transition-all ${
+                      <Home className={`w-3.5 h-3.5 ${
                         selectedLocation === 'domicilio' ? 'text-background' : 'text-primary'
                       }`} />
                       <span>A Domicilio</span>
@@ -515,7 +469,7 @@ export function ModelCard({ model, onContact }: ModelCardProps) {
                       <div
                         key={idx}
                         onClick={() => setSelectedService(service)}
-                        className={`flex flex-col justify-between p-2 rounded-lg transition-all cursor-pointer border ${
+                        className={`flex flex-col justify-between p-2 rounded-lg transition-colors cursor-default border ${
                           isSelected
                             ? 'bg-primary/20 border-primary shadow-sm'
                             : 'bg-primary/5 border-primary/10 hover:border-primary/30 hover:bg-primary/10'
@@ -565,9 +519,9 @@ export function ModelCard({ model, onContact }: ModelCardProps) {
                 )}
                 <Button
                   onClick={handleReservar}
-                  className={`w-full gap-2 h-9 text-xs transition-all ${
-                    selectedService 
-                      ? 'bg-primary text-background hover:bg-primary/90 shadow-md shadow-primary/20 scale-[1.02]' 
+                  className={`w-full gap-2 h-9 text-xs transition-colors ${
+                    selectedService
+                      ? 'bg-primary text-background hover:bg-primary/90 shadow-md shadow-primary/20'
                       : 'bg-primary/20 text-primary hover:bg-primary/30'
                   }`}
                   size="sm"
@@ -620,7 +574,7 @@ export function ModelCard({ model, onContact }: ModelCardProps) {
                 {model.gallery.map((img, idx) => (
                   <div
                     key={idx}
-                    className={`rounded-xl overflow-hidden cursor-pointer transition-all transform hover:scale-[1.02] shadow-lg hover:shadow-2xl relative group ${
+                    className={`rounded-xl overflow-hidden cursor-default shadow-lg hover:shadow-2xl relative group ${
                       selectedImage === idx
                         ? 'ring-4 ring-primary'
                         : 'hover:ring-2 hover:ring-primary/50'

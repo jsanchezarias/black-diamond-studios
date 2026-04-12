@@ -136,7 +136,8 @@ export function GastosProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase
         .from('gastos_operativos')
         .select('*')
-        .order('fecha', { ascending: false });
+        .order('fecha', { ascending: false })
+        .limit(100);
 
       if (error) {
         if (process.env.NODE_ENV === 'development') console.error('❌ Error cargando gastos:', error);

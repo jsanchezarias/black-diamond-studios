@@ -18,6 +18,8 @@ import { useAgendamientos, Agendamiento } from './AgendamientosContext';
 import { useServicios, Servicio } from './ServiciosContext';
 import { useModelos } from './ModelosContext';
 import { supabase } from '../../utils/supabase/info';
+import { AgendamientosPanel } from './AgendamientosPanel';
+import { AgendamientosMetrics } from './AgendamientosMetrics';
 
 interface SupervisorDashboardProps {
   userEmail: string;
@@ -416,6 +418,10 @@ export function SupervisorDashboard({ userEmail, onLogout }: SupervisorDashboard
               <PieChart className="w-4 h-4 mr-2" />
               Analytics
             </TabsTrigger>
+            <TabsTrigger value="agendamientos" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Calendar className="w-4 h-4 mr-2" />
+              Agendamientos
+            </TabsTrigger>
             <TabsTrigger value="notificaciones" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Bell className="w-4 h-4 mr-2" />
               Notificaciones
@@ -442,6 +448,12 @@ export function SupervisorDashboard({ userEmail, onLogout }: SupervisorDashboard
           </TabsContent>
           <TabsContent value="analytics">
             <AnalyticsPanel rol="admin" />
+          </TabsContent>
+          <TabsContent value="agendamientos">
+            <div className="space-y-4">
+              <AgendamientosMetrics rol="supervisor" />
+              <AgendamientosPanel rol="supervisor" userEmail={userEmail} />
+            </div>
           </TabsContent>
           <TabsContent value="notificaciones">
             <NotificacionesPanel />

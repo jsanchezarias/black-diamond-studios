@@ -112,12 +112,33 @@
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
   }
+
+  /* Cursor personalizado — ocultar nativo en dispositivos con mouse */
+  @media (hover: hover) and (pointer: fine) {
+    *, *::before, *::after {
+      cursor: none !important;
+    }
+  }
+
+  /* Textura grain premium sobre toda la UI */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 180px 180px;
+    opacity: 0.028;
+    pointer-events: none;
+    z-index: 99998;
+    mix-blend-mode: overlay;
+  }
   
   #root {
     background-color: var(--bg-black);
     min-height: 100vh;
   }
-  
+
   h1, h2, h3, h4, h5, h6 {
     color: var(--text-white);
     font-weight: 700;
@@ -376,4 +397,102 @@
   input, textarea, select {
     font-size: 16px !important;
   }
+}
+
+/* =================================================================
+   BLACK DIAMOND — PREMIUM ENTRY ANIMATIONS
+   Animaciones de entrada cinéticas para una experiencia inmersiva
+   ================================================================= */
+
+@keyframes bd-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(32px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes bd-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes bd-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes bd-shimmer-line {
+  0%   { transform: scaleX(0); opacity: 0; }
+  40%  { opacity: 1; }
+  100% { transform: scaleX(1); opacity: 0.6; }
+}
+
+@keyframes bd-glow-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0); }
+  50%       { box-shadow: 0 0 24px 4px rgba(212, 175, 55, 0.25); }
+}
+
+@keyframes bd-float {
+  0%, 100% { transform: translateY(0px);   }
+  50%       { transform: translateY(-6px);  }
+}
+
+/* Clases de animación reutilizables */
+.bd-animate-fade-up {
+  animation: bd-fade-up 0.75s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.bd-animate-fade-in {
+  animation: bd-fade-in 0.6s ease both;
+}
+
+.bd-animate-scale-in {
+  animation: bd-scale-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.bd-animate-float {
+  animation: bd-float 3.5s ease-in-out infinite;
+}
+
+.bd-animate-glow {
+  animation: bd-glow-pulse 3s ease-in-out infinite;
+}
+
+/* Delays escalonados para stagger de cards */
+.bd-delay-0  { animation-delay: 0ms; }
+.bd-delay-1  { animation-delay: 80ms; }
+.bd-delay-2  { animation-delay: 160ms; }
+.bd-delay-3  { animation-delay: 240ms; }
+.bd-delay-4  { animation-delay: 320ms; }
+.bd-delay-5  { animation-delay: 400ms; }
+
+/* Línea shimmer dorada decorativa */
+.bd-shimmer-line {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gold) 50%, transparent);
+  animation: bd-shimmer-line 1.8s ease forwards;
+  transform-origin: left center;
+}
+
+/* Cards con hover premium */
+.bd-card-hover {
+  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 0.3s ease,
+              border-color 0.3s ease;
+}
+
+.bd-card-hover:hover {
+  transform: translateY(-4px) scale(1.01);
+  box-shadow: 0 12px 40px rgba(212, 175, 55, 0.18);
+  border-color: rgba(212, 175, 55, 0.5) !important;
 }

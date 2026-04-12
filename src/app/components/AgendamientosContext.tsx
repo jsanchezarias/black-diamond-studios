@@ -13,7 +13,7 @@ export interface Agendamiento {
   hora: string;
   duracionMinutos: number;
   tipoServicio: string;
-  estado: 'pendiente' | 'confirmado' | 'completado' | 'cancelado' | 'no_show';
+  estado: 'pendiente' | 'confirmado' | 'aprobado' | 'completado' | 'cancelado' | 'no_show';
   notas?: string;
   creadoPor?: string;
   fechaCreacion?: string;
@@ -29,6 +29,36 @@ export interface Agendamiento {
   tarifaNombre?: string;
   tarifaDescripcion?: string;
 }
+
+export const formatearFecha = (fecha: string) => {
+  if (!fecha) return '';
+  // Try to parse assuming YYYY-MM-DD
+  const [year, month, day] = fecha.split('-');
+  if (year && month && day) {
+    const d = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    return d.toLocaleDateString('es-CO', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  }
+  return new Date(fecha).toLocaleDateString('es-CO', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+};
+
+export const formatearHora = (hora: string) => {
+  if (!hora) return '';
+  const [h, m] = hora.split(':');
+  const hNum = parseInt(h);
+  const ampm = hNum >= 12 ? 'PM' : 'AM';
+  const h12 = hNum % 12 || 12;
+  return `${h12}:${m} ${ampm}`;
+};
 
 // Mapper: DB row (snake_case) → Agendamiento (camelCase)
 function rowToAgendamiento(row: any): Agendamiento {
@@ -109,6 +139,12 @@ interface AgendamientosContextType {
   cancelarAgendamiento: (id: string, motivo: string, canceladoPor: string) => Promise<void>;
   marcarComoNoShow: (id: string, motivo: string, marcadoPor: string) => Promise<void>;
   recargarAgendamientos: () => Promise<void>;
+  // ── Nuevas funciones v2 ──────────────────────────────────────────────────────
+  aprobarAgendamiento: (id: string, aprobadoPor: string) => Promise<void>;
+  rechazarAgendamiento: (id: string, motivo: string, rechazadoPor: string) => Promise<void>;
+  cambiarEstado: (id: string, nuevoEstado: Agendamiento['estado'], meta?: Partial<Agendamiento>) => Promise<void>;
+  getAgendamientosHoy: () => Agendamiento[];
+  getAgendamientosPendientesAprobacion: () => Agendamiento[];
 }
 
 const AgendamientosContext = createContext<AgendamientosContextType | undefined>(undefined);
@@ -119,11 +155,32 @@ export function AgendamientosProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     cargarAgendamientos();
 
-    // ✅ REALTIME: recargar agendamientos ante cualquier cambio
+    // ✅ REALTIME: recargar agendamientos ante cualquier cambio con ordenamiento defensivo
     const channel = supabase
       .channel('agendamientos-rt')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'agendamientos' }, () => {
-        cargarAgendamientos();
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'agendamientos' }, (payload) => {
+        setAgendamientos(prev => {
+          const nuevo = rowToAgendamiento(payload.new);
+          const actualizado = [...prev, nuevo];
+          return actualizado.sort((a, b) => {
+            const fechaA = new Date(a.fecha + 'T' + (a.hora || '00:00'));
+            const fechaB = new Date(b.fecha + 'T' + (b.hora || '00:00'));
+            return fechaA.getTime() - fechaB.getTime();
+          });
+        });
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'agendamientos' }, (payload) => {
+        setAgendamientos(prev => {
+          const actualizado = rowToAgendamiento(payload.new);
+          return prev.map(a => a.id === actualizado.id ? actualizado : a).sort((a, b) => {
+            const fechaA = new Date(a.fecha + 'T' + (a.hora || '00:00'));
+            const fechaB = new Date(b.fecha + 'T' + (b.hora || '00:00'));
+            return fechaA.getTime() - fechaB.getTime();
+          });
+        });
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'agendamientos' }, (payload) => {
+        setAgendamientos(prev => prev.filter(a => a.id !== payload.old.id));
       })
       .subscribe();
 
@@ -135,7 +192,9 @@ export function AgendamientosProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase
         .from('agendamientos')
         .select('*')
-        .order('fecha', { ascending: true });
+        .order('fecha', { ascending: true })
+        .order('hora', { ascending: true })
+        .limit(100);
 
       if (error) {
         if (process.env.NODE_ENV === 'development') console.error('❌ Error cargando agendamientos:', error.message);
@@ -167,9 +226,14 @@ export function AgendamientosProvider({ children }: { children: ReactNode }) {
       }
 
       const nuevo = rowToAgendamiento(data);
-      setAgendamientos(prev => [...prev, nuevo].sort((a, b) =>
-        new Date(`${a.fecha}T${a.hora}`).getTime() - new Date(`${b.fecha}T${b.hora}`).getTime()
-      ));
+      setAgendamientos(prev => {
+        const actualizado = [...prev, nuevo];
+        return actualizado.sort((a, b) => {
+          const fechaA = new Date(a.fecha + 'T' + (a.hora || '00:00'));
+          const fechaB = new Date(b.fecha + 'T' + (b.hora || '00:00'));
+          return fechaA.getTime() - fechaB.getTime();
+        });
+      });
 
       return { success: true, data: nuevo };
     } catch (error) {
@@ -230,9 +294,11 @@ export function AgendamientosProvider({ children }: { children: ReactNode }) {
         a.estado !== 'completado' &&
         a.estado !== 'cancelado' &&
         fechaA >= hoy;
-    }).sort((a, b) =>
-      new Date(`${a.fecha}T${a.hora}`).getTime() - new Date(`${b.fecha}T${b.hora}`).getTime()
-    );
+    }).sort((a, b) => {
+      const msA = new Date(a.fecha + 'T' + (a.hora || '00:00')).getTime();
+      const msB = new Date(b.fecha + 'T' + (b.hora || '00:00')).getTime();
+      return msA - msB;
+    });
   };
 
   const marcarComoCompletado = async (id: string) => {
@@ -277,11 +343,44 @@ export function AgendamientosProvider({ children }: { children: ReactNode }) {
     await cargarAgendamientos();
   };
 
+  // ── Nuevas funciones v2 ──────────────────────────────────────────────────────
+
+  const aprobarAgendamiento = async (id: string, aprobadoPor: string) => {
+    await actualizarAgendamiento(id, {
+      estado: 'aprobado',
+      notas: `Aprobado por ${aprobadoPor} el ${new Date().toLocaleString('es-CO')}`,
+    });
+  };
+
+  const rechazarAgendamiento = async (id: string, motivo: string, rechazadoPor: string) => {
+    await actualizarAgendamiento(id, {
+      estado: 'cancelado',
+      motivoCancelacion: motivo,
+      canceladoPor: rechazadoPor,
+      fechaCancelacion: new Date().toISOString(),
+    });
+  };
+
+  const cambiarEstado = async (id: string, nuevoEstado: Agendamiento['estado'], meta?: Partial<Agendamiento>) => {
+    await actualizarAgendamiento(id, { estado: nuevoEstado, ...meta });
+  };
+
+  const getAgendamientosHoy = (): Agendamiento[] => {
+    const hoy = new Date().toISOString().split('T')[0];
+    return agendamientos
+      .filter(a => a.fecha === hoy)
+      .sort((a, b) => a.hora.localeCompare(b.hora));
+  };
+
+  const getAgendamientosPendientesAprobacion = (): Agendamiento[] => {
+    return agendamientos.filter(a => a.estado === 'pendiente');
+  };
+
   // Recordatorios automáticos
   useEffect(() => {
     if (agendamientos.length === 0) return;
     const activos: AgendamientoParaRecordatorio[] = agendamientos
-      .filter(a => a.estado === 'confirmado' || a.estado === 'pendiente')
+      .filter(a => a.estado === 'confirmado' || a.estado === 'aprobado' || a.estado === 'pendiente')
       .map(a => ({
         id: a.id,
         modeloEmail: a.modeloEmail,
@@ -309,6 +408,11 @@ export function AgendamientosProvider({ children }: { children: ReactNode }) {
         cancelarAgendamiento,
         marcarComoNoShow,
         recargarAgendamientos,
+        aprobarAgendamiento,
+        rechazarAgendamiento,
+        cambiarEstado,
+        getAgendamientosHoy,
+        getAgendamientosPendientesAprobacion,
       }}
     >
       {children}
@@ -330,6 +434,11 @@ export function useAgendamientos() {
       cancelarAgendamiento: async () => {},
       marcarComoNoShow: async () => {},
       recargarAgendamientos: async () => {},
+      aprobarAgendamiento: async () => {},
+      rechazarAgendamiento: async () => {},
+      cambiarEstado: async () => {},
+      getAgendamientosHoy: () => [],
+      getAgendamientosPendientesAprobacion: () => [],
     } as AgendamientosContextType;
   }
   return context;

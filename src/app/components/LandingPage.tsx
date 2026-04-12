@@ -11,6 +11,10 @@ import { AgregarTestimonioModal } from './AgregarTestimonioModal';
 import { ClienteLoginModal } from './ClienteLoginModal';
 import { BoutiqueStreamPlayer } from './BoutiqueStreamPlayer';
 import { TipNotification } from './TipNotification'; // ✅ Agregar TipNotification
+import { ParticlesBackground } from './ParticlesBackground'; // ✅ Fondo de partículas premium
+import { GoldenCursor } from './GoldenCursor'; // ✅ Cursor personalizado dorado
+import { ScrollUI } from './ScrollUI'; // ✅ Barra de progreso y back-to-top
+import { HeroStats } from './HeroStats'; // ✅ Estadísticas de impacto visual
 import { Gem, Calendar, Clock, MapPin, Shield, Award, Star, ChevronRight, Menu as MenuIcon, X, User as UserIcon, Phone, Mail, MessageSquare, Instagram, Twitter, Facebook, Sparkles, Crown, Globe, Heart, Send, LogOut } from 'lucide-react'; // ✅ Consolidar todos los icons
 import { useLanguage } from './LanguageContext';
 import { LanguageSelector } from './LanguageSelector';
@@ -55,6 +59,7 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
   const [sedeActual, setSedeActual] = useState('sede-1'); // Estado para la sede seleccionada
   const [streamUrl, setStreamUrl] = useState(sedes[0].streamUrl); // URL del stream actual
   const [loadingStream, setLoadingStream] = useState(false); // Estado de carga de streams
+  const [isScrolled, setIsScrolled] = useState(false); // ✅ Estado de scroll para el nav
   
   // Estados para sistema de propinas
   const [showTipModal, setShowTipModal] = useState(false);
@@ -137,6 +142,16 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
     return () => clearTimeout(timeout);
   }, []); // Solo al montar el componente
 
+  // ✅ NUEVO: Detectar scroll para el nav transparente/glassmorphism
+  useEffect(() => {
+    const handleScrollNav = () => {
+      setIsScrolled(window.scrollY > 50);
+    };
+    window.addEventListener('scroll', handleScrollNav, { passive: true });
+    handleScrollNav(); // init
+    return () => window.removeEventListener('scroll', handleScrollNav);
+  }, []);
+
   // Actualizar stream URL cuando cambia la sede (desde sedesData directamente)
   useEffect(() => {
     const sede = sedes.find(s => s.id === sedeActual);
@@ -168,6 +183,44 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
       document.body.style.overflow = 'unset';
     };
   }, [menuOpen]);
+
+  // ✨ Intersection Observer — animaciones scroll-reveal
+  // Las secciones se "despiertan" al entrar en el viewport
+  useEffect(() => {
+    const sections = document.querySelectorAll<HTMLElement>('section[id], footer');
+    
+    // Marca todos los elementos animables como "dormidos" inicialmente
+    sections.forEach(section => {
+      const animated = section.querySelectorAll<HTMLElement>(
+        '.bd-animate-fade-up, .bd-animate-scale-in, .bd-animate-fade-in'
+      );
+      animated.forEach(el => {
+        el.style.animationPlayState = 'paused';
+        el.style.opacity = '0';
+      });
+    });
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const animated = entry.target.querySelectorAll<HTMLElement>(
+              '.bd-animate-fade-up, .bd-animate-scale-in, .bd-animate-fade-in'
+            );
+            animated.forEach(el => {
+              el.style.opacity = '';
+              el.style.animationPlayState = 'running';
+            });
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.08, rootMargin: '0px 0px -60px 0px' }
+    );
+
+    sections.forEach(section => observer.observe(section));
+    return () => observer.disconnect();
+  }, []);
 
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
@@ -288,8 +341,12 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
       )}
 
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-card/98 backdrop-blur-premium border-b border-primary/15 shadow-premium">
-        <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-2.5 sm:py-3">
+      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        isScrolled 
+          ? 'bg-card/90 backdrop-blur-md border-b border-primary/20 shadow-premium py-1' 
+          : 'bg-transparent border-b border-transparent py-3'
+      }`}>
+        <div className="container mx-auto px-3 sm:px-4 lg:px-6">
           <div className="flex items-center justify-between gap-2 sm:gap-4">
             {/* Logo - Responsive size */}
             <div className="flex items-center flex-shrink-0">
@@ -476,9 +533,17 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
       {/* Video Showcase Section - Full Screen Hero */}
       <VideoShowcase />
 
-      {/* Live Stream Hero Section */}
-      <section id="inicio" className="pt-16 relative">
-        <div className="w-full h-[calc(100vh-4rem)] flex flex-col lg:flex-row">
+      {/* Live Stream Hero Section — con partículas premium */}
+      <section id="inicio" className="pt-16 relative overflow-hidden">
+        {/* 🌟 Partículas doradas de alta densidad en el hero */}
+        <ParticlesBackground
+          density="high"
+          showConnections={true}
+          showNebula={true}
+          mouseRadius={160}
+          className="opacity-70"
+        />
+        <div className="w-full h-[calc(100vh-4rem)] flex flex-col lg:flex-row relative" style={{ zIndex: 1 }}>
           {/* Video Stream - Ocupa 70% en desktop, reducido en mobile para dar más espacio al chat */}
           <div className="w-full lg:w-[70%] h-[40vh] lg:h-full relative">
             <BoutiqueStreamPlayer 
@@ -500,25 +565,36 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
         </div>
       </section>
 
-      {/* Services Section */}
-      <section id="servicios" className="py-16 md:py-24 bg-background">
-        <div className="container mx-auto px-4">
+      {/* ✅ Estadísticas de Alto Impacto (Animadas) */}
+      <HeroStats />
+
+      {/* Services Section — partículas sutiles */}
+      <section id="servicios" className="py-16 md:py-24 bg-background relative overflow-hidden">
+        <ParticlesBackground
+          density="low"
+          showConnections={false}
+          showNebula={true}
+          mouseRadius={100}
+          className="opacity-40"
+        />
+        <div className="container mx-auto px-4 relative" style={{ zIndex: 1 }}>
           <div className="text-center mb-12">
-            <Badge className="mb-4 bg-primary/20 text-primary border-primary/30">
+            <Badge className="mb-4 bg-primary/20 text-primary border-primary/30 bd-animate-fade-up bd-delay-0">
               <Gem className="w-4 h-4 mr-2 inline" />
               {t.services.badge}
             </Badge>
-            <h2 className="text-4xl md:text-6xl font-bold mb-4" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+            <h2 className="text-4xl md:text-6xl font-bold mb-4 bd-animate-fade-up bd-delay-1" style={{ fontFamily: 'Montserrat, sans-serif' }}>
               {t.services.title} <span className="text-primary">{t.services.titleHighlight}</span>
             </h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
+            <p className="text-muted-foreground max-w-2xl mx-auto bd-animate-fade-up bd-delay-2">
               {t.services.subtitle}
             </p>
+            <div className="bd-shimmer-line max-w-xs mx-auto mt-6" />
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
             {/* Servicio 1 */}
-            <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/5 hover:shadow-lg hover:shadow-primary/10 transition-all group">
+            <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/5 hover:shadow-lg hover:shadow-primary/10 transition-all group bd-animate-scale-in bd-delay-0 bd-card-hover">
               <CardContent className="p-6">
                 <div className="w-14 h-14 rounded-full bg-primary/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                   <Clock className="w-7 h-7 text-primary" />
@@ -537,7 +613,7 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
             </Card>
 
             {/* Servicio 2 */}
-            <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/5 hover:shadow-lg hover:shadow-primary/10 transition-all group">
+            <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/5 hover:shadow-lg hover:shadow-primary/10 transition-all group bd-animate-scale-in bd-delay-1 bd-card-hover">
               <CardContent className="p-6">
                 <div className="w-14 h-14 rounded-full bg-primary/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                   <MapPin className="w-7 h-7 text-primary" />
@@ -556,7 +632,7 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
             </Card>
 
             {/* Servicio 3 */}
-            <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/5 hover:shadow-lg hover:shadow-primary/10 transition-all group">
+            <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/5 hover:shadow-lg hover:shadow-primary/10 transition-all group bd-animate-scale-in bd-delay-2 bd-card-hover">
               <CardContent className="p-6">
                 <div className="w-14 h-14 rounded-full bg-primary/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                   <Gem className="w-7 h-7 text-primary" />
@@ -575,7 +651,7 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
             </Card>
 
             {/* Servicio 4 */}
-            <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/5 hover:shadow-lg hover:shadow-primary/10 transition-all group">
+            <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/5 hover:shadow-lg hover:shadow-primary/10 transition-all group bd-animate-scale-in bd-delay-3 bd-card-hover">
               <CardContent className="p-6">
                 <div className="w-14 h-14 rounded-full bg-primary/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                   <Heart className="w-7 h-7 text-primary" />
@@ -594,7 +670,7 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
             </Card>
 
             {/* Servicio 5 */}
-            <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/5 hover:shadow-lg hover:shadow-primary/10 transition-all group">
+            <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/5 hover:shadow-lg hover:shadow-primary/10 transition-all group bd-animate-scale-in bd-delay-4 bd-card-hover">
               <CardContent className="p-6">
                 <div className="w-14 h-14 rounded-full bg-primary/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                   <Award className="w-7 h-7 text-primary" />
@@ -613,7 +689,7 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
             </Card>
 
             {/* Servicio 6 */}
-            <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/5 hover:shadow-lg hover:shadow-primary/10 transition-all group">
+            <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/5 hover:shadow-lg hover:shadow-primary/10 transition-all group bd-animate-scale-in bd-delay-5 bd-card-hover">
               <CardContent className="p-6">
                 <div className="w-14 h-14 rounded-full bg-primary/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                   <Sparkles className="w-7 h-7 text-primary" />
@@ -634,20 +710,28 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
         </div>
       </section>
 
-      {/* Models Section */}
-      <section id="modelos" className="py-16 md:py-24">
-        <div className="container mx-auto px-4">
+      {/* Models Section — partículas medias para galería */}
+      <section id="modelos" className="py-16 md:py-24 relative overflow-hidden">
+        <ParticlesBackground
+          density="medium"
+          showConnections={true}
+          showNebula={false}
+          mouseRadius={120}
+          className="opacity-35"
+        />
+        <div className="container mx-auto px-4 relative" style={{ zIndex: 1 }}>
           <div className="text-center mb-12">
-            <Badge className="mb-4 bg-primary/20 text-primary border-primary/30">
+            <Badge className="mb-4 bg-primary/20 text-primary border-primary/30 bd-animate-fade-up bd-delay-0">
               <Star className="w-4 h-4 mr-2 inline" />
               {t.models.badge}
             </Badge>
-            <h2 className="text-4xl md:text-6xl font-bold mb-4" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+            <h2 className="text-4xl md:text-6xl font-bold mb-4 bd-animate-fade-up bd-delay-1" style={{ fontFamily: 'Montserrat, sans-serif' }}>
               {t.models.title} <span className="text-primary">{t.models.titleHighlight}</span>
             </h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
+            <p className="text-muted-foreground max-w-2xl mx-auto bd-animate-fade-up bd-delay-2">
               {t.models.subtitle}
             </p>
+            <div className="bd-shimmer-line max-w-xs mx-auto mt-6" />
           </div>
 
           {/* Modelos Disponibles - Grid Vertical */}
@@ -734,24 +818,32 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
         onSedeChange={handleSedeChange}
       /> */}
 
-      {/* About Section */}
-      <section id="sobre-nosotros" className="py-16 md:py-24 bg-gradient-to-b from-primary/5 to-background">
-        <div className="container mx-auto px-4">
+      {/* About Section — con nebulosa y partículas refinadas */}
+      <section id="sobre-nosotros" className="py-16 md:py-24 bg-gradient-to-b from-primary/5 to-background relative overflow-hidden">
+        <ParticlesBackground
+          density="medium"
+          showConnections={true}
+          showNebula={true}
+          mouseRadius={130}
+          className="opacity-55"
+        />
+        <div className="container mx-auto px-4 relative" style={{ zIndex: 1 }}>
           <div className="max-w-4xl mx-auto">
             <div className="text-center mb-12">
-              <Badge className="mb-4 bg-primary/20 text-primary border-primary/30">
+              <Badge className="mb-4 bg-primary/20 text-primary border-primary/30 bd-animate-fade-up bd-delay-0">
                 <Gem className="w-4 h-4 mr-2 inline" />
                 {t.about.badge}
               </Badge>
-              <h2 className="text-4xl md:text-6xl font-bold mb-6" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+              <h2 className="text-4xl md:text-6xl font-bold mb-6 bd-animate-fade-up bd-delay-1" style={{ fontFamily: 'Montserrat, sans-serif' }}>
                 {t.about.title} <span className="text-primary">{t.about.titleHighlight}</span>
               </h2>
+              <div className="bd-shimmer-line max-w-xs mx-auto" />
             </div>
 
             <div className="grid md:grid-cols-2 gap-8 mb-12">
-              <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/5">
+              <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/5 bd-animate-scale-in bd-delay-2 bd-card-hover">
                 <CardContent className="p-6">
-                  <Shield className="w-12 h-12 text-primary mb-4" />
+                  <Shield className="w-12 h-12 text-primary mb-4 bd-animate-float" />
                   <h3 className="text-2xl font-bold mb-3" style={{ fontFamily: 'Montserrat, sans-serif' }}>
                     {t.about.totalSecurity.title}
                   </h3>
@@ -761,9 +853,9 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
                 </CardContent>
               </Card>
 
-              <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/5">
+              <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/5 bd-animate-scale-in bd-delay-3 bd-card-hover">
                 <CardContent className="p-6">
-                  <Award className="w-12 h-12 text-primary mb-4" />
+                  <Award className="w-12 h-12 text-primary mb-4 bd-animate-float" style={{ animationDelay: '0.8s' }} />
                   <h3 className="text-2xl font-bold mb-3" style={{ fontFamily: 'Montserrat, sans-serif' }}>
                     {t.about.premiumQuality.title}
                   </h3>
@@ -774,27 +866,27 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
               </Card>
             </div>
 
-            <div className="text-center bg-gradient-to-br from-primary/10 to-primary/5 rounded-2xl p-8 border border-primary/20">
+            <div className="text-center bg-gradient-to-br from-primary/10 to-primary/5 rounded-2xl p-8 border border-primary/20 bd-animate-scale-in bd-delay-4 bd-animate-glow">
               <h3 className="text-3xl font-bold mb-4" style={{ fontFamily: 'Montserrat, sans-serif' }}>
                 {t.about.ourValues}
               </h3>
               <div className="grid md:grid-cols-3 gap-6 mt-8">
-                <div>
-                  <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-3">
+                <div className="bd-animate-fade-up bd-delay-0">
+                  <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-3 bd-animate-float">
                     <Heart className="w-8 h-8 text-primary" />
                   </div>
                   <h4 className="font-bold mb-2">{t.about.respect.title}</h4>
                   <p className="text-sm text-muted-foreground">{t.about.respect.description}</p>
                 </div>
-                <div>
-                  <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-3">
+                <div className="bd-animate-fade-up bd-delay-2">
+                  <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-3 bd-animate-float" style={{ animationDelay: '1s' }}>
                     <Shield className="w-8 h-8 text-primary" />
                   </div>
                   <h4 className="font-bold mb-2">{t.about.confidentiality.title}</h4>
                   <p className="text-sm text-muted-foreground">{t.about.confidentiality.description}</p>
                 </div>
-                <div>
-                  <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-3">
+                <div className="bd-animate-fade-up bd-delay-4">
+                  <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-3 bd-animate-float" style={{ animationDelay: '2s' }}>
                     <Sparkles className="w-8 h-8 text-primary" />
                   </div>
                   <h4 className="font-bold mb-2">{t.about.excellence.title}</h4>
@@ -809,26 +901,34 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
       {/* Sección de Testimonios - Experiencias de Nuestros Clientes */}
       <TestimoniosSection onAddTestimonio={() => setShowTestimonioModal(true)} />
 
-      {/* Contact Section */}
-      <section id="contacto" className="py-16 md:py-24">
-        <div className="container mx-auto px-4">
+      {/* Contact Section — partículas de densidad alta, el gran final */}
+      <section id="contacto" className="py-16 md:py-24 relative overflow-hidden">
+        <ParticlesBackground
+          density="medium"
+          showConnections={true}
+          showNebula={true}
+          mouseRadius={150}
+          className="opacity-50"
+        />
+        <div className="container mx-auto px-4 relative" style={{ zIndex: 1 }}>
           <div className="max-w-4xl mx-auto">
             <div className="text-center mb-12">
-              <Badge className="mb-4 bg-primary/20 text-primary border-primary/30">
+              <Badge className="mb-4 bg-primary/20 text-primary border-primary/30 bd-animate-fade-up bd-delay-0">
                 <Phone className="w-4 h-4 mr-2 inline" />
                 {t.contact.badge}
               </Badge>
-              <h2 className="text-4xl md:text-6xl font-bold mb-4" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+              <h2 className="text-4xl md:text-6xl font-bold mb-4 bd-animate-fade-up bd-delay-1" style={{ fontFamily: 'Montserrat, sans-serif' }}>
                 {t.contact.title} <span className="text-primary">{t.contact.titleHighlight}</span>
               </h2>
-              <p className="text-muted-foreground max-w-2xl mx-auto">
+              <p className="text-muted-foreground max-w-2xl mx-auto bd-animate-fade-up bd-delay-2">
                 {t.contact.subtitle}
               </p>
+              <div className="bd-shimmer-line max-w-xs mx-auto mt-6" />
             </div>
 
             <div className="grid md:grid-cols-4 gap-6 mb-12">
               {/* Telegram - Azul */}
-              <Card className="border-blue-500/20 bg-gradient-to-br from-card to-blue-600/10 hover:shadow-lg hover:shadow-blue-500/20 transition-all">
+              <Card className="border-blue-500/20 bg-gradient-to-br from-card to-blue-600/10 hover:shadow-lg hover:shadow-blue-500/20 transition-all bd-animate-scale-in bd-delay-0 bd-card-hover">
                 <CardContent className="p-6 text-center">
                   <div className="w-14 h-14 rounded-full bg-blue-600/20 flex items-center justify-center mx-auto mb-4">
                     <Send className="w-7 h-7 text-blue-500" />
@@ -842,7 +942,7 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
               </Card>
 
               {/* WhatsApp - Verde */}
-              <Card className="border-green-500/20 bg-gradient-to-br from-card to-green-600/10 hover:shadow-lg hover:shadow-green-500/20 transition-all">
+              <Card className="border-green-500/20 bg-gradient-to-br from-card to-green-600/10 hover:shadow-lg hover:shadow-green-500/20 transition-all bd-animate-scale-in bd-delay-1 bd-card-hover">
                 <CardContent className="p-6 text-center">
                   <div className="w-14 h-14 rounded-full bg-green-600/20 flex items-center justify-center mx-auto mb-4">
                     <Phone className="w-7 h-7 text-green-500" />
@@ -856,7 +956,7 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
               </Card>
 
               {/* X (antes Twitter) - Negro/Blanco */}
-              <Card className="border-white/20 bg-gradient-to-br from-card to-white/10 hover:shadow-lg hover:shadow-white/20 transition-all">
+              <Card className="border-white/20 bg-gradient-to-br from-card to-white/10 hover:shadow-lg hover:shadow-white/20 transition-all bd-animate-scale-in bd-delay-2 bd-card-hover">
                 <CardContent className="p-6 text-center">
                   <div className="w-14 h-14 rounded-full bg-white/10 flex items-center justify-center mx-auto mb-4">
                     <svg className="w-7 h-7 text-white" viewBox="0 0 24 24" fill="currentColor">
@@ -872,7 +972,7 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
               </Card>
 
               {/* Email - Blanco con rojo */}
-              <Card className="border-red-500/20 bg-gradient-to-br from-card to-red-600/10 hover:shadow-lg hover:shadow-red-500/20 transition-all">
+              <Card className="border-red-500/20 bg-gradient-to-br from-card to-red-600/10 hover:shadow-lg hover:shadow-red-500/20 transition-all bd-animate-scale-in bd-delay-3 bd-card-hover">
                 <CardContent className="p-6 text-center">
                   <div className="w-14 h-14 rounded-full bg-red-600/20 flex items-center justify-center mx-auto mb-4">
                     <Mail className="w-7 h-7 text-red-400" />
@@ -890,9 +990,9 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
             </div>
 
             {/* CTA Final */}
-            <Card className="border-primary/30 bg-gradient-to-br from-primary/10 to-primary/5">
+            <Card className="border-primary/30 bg-gradient-to-br from-primary/10 to-primary/5 bd-animate-scale-in bd-delay-4 bd-animate-glow">
               <CardContent className="p-8 md:p-12 text-center">
-                <Gem className="w-16 h-16 text-primary mx-auto mb-6" />
+                <Gem className="w-16 h-16 text-primary mx-auto mb-6 bd-animate-float" />
                 <h3 className="text-3xl md:text-4xl font-bold mb-4" style={{ fontFamily: 'Montserrat, sans-serif' }}>
                   {t.contact.ctaTitle}
                 </h3>
@@ -914,9 +1014,16 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-primary/20 bg-gradient-to-b from-background to-primary/5">
-        <div className="container mx-auto px-4 py-12">
+      {/* Footer con partículas sutiles */}
+      <footer className="border-t border-primary/20 bg-gradient-to-b from-background to-primary/5 relative overflow-hidden">
+        <ParticlesBackground
+          density="low"
+          showConnections={false}
+          showNebula={true}
+          mouseRadius={80}
+          className="opacity-30"
+        />
+        <div className="container mx-auto px-4 py-12 relative" style={{ zIndex: 1 }}>
           <div className="grid md:grid-cols-4 gap-8 mb-8">
             {/* Logo & Description */}
             <div className="md:col-span-2">
@@ -1012,6 +1119,12 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
           onLoginSuccess={setClienteActual}
         />
       )}
+
+      {/* ✨ Cursor personalizado dorado — solo desktop */}
+      <GoldenCursor />
+
+      {/* ✨ Scroll Progress Bar & Back to top */}
+      <ScrollUI />
     </div>
   );
 }

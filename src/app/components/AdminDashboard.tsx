@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import { 
   BarChart3, 
   Users, 
@@ -35,34 +35,36 @@ import { usePagos } from './PagosContext';
 import { useInventory } from './InventoryContext';
 import { useGastos } from './GastosContext';
 import { toast } from 'sonner';
-import { AsistenciaPanel } from './AsistenciaPanel';
-import { RendimientoModelosPanel } from '../../components/RendimientoModelosPanel';
-import { ModelosArchivadasPanel } from '../../components/ModelosArchivadasPanel';
-import { HistorialClientesPanel } from '../../components/HistorialClientesPanel';
-import { LiquidacionPanel } from '../../components/LiquidacionPanel';
-import { GestionAdelantosPanel } from '../../components/GestionAdelantosPanel';
-import { HabitacionesPanel } from '../../components/HabitacionesPanel';
-import { FinanzasPanel } from '../../components/FinanzasPanel';
-import { GastosOperativosPanel } from '../../components/GastosOperativosPanel';
-import { StreamConfigPanel } from '../../components/StreamConfigPanel';
-import { DetalleModeloPanel } from '../../components/DetalleModeloPanel';
-import { EditarModeloModal } from './EditarModeloModal';
-import { CrearModeloModal } from '../../components/CrearModeloModal';
-import { BoutiquePanel } from '../../components/BoutiquePanel';
-import { SolicitudesEntradaPanel } from '../../components/SolicitudesEntradaPanel';
-import { ServiciosPublicosPanel } from '../../components/ServiciosPublicosPanel';
-import { MigrarModelosRealesPanel } from '../../components/MigrarModelosRealesPanel';
-import { DiagnosticoPanel } from '../../components/admin/DiagnosticoPanel';
-import { ConfiguracionChatPanel } from '../../components/ConfiguracionChatPanel';
-import { ChatModeratorPanel } from '../../components/ChatModeratorPanel';
-import { GestionUsuariosPanel } from '../../components/GestionUsuariosPanel'; // Agregado
-import { GestionClientesAdmin } from './GestionClientesAdmin'; // 🆕 Gestión de clientes con multas
-import { NotificacionesPanel } from './NotificacionesPanel';
-import { AnalyticsPanel } from './AnalyticsPanel'; // 📊 Sistema de Analytics
-import { GestionTestimoniosPanel } from '../../components/GestionTestimoniosPanel';
-import { AdminResumenPanel } from '../../components/admin/AdminResumenPanel';
+// Lazy loading de paneles — solo se cargan cuando se activa la pestaña correspondiente
+const AsistenciaPanel = lazy(() => import('./AsistenciaPanel').then(m => ({ default: m.AsistenciaPanel })));
+const RendimientoModelosPanel = lazy(() => import('../../components/RendimientoModelosPanel').then(m => ({ default: m.RendimientoModelosPanel })));
+const ModelosArchivadasPanel = lazy(() => import('../../components/ModelosArchivadasPanel').then(m => ({ default: m.ModelosArchivadasPanel })));
+const HistorialClientesPanel = lazy(() => import('../../components/HistorialClientesPanel').then(m => ({ default: m.HistorialClientesPanel })));
+const LiquidacionPanel = lazy(() => import('../../components/LiquidacionPanel').then(m => ({ default: m.LiquidacionPanel })));
+const GestionAdelantosPanel = lazy(() => import('../../components/GestionAdelantosPanel').then(m => ({ default: m.GestionAdelantosPanel })));
+const HabitacionesPanel = lazy(() => import('../../components/HabitacionesPanel').then(m => ({ default: m.HabitacionesPanel })));
+const FinanzasPanel = lazy(() => import('../../components/FinanzasPanel').then(m => ({ default: m.FinanzasPanel })));
+const GastosOperativosPanel = lazy(() => import('../../components/GastosOperativosPanel').then(m => ({ default: m.GastosOperativosPanel })));
+const StreamConfigPanel = lazy(() => import('../../components/StreamConfigPanel').then(m => ({ default: m.StreamConfigPanel })));
+const DetalleModeloPanel = lazy(() => import('../../components/DetalleModeloPanel').then(m => ({ default: m.DetalleModeloPanel })));
+const EditarModeloModal = lazy(() => import('./EditarModeloModal').then(m => ({ default: m.EditarModeloModal })));
+const CrearModeloModal = lazy(() => import('../../components/CrearModeloModal').then(m => ({ default: m.CrearModeloModal })));
+const BoutiquePanel = lazy(() => import('../../components/BoutiquePanel').then(m => ({ default: m.BoutiquePanel })));
+const SolicitudesEntradaPanel = lazy(() => import('../../components/SolicitudesEntradaPanel').then(m => ({ default: m.SolicitudesEntradaPanel })));
+const ServiciosPublicosPanel = lazy(() => import('../../components/ServiciosPublicosPanel').then(m => ({ default: m.ServiciosPublicosPanel })));
+const DiagnosticoPanel = lazy(() => import('../../components/admin/DiagnosticoPanel').then(m => ({ default: m.DiagnosticoPanel })));
+const ConfiguracionChatPanel = lazy(() => import('../../components/ConfiguracionChatPanel').then(m => ({ default: m.ConfiguracionChatPanel })));
+const ChatModeratorPanel = lazy(() => import('../../components/ChatModeratorPanel').then(m => ({ default: m.ChatModeratorPanel })));
+const GestionUsuariosPanel = lazy(() => import('../../components/GestionUsuariosPanel').then(m => ({ default: m.GestionUsuariosPanel })));
+const GestionClientesAdmin = lazy(() => import('./GestionClientesAdmin').then(m => ({ default: m.GestionClientesAdmin })));
+const NotificacionesPanel = lazy(() => import('./NotificacionesPanel').then(m => ({ default: m.NotificacionesPanel })));
+const AnalyticsPanel = lazy(() => import('./AnalyticsPanel').then(m => ({ default: m.AnalyticsPanel })));
+const GestionTestimoniosPanel = lazy(() => import('../../components/GestionTestimoniosPanel').then(m => ({ default: m.GestionTestimoniosPanel })));
+const AdminResumenPanel = lazy(() => import('../../components/admin/AdminResumenPanel').then(m => ({ default: m.AdminResumenPanel })));
+const AgendamientosPanel = lazy(() => import('./AgendamientosPanel').then(m => ({ default: m.AgendamientosPanel })));
+const AgendamientosMetrics = lazy(() => import('./AgendamientosMetrics').then(m => ({ default: m.AgendamientosMetrics })));
 
-type ModuloType = 'general' | 'modelos' | 'clientes' | 'pagos' | 'habitaciones' | 'finanzas' | 'operaciones' | 'boutique' | 'streams' | 'diagnostico' | 'chat' | 'programadores' | 'notificaciones' | 'analytics' | 'testimonios';
+type ModuloType = 'general' | 'modelos' | 'clientes' | 'pagos' | 'habitaciones' | 'finanzas' | 'operaciones' | 'agendamientos' | 'boutique' | 'streams' | 'diagnostico' | 'chat' | 'programadores' | 'notificaciones' | 'analytics' | 'testimonios';
 
 interface Modulo {
   id: ModuloType;
@@ -168,6 +170,12 @@ export function AdminDashboard({ accessToken, userId, userEmail = '', onLogout }
       nombre: 'Operaciones',
       icono: <Calendar className="w-5 h-5" />,
       descripcion: 'Servicios y ocupación'
+    },
+    {
+      id: 'agendamientos',
+      nombre: 'Agendamientos',
+      icono: <Calendar className="w-5 h-5" />,
+      descripcion: 'Gestión de citas y aprobaciones'
     },
     {
       id: 'boutique',
@@ -381,7 +389,9 @@ export function AdminDashboard({ accessToken, userId, userEmail = '', onLogout }
       </div>
 
       {/* Panel de Asistencia */}
-      <AsistenciaPanel userRole="admin" />
+      <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Cargando Asistencia...</div>}>
+        <AsistenciaPanel userRole="admin" />
+      </Suspense>
 
       {/* Selector de Módulo - Menú Desplegable */}
       <Card className="border-primary/30 bg-gradient-to-br from-card to-card/50">
@@ -430,6 +440,14 @@ export function AdminDashboard({ accessToken, userId, userEmail = '', onLogout }
       </Card>
 
       {/* Contenido del Módulo */}
+      <Suspense fallback={
+        <Card className="w-full h-96 flex items-center justify-center bg-card/50 border-dashed border-2 border-primary/20">
+          <div className="text-center space-y-4">
+            <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto" />
+            <p className="text-primary font-medium">Preparando panel {moduloSeleccionado?.nombre}...</p>
+          </div>
+        </Card>
+      }>
       <div className="space-y-4">
         {moduloActivo === 'general' && (
           <AdminResumenPanel 
@@ -672,6 +690,13 @@ export function AdminDashboard({ accessToken, userId, userEmail = '', onLogout }
           </Tabs>
         )}
 
+        {moduloActivo === 'agendamientos' && (
+          <div className="space-y-4">
+            <AgendamientosMetrics rol="admin" />
+            <AgendamientosPanel rol="admin" userEmail={userEmail} />
+          </div>
+        )}
+
         {moduloActivo === 'boutique' && <BoutiquePanel />}
 
         {moduloActivo === 'streams' && (
@@ -709,28 +734,35 @@ export function AdminDashboard({ accessToken, userId, userEmail = '', onLogout }
           <AnalyticsPanel />
         )}
       </div>
+      </Suspense>
 
       {/* Modal de Detalle de Modelo */}
       {modeloDetalle && (
-        <DetalleModeloPanel 
-          modelo={modeloDetalle} 
-          onClose={() => setModeloDetalle(null)} 
-          onEdit={() => {
-            setModeloEditar(modeloDetalle);
-            setModeloDetalle(null);
-          }}
-        />
+        <Suspense fallback={null}>
+          <DetalleModeloPanel 
+            modelo={modeloDetalle} 
+            onClose={() => setModeloDetalle(null)} 
+            onEdit={() => {
+              setModeloEditar(modeloDetalle);
+              setModeloDetalle(null);
+            }}
+          />
+        </Suspense>
       )}
 
       {/* Modal de Editar Modelo */}
-      <EditarModeloModal 
-        open={!!modeloEditar}
-        onClose={() => setModeloEditar(null)}
-        modelo={modeloEditar}
-      />
+      <Suspense fallback={null}>
+        <EditarModeloModal 
+          open={!!modeloEditar}
+          onClose={() => setModeloEditar(null)}
+          modelo={modeloEditar}
+        />
+      </Suspense>
 
       {/* Modal de Crear Modelo */}
-      <CrearModeloModal open={mostrarCrearModelo} onClose={() => setMostrarCrearModelo(false)} />
+      <Suspense fallback={null}>
+        <CrearModeloModal open={mostrarCrearModelo} onClose={() => setMostrarCrearModelo(false)} />
+      </Suspense>
 
       </main>
     </div>

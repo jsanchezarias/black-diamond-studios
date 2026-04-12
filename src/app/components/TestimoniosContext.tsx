@@ -34,7 +34,8 @@ export function TestimoniosProvider({ children }: { children: ReactNode }) {
         const { data, error } = await (supabase as any)
           .from('testimonios')
           .select('*')
-          .order('fecha', { ascending: false });
+          .order('fecha', { ascending: false })
+          .limit(100);
 
         if (error) {
           if (process.env.NODE_ENV === 'development') console.error('⚠️ Tabla testimonios no encontrada o error al cargar:', error.message);

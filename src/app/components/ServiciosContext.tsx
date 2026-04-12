@@ -201,7 +201,8 @@ export function ServiciosProvider({ children }: { children: ReactNode }) {
         .from('agendamientos')
         .select('*')
         .neq('estado', 'pendiente') // Pull records that are not just pending appointments
-        .order('fecha', { ascending: false });
+        .order('fecha', { ascending: false })
+        .limit(100);
 
       if (error) {
         if (process.env.NODE_ENV === 'development') console.error('❌ Error cargando servicios:', error.message);

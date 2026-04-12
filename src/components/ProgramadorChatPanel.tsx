@@ -26,6 +26,17 @@ import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Send, Users, MessageSquare, Gem, Trash2, AlertCircle, CheckCircle } from 'lucide-react';
 import { supabase } from '../utils/supabase/info'; // ✅ Corregido: ruta correcta
+import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "./ui/alert-dialog";
 
 interface Message {
   id: string;
@@ -50,6 +61,7 @@ export function ProgramadorChatPanel({ userId, userEmail }: ProgramadorChatPanel
   const [onlineUsers, setOnlineUsers] = useState(0);
   const [loading, setLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [mostrarLimpiarDialog, setMostrarLimpiarDialog] = useState(false);
 
   // Auto-scroll al final cuando hay nuevos mensajes
   useEffect(() => {
@@ -167,7 +179,7 @@ export function ProgramadorChatPanel({ userId, userEmail }: ProgramadorChatPanel
 
       if (!existingUser) {
         if (process.env.NODE_ENV === 'development') console.error('❌ Usuario programador no encontrado. Debe ser creado primero en la configuración del chat.');
-        alert('Error: Usuario programador no configurado. Ve a Configuración > Chat para crearlo.');
+        toast.error('Usuario programador no configurado. Ve a Configuración > Chat para crearlo.');
         return;
       }
 
@@ -183,7 +195,7 @@ export function ProgramadorChatPanel({ userId, userEmail }: ProgramadorChatPanel
 
       if (sendError) {
         if (process.env.NODE_ENV === 'development') console.error('❌ Error enviando mensaje:', sendError);
-        alert('Error al enviar mensaje. Intenta de nuevo.');
+        toast.error('Error al enviar mensaje. Intenta de nuevo.');
         return;
       }
 
@@ -194,15 +206,15 @@ export function ProgramadorChatPanel({ userId, userEmail }: ProgramadorChatPanel
       await loadMessages();
     } catch (err) {
       if (process.env.NODE_ENV === 'development') console.error('Error completo al enviar mensaje:', err);
-      alert('Error al enviar mensaje. Intenta de nuevo.');
+      toast.error('Error al enviar mensaje. Intenta de nuevo.');
     }
   };
 
-  const clearAllMessages = async () => {
-    if (!confirm('¿Estás seguro de que quieres eliminar TODOS los mensajes del chat?')) {
-      return;
-    }
+  const clearAllMessages = () => {
+    setMostrarLimpiarDialog(true);
+  };
 
+  const confirmarLimpiar = async () => {
     try {
       const { error } = await supabase
         .from('chat_mensajes_publicos')
@@ -211,7 +223,7 @@ export function ProgramadorChatPanel({ userId, userEmail }: ProgramadorChatPanel
 
       if (error) {
         if (process.env.NODE_ENV === 'development') console.error('Error eliminando mensajes:', error);
-        alert('Error al eliminar mensajes. Intenta de nuevo.');
+        toast.error('Error al eliminar mensajes. Intenta de nuevo.');
         return;
       }
 
@@ -234,9 +246,11 @@ export function ProgramadorChatPanel({ userId, userEmail }: ProgramadorChatPanel
       }
 
       await loadMessages();
+      toast.success('Chat limpiado exitosamente');
+      setMostrarLimpiarDialog(false);
     } catch (err) {
       if (process.env.NODE_ENV === 'development') console.error('Error completo:', err);
-      alert('Error al eliminar mensajes. Intenta de nuevo.');
+      toast.error('Error al eliminar mensajes. Intenta de nuevo.');
     }
   };
 
@@ -407,6 +421,24 @@ export function ProgramadorChatPanel({ userId, userEmail }: ProgramadorChatPanel
           </div>
         </CardContent>
       </Card>
+
+      {/* Alerta Limpiar Chat */}
+      <AlertDialog open={mostrarLimpiarDialog} onOpenChange={setMostrarLimpiarDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Limpiar Chat?</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Estás seguro de que quieres eliminar TODOS los mensajes del chat? Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction className="bg-red-500 hover:bg-red-600 text-white" onClick={confirmarLimpiar}>
+              Limpiar Chat
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

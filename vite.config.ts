@@ -57,6 +57,20 @@
     build: {
       target: 'esnext',
       outDir: 'build',
+      minify: 'esbuild',
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'vendor-react': ['react', 'react-dom'],
+            'vendor-supabase': ['@supabase/supabase-js'],
+            'vendor-charts': ['recharts'],
+            'vendor-ui': ['lucide-react'],
+            'vendor-utils': ['date-fns', 'clsx', 'tailwind-merge'],
+            'vendor-pdf': ['jspdf', 'html2canvas'],
+          },
+        },
+      },
+      chunkSizeWarningLimit: 1000,
     },
     server: {
       port: 3000,

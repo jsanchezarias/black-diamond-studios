@@ -1,7 +1,18 @@
+import { useState } from 'react';
 import { X, ShoppingCart, Plus, Minus, Trash2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { useCarrito } from '../app/components/CarritoContext';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "./ui/alert-dialog";
 
 interface CarritoBoutiqueModalProps {
   isOpen: boolean;
@@ -11,6 +22,7 @@ interface CarritoBoutiqueModalProps {
 
 export function CarritoBoutiqueModal({ isOpen, onClose, onProcederCheckout }: CarritoBoutiqueModalProps) {
   const { carrito, eliminarDelCarrito, actualizarCantidad, obtenerTotal, vaciarCarrito } = useCarrito();
+  const [mostrarVaciarDialog, setMostrarVaciarDialog] = useState(false);
 
   if (!isOpen) return null;
 
@@ -155,11 +167,7 @@ export function CarritoBoutiqueModal({ isOpen, onClose, onProcederCheckout }: Ca
             <div className="flex gap-3">
               <Button
                 variant="outline"
-                onClick={() => {
-                  if (window.confirm('¿Estás segura de vaciar el carrito?')) {
-                    vaciarCarrito();
-                  }
-                }}
+                onClick={() => setMostrarVaciarDialog(true)}
                 className="flex-1"
               >
                 Vaciar Carrito
@@ -174,6 +182,24 @@ export function CarritoBoutiqueModal({ isOpen, onClose, onProcederCheckout }: Ca
           </div>
         )}
       </div>
+
+      {/* Alerta de vaciar carrito */}
+      <AlertDialog open={mostrarVaciarDialog} onOpenChange={setMostrarVaciarDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Vaciar carrito?</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Estás segura de vaciar el carrito? Todos los productos seleccionados serán removidos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction className="bg-red-500 hover:bg-red-600 text-white" onClick={vaciarCarrito}>
+              Sí, vaciar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

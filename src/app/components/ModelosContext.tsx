@@ -81,7 +81,7 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
     
     const inicializar = async () => {
       // 1. Intentar cargar desde caché para visualización instantánea
-      const cacheData = CacheSystem.get<{activos: Modelo[], archivados: Modelo[]}>('modelos');
+      const cacheData = CacheSystem.get<{activos: Modelo[], archivados: Modelo[]}>('modelos_v2');
       if (cacheData && isMounted) {
         setModelos(cacheData.activos);
         setModelosArchivadas(cacheData.archivados);
@@ -130,7 +130,7 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
             medidas: '90-60-90',
             fotoPerfil: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400',
             fotosAdicionales: [],
-            descripcion: 'Modelo profesional con 3 años de experiencia',
+            descripcion: `⚠️ ERROR DB: ${error?.message || JSON.stringify(error)}`,
             sede: 'Sede Norte',
             servicios: 0,
             ingresos: 0,
@@ -229,7 +229,7 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
         setModelosArchivadas(modelosArchivados);
 
         // ✅ NUEVO: Guardar en caché para futuras cargas instantáneas
-        CacheSystem.set('modelos', {
+        CacheSystem.set('modelos_v2', {
           activos: modelosActivos,
           archivados: modelosArchivados
         }, 120); // Caché por 2 horas

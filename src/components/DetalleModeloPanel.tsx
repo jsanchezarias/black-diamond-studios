@@ -4,12 +4,23 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from './ui/
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Label } from './ui/label';
+import { Input } from './ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Modelo, useModelos } from '../app/components/ModelosContext';
 import { useServicios } from '../app/components/ServiciosContext';
 import { useMultas } from '../app/components/MultasContext';
 import { usePagos } from '../app/components/PagosContext';
 import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "./ui/alert-dialog";
 
 interface DetalleModeloPanelProps {
   modelo: Modelo;
@@ -22,6 +33,8 @@ export function DetalleModeloPanel({ modelo, onClose, onEdit }: DetalleModeloPan
   const { multas, obtenerTotalMultasPendientes } = useMultas();
   const { adelantos, obtenerAdelantosPendientes } = usePagos();
   const { archivarModelo } = useModelos();
+  const [mostrarArchivarDialog, setMostrarArchivarDialog] = useState(false);
+  const [motivoArchivado, setMotivoArchivado] = useState('');
 
   // Filtrar datos de esta modelo
   const serviciosModelo = serviciosFinalizados.filter(s => s.modeloId === modelo.id);
@@ -42,18 +55,16 @@ export function DetalleModeloPanel({ modelo, onClose, onEdit }: DetalleModeloPan
     .reduce((acc, a) => acc + a.monto, 0);
 
   // Handler para archivar modelo
-  const handleArchivar = async () => {
-    const confirmar = window.confirm(
-      `¿Estás seguro de archivar a ${modelo.nombreArtistico || modelo.nombre}?\n\nLa modelo dejará de aparecer en los listados activos, pero podrás recuperarla desde "Modelos Archivadas".`
-    );
-    
-    if (!confirmar) return;
-    
-    const motivo = prompt('Motivo del archivado (opcional):');
-    
+  const handleArchivar = () => {
+    setMostrarArchivarDialog(true);
+    setMotivoArchivado('');
+  };
+
+  const confirmarArchivar = async () => {
     try {
-      await archivarModelo(modelo.id, motivo || undefined);
+      await archivarModelo(modelo.id, motivoArchivado || undefined);
       toast.success(`${modelo.nombreArtistico || modelo.nombre} ha sido archivada`);
+      setMostrarArchivarDialog(false);
       onClose();
     } catch (error) {
       if (process.env.NODE_ENV === 'development') console.error('Error archivando modelo:', error);
@@ -96,6 +107,7 @@ export function DetalleModeloPanel({ modelo, onClose, onEdit }: DetalleModeloPan
                   src={modelo.fotoPerfil} 
                   alt={modelo.nombre}
                   className="w-full h-full object-cover"
+                  loading="lazy"
                 />
               </div>
               <div className="space-y-2 sm:space-y-3 flex-1 min-w-0">
@@ -113,7 +125,7 @@ export function DetalleModeloPanel({ modelo, onClose, onEdit }: DetalleModeloPan
                   </Badge>
                   <Badge variant="outline" className="text-xs">{modelo.edad} años</Badge>
                   {servicioActivo && (
-                    <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30 animate-pulse text-xs">
+                    <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30 text-xs">
                       En Servicio
                     </Badge>
                   )}
@@ -261,7 +273,7 @@ export function DetalleModeloPanel({ modelo, onClose, onEdit }: DetalleModeloPan
                   {serviciosModelo.map((servicio) => {
                     const total = servicio.costoServicio + servicio.costoAdicionales + servicio.costoConsumo;
                     return (
-                      <Card key={servicio.id} className="border-border/50 hover:border-primary/30 transition-all">
+                      <Card key={servicio.id} className="border-border/50 hover:border-primary/30 transition-colors">
                         <CardContent className="p-4">
                           <div className="flex items-start justify-between">
                             <div className="space-y-2 flex-1">
@@ -347,7 +359,7 @@ export function DetalleModeloPanel({ modelo, onClose, onEdit }: DetalleModeloPan
                             </div>
                             <div className="h-2 bg-secondary rounded-full overflow-hidden">
                               <div 
-                                className="h-full bg-primary rounded-full transition-all"
+                                className="h-full bg-primary rounded-full"
                                 style={{ width: `${porcentaje}%` }}
                               />
                             </div>
@@ -523,7 +535,7 @@ export function DetalleModeloPanel({ modelo, onClose, onEdit }: DetalleModeloPan
                       <img 
                         src={modelo.documentoFrente} 
                         alt="Documento Frente"
-                        className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform"
+                        className="w-full h-full object-cover cursor-default"
                         onClick={() => window.open(modelo.documentoFrente, '_blank')}
                       />
                     </div>
@@ -539,7 +551,7 @@ export function DetalleModeloPanel({ modelo, onClose, onEdit }: DetalleModeloPan
                       <img 
                         src={modelo.documentoReverso} 
                         alt="Documento Reverso"
-                        className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform"
+                        className="w-full h-full object-cover cursor-default"
                         onClick={() => window.open(modelo.documentoReverso, '_blank')}
                       />
                     </div>
@@ -592,6 +604,34 @@ export function DetalleModeloPanel({ modelo, onClose, onEdit }: DetalleModeloPan
           </Tabs>
         </div>
       </div>
+
+      {/* Alerta de Archivar */}
+      <AlertDialog open={mostrarArchivarDialog} onOpenChange={setMostrarArchivarDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Archivar modelo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Estás seguro de archivar a {modelo.nombreArtistico || modelo.nombre}? La modelo dejará de aparecer en los listados activos, pero podrás recuperarla desde "Modelos Archivadas".
+              <div className="mt-4">
+                <Label htmlFor="motivo">Motivo del archivado (opcional)</Label>
+                <Input 
+                  id="motivo" 
+                  value={motivoArchivado} 
+                  onChange={(e) => setMotivoArchivado(e.target.value)} 
+                  placeholder="Ej: Inactividad temporal"
+                  className="mt-2"
+                />
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction className="bg-orange-500 hover:bg-orange-600 text-white" onClick={confirmarArchivar}>
+              Archivar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

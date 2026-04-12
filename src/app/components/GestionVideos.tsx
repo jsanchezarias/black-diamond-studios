@@ -22,6 +22,16 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../../components/ui/alert-dialog";
 
 export function GestionVideos() {
   const { videos, videosActivos, cargando, agregarVideo, actualizarVideo, eliminarVideo, subirArchivoVideo, reordenarVideos } = useVideos();
@@ -29,6 +39,7 @@ export function GestionVideos() {
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [videoEditando, setVideoEditando] = useState<string | null>(null);
   const [videoVisualizando, setVideoVisualizando] = useState<string | null>(null);
+  const [videoEliminar, setVideoEliminar] = useState<{id: string, titulo: string} | null>(null);
   
   // Estados del formulario
   const [titulo, setTitulo] = useState('');
@@ -125,16 +136,16 @@ export function GestionVideos() {
   // ============================================
   // 🗑️ ELIMINAR VIDEO
   // ============================================
-  const handleEliminarVideo = async (videoId: string) => {
+  const handleEliminarVideo = (videoId: string) => {
     const video = videos.find(v => v.id === videoId);
     if (!video) return;
+    setVideoEliminar({ id: video.id, titulo: video.titulo });
+  };
 
-    const confirmar = window.confirm(
-      `¿Estás seguro de eliminar el video "${video.titulo}"?\n\nEsta acción no se puede deshacer.`
-    );
-
-    if (confirmar) {
-      await eliminarVideo(videoId);
+  const confirmarEliminar = async () => {
+    if (videoEliminar) {
+      await eliminarVideo(videoEliminar.id);
+      setVideoEliminar(null);
     }
   };
 
@@ -463,6 +474,24 @@ export function GestionVideos() {
           </div>
         )}
       </div>
+
+      {/* Alerta de Eliminación */}
+      <AlertDialog open={!!videoEliminar} onOpenChange={(open) => !open && setVideoEliminar(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar video?</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Estás seguro de eliminar el video "{videoEliminar?.titulo}"? Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction className="bg-red-500 hover:bg-red-600 text-white" onClick={confirmarEliminar}>
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

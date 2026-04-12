@@ -6,17 +6,33 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { useModelos } from '../app/components/ModelosContext';
 import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "./ui/alert-dialog";
 
 export function ModelosArchivadasPanel() {
   const { modelosArchivadas, restaurarModelo } = useModelos();
   const [searchTerm, setSearchTerm] = useState('');
+  const [modeloRestaurar, setModeloRestaurar] = useState<{id: number, nombre: string} | null>(null);
 
   const handleRestaurar = (id: number, nombre: string) => {
-    if (confirm(`¿Estás seguro de restaurar a ${nombre}?\n\nLa modelo volverá a estar activa y podrá iniciar sesión nuevamente.`)) {
-      restaurarModelo(id);
+    setModeloRestaurar({ id, nombre });
+  };
+
+  const confirmarRestaurar = () => {
+    if (modeloRestaurar) {
+      restaurarModelo(modeloRestaurar.id);
       toast.success(`✅ Modelo restaurada exitosamente!`, {
-        description: `${nombre} ha sido restaurada y puede volver a trabajar.`
+        description: `${modeloRestaurar.nombre} ha sido restaurada y puede volver a trabajar.`
       });
+      setModeloRestaurar(null);
     }
   };
 
@@ -179,6 +195,24 @@ export function ModelosArchivadasPanel() {
           </div>
         )}
       </CardContent>
+
+      {/* Alerta de Restauración */}
+      <AlertDialog open={!!modeloRestaurar} onOpenChange={(open) => !open && setModeloRestaurar(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Restaurar modelo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Estás seguro de restaurar a {modeloRestaurar?.nombre}? La modelo volverá a estar activa y podrá iniciar sesión nuevamente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction className="bg-green-500 hover:bg-green-600 text-white" onClick={confirmarRestaurar}>
+              Sí, restaurar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

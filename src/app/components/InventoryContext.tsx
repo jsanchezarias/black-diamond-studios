@@ -52,7 +52,8 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
         .from('productos')
         .select('*')
         .order('categoria', { ascending: true })
-        .order('nombre', { ascending: true });
+        .order('nombre', { ascending: true })
+        .limit(100);
 
       if (error) {
         if (process.env.NODE_ENV === 'development') console.error('❌ Error cargando productos:', error);

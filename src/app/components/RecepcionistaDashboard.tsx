@@ -13,8 +13,10 @@ import { SolicitudesEntradaPanel } from '../../components/SolicitudesEntradaPane
 import { HabitacionesPanel } from '../../components/HabitacionesPanel';
 import { HistorialClientesPanel } from '../../components/HistorialClientesPanel';
 import { NotificacionesPanel } from './NotificacionesPanel';
-import { useAgendamientos, Agendamiento } from './AgendamientosContext';
+import { useAgendamientos, Agendamiento, formatearFecha, formatearHora } from './AgendamientosContext';
 import { supabase } from '../../utils/supabase/info';
+import { AgendamientosPanel } from './AgendamientosPanel';
+import { AgendamientosMetrics } from './AgendamientosMetrics';
 
 interface RecepcionistaDashboardProps {
   userId: string;
@@ -95,8 +97,8 @@ function AgendaDiaPanel() {
                     key={ag.id}
                     className="flex items-center gap-3 p-3 rounded-lg border border-white/5 bg-white/[0.02] hover:bg-white/[0.04] transition-colors"
                   >
-                    <div className="flex-shrink-0 w-14 text-center">
-                      <span className="text-base font-bold" style={{ color: COLOR_PRIMARY }}>{ag.hora}</span>
+                    <div className="flex-shrink-0 w-20 text-center">
+                      <span className="text-base font-bold" style={{ color: COLOR_PRIMARY }}>{formatearHora(ag.hora)}</span>
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-white truncate">{ag.clienteNombre}</p>
@@ -265,6 +267,10 @@ export function RecepcionistaDashboard({ userId, userEmail, onLogout }: Recepcio
               <Calendar className="w-4 h-4 mr-2" />
               Agenda del día
             </TabsTrigger>
+            <TabsTrigger value="agendamientos" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Calendar className="w-4 h-4 mr-2" />
+              Agendamientos
+            </TabsTrigger>
             <TabsTrigger value="asistencia" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <UserCheck className="w-4 h-4 mr-2" />
               Asistencia
@@ -289,6 +295,13 @@ export function RecepcionistaDashboard({ userId, userEmail, onLogout }: Recepcio
 
           <TabsContent value="agenda" className="mt-0">
             <AgendaDiaPanel />
+          </TabsContent>
+
+          <TabsContent value="agendamientos" className="mt-0">
+            <div className="space-y-4">
+              <AgendamientosMetrics rol="recepcionista" />
+              <AgendamientosPanel rol="recepcionista" userEmail={userEmail} />
+            </div>
           </TabsContent>
 
           <TabsContent value="asistencia" className="mt-0">
