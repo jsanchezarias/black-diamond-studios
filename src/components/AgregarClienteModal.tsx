@@ -5,7 +5,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { User, Phone, Mail, MapPin, Calendar, Star, Save, X, Lock, Eye, EyeOff } from 'lucide-react';
-import { useClientes } from '../src/app/components/ClientesContext';
+import { useClientes } from '../app/components/ClientesContext';
 import { toast } from 'sonner';
 
 interface AgregarClienteModalProps {
@@ -126,7 +126,7 @@ export function AgregarClienteModal({ isOpen, onClose }: AgregarClienteModalProp
       
       onClose();
     } catch (error: any) {
-      console.error('Error al gestionar cliente:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Error al gestionar cliente:', error);
       
       // Mensajes de error más claros para el usuario
       let errorMessage = 'Error al agregar cliente';

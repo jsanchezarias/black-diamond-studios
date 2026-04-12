@@ -4,7 +4,7 @@ import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Label } from './ui/label';
 import { toast } from 'sonner';
-import { useGastos } from '../src/app/components/GastosContext';
+import { useGastos } from '../app/components/GastosContext';
 
 interface AgregarServicioPublicoModalProps {
   isOpen: boolean;

@@ -22,87 +22,68 @@ import {
   Receipt,
   User
 } from 'lucide-react';
-import { useModelos } from '../src/app/components/ModelosContext';
-import { useServicios } from '../src/app/components/ServiciosContext';
-import { useCarrito } from '../src/app/components/CarritoContext';
-import { useMultas } from '../src/app/components/MultasContext';
-import { usePagos, LiquidacionDetalle } from '../src/app/components/PagosContext';
+import { useModelos } from '../app/components/ModelosContext';
+import { useServicios } from '../app/components/ServiciosContext';
+import { useCarrito } from '../app/components/CarritoContext';
+import { useMultas } from '../app/components/MultasContext';
+import { usePagos, LiquidacionDetalle } from '../app/components/PagosContext';
 
 interface LiquidacionPanelProps {
   userEmail: string;
 }
 
 export function LiquidacionPanel({ userEmail }: LiquidacionPanelProps) {
-  const { modelos } = useModelos();
-  const { serviciosActivos, serviciosFinalizados } = useServicios();
+  const { modelos, loading: modelosLoading } = useModelos();
+  const { servicios, loading: serviciosLoading } = useServicios();
   const { compras } = useCarrito();
   const { multas } = useMultas();
-  const { registrarPago, obtenerPagosModelo, obtenerTotalAdelantosAprobados } = usePagos();
+  const { registrarPago, obtenerPagosModelo, obtenerTotalAdelantosAprobados, loading: pagosLoading } = usePagos();
+  const isLoading = modelosLoading || serviciosLoading || pagosLoading;
 
   const [modeloSeleccionado, setModeloSeleccionado] = useState<string>('');
   const [mostrarModalPago, setMostrarModalPago] = useState(false);
   const [metodoPago, setMetodoPago] = useState('Efectivo');
   const [notas, setNotas] = useState('');
 
-  // Calcular liquidación de una modelo
+  // Calcular liquidación de una modelo usando el modelo actual de datos
   const calcularLiquidacion = (modeloEmail: string): LiquidacionDetalle => {
     const modelo = modelos.find((m) => m.email === modeloEmail);
     const pagosAnteriores = obtenerPagosModelo(modeloEmail);
     const ultimoPago = pagosAnteriores.length > 0 ? pagosAnteriores[0].fecha : null;
 
-    // Combinar servicios activos y finalizados
-    const todosLosServicios = [...serviciosActivos, ...serviciosFinalizados];
-
-    // Filtrar servicios desde el último pago
-    const serviciosModelo = todosLosServicios.filter(
-      (s) => 
-        s.modeloEmail === modeloEmail && 
-        s.estado === 'finalizado' &&
-        (!ultimoPago || s.horaFin! > ultimoPago)
+    // Filtrar servicios completados de esta modelo desde el último pago
+    const serviciosModelo = servicios.filter(
+      (s) =>
+        s.modeloEmail === modeloEmail &&
+        s.estado === 'completado' &&
+        (!ultimoPago || new Date(s.fechaCreacion) > ultimoPago)
     );
 
-    // Calcular servicios (50% del valor base)
-    const valorServicios = serviciosModelo.reduce((total, s) => {
-      const costoTiemposAdicionales = s.tiemposAdicionales?.reduce((sum, t) => sum + t.costo, 0) || 0;
-      return total + s.costoServicio + costoTiemposAdicionales;
-    }, 0);
-    const liquidacionServicios = valorServicios * 0.5;
-
-    // Calcular adicionales (100% del valor)
-    const valorAdicionales = serviciosModelo.reduce(
-      (total, s) => total + s.costoAdicionales,
+    // Calcular servicios (50% del valor pagado/pactado)
+    const valorServicios = serviciosModelo.reduce(
+      (total, s) => total + (s.montoPagado ?? s.montoPactado ?? 0),
       0
     );
-    const liquidacionAdicionales = valorAdicionales;
+    const liquidacionServicios = valorServicios * 0.5;
+
+    // Sin campo costoAdicionales en el modelo actual — se omite
+    const valorAdicionales = 0;
+    const liquidacionAdicionales = 0;
 
     // Obtener compras de la modelo
     const comprasModelo = compras.filter(
-      (c) => c.modeloEmail === modeloEmail && (!ultimoPago || c.fecha > ultimoPago)
+      (c) => c.modeloEmail === modeloEmail && (!ultimoPago || new Date(c.fecha as string) > ultimoPago)
     );
 
-    // Separar compras durante servicio y fuera de servicio
-    const comprasDuranteServicio = comprasModelo.filter((c) => c.duranteServicio);
-    const comprasFueraServicio = comprasModelo.filter((c) => !c.duranteServicio);
+    // Todas las compras de boutique se restan (no hay campo duranteServicio en modelo actual)
+    const valorComprasBoutique = comprasModelo.reduce((total, c) => total + c.total, 0);
 
-    // Consumo durante servicio (20% del valor)
-    const valorConsumoDuranteServicio = comprasDuranteServicio.reduce(
-      (total, c) => total + c.total,
-      0
-    );
-    const liquidacionConsumo = valorConsumoDuranteServicio * 0.2;
-
-    // Compras fuera de servicio (se restan)
-    const valorComprasFueraServicio = comprasFueraServicio.reduce(
-      (total, c) => total + c.total,
-      0
-    );
-
-    // Multas (se restan)
+    // Multas pendientes (se restan)
     const multasModelo = multas.filter(
-      (m) => 
-        m.modeloEmail === modeloEmail && 
-        m.estado === 'activa' &&
-        (!ultimoPago || m.fecha > ultimoPago)
+      (m) =>
+        m.modeloEmail === modeloEmail &&
+        m.estado === 'pendiente' &&
+        (!ultimoPago || new Date(m.fecha) > ultimoPago)
     );
     const valorMultas = multasModelo.reduce((total, m) => total + m.monto, 0);
 
@@ -110,8 +91,8 @@ export function LiquidacionPanel({ userEmail }: LiquidacionPanelProps) {
     const valorAdelantos = obtenerTotalAdelantosAprobados(modeloEmail);
 
     // Calcular totales
-    const subtotal = liquidacionServicios + liquidacionAdicionales + liquidacionConsumo;
-    const deducciones = valorComprasFueraServicio + valorMultas + valorAdelantos;
+    const subtotal = liquidacionServicios + liquidacionAdicionales;
+    const deducciones = valorComprasBoutique + valorMultas + valorAdelantos;
     const totalAPagar = Math.max(0, subtotal - deducciones);
 
     return {
@@ -124,20 +105,20 @@ export function LiquidacionPanel({ userEmail }: LiquidacionPanelProps) {
         liquidacion: liquidacionServicios,
       },
       adicionales: {
-        cantidad: serviciosModelo.filter(s => s.costoAdicionales > 0).length,
+        cantidad: 0,
         valorTotal: valorAdicionales,
         porcentaje: 100,
         liquidacion: liquidacionAdicionales,
       },
       consumoDuranteServicio: {
-        cantidad: comprasDuranteServicio.length,
-        valorTotal: valorConsumoDuranteServicio,
+        cantidad: 0,
+        valorTotal: 0,
         porcentaje: 20,
-        liquidacion: liquidacionConsumo,
+        liquidacion: 0,
       },
       comprasFueraServicio: {
-        cantidad: comprasFueraServicio.length,
-        valorTotal: valorComprasFueraServicio,
+        cantidad: comprasModelo.length,
+        valorTotal: valorComprasBoutique,
       },
       multas: {
         cantidad: multasModelo.length,
@@ -157,7 +138,7 @@ export function LiquidacionPanel({ userEmail }: LiquidacionPanelProps) {
   // Calcular liquidaciones de todas las modelos
   const liquidaciones = useMemo(() => {
     return modelos.map((modelo) => calcularLiquidacion(modelo.email));
-  }, [modelos, serviciosActivos, serviciosFinalizados, compras, multas]);
+  }, [modelos, servicios, compras, multas]);
 
   const liquidacionActual = modeloSeleccionado
     ? calcularLiquidacion(modeloSeleccionado)
@@ -185,8 +166,38 @@ export function LiquidacionPanel({ userEmail }: LiquidacionPanelProps) {
   const statsGenerales = {
     totalAPagar: liquidaciones.reduce((sum, l) => sum + l.totalAPagar, 0),
     totalModelos: liquidaciones.filter((l) => l.totalAPagar > 0).length,
-    mayorLiquidacion: Math.max(...liquidaciones.map((l) => l.totalAPagar)),
+    mayorLiquidacion: liquidaciones.length ? Math.max(...liquidaciones.map((l) => l.totalAPagar)) : 0,
   };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[1, 2, 3].map(i => (
+            <Card key={i} className="border-primary/30">
+              <CardHeader className="pb-3">
+                <div className="h-4 w-32 bg-secondary/50 rounded animate-pulse mb-2"></div>
+                <div className="h-8 w-24 bg-secondary/50 rounded animate-pulse"></div>
+              </CardHeader>
+            </Card>
+          ))}
+        </div>
+        <Card>
+          <CardHeader>
+            <div className="h-6 w-48 bg-secondary/50 rounded animate-pulse mb-2"></div>
+            <div className="h-4 w-64 bg-secondary/50 rounded animate-pulse"></div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-32 rounded-lg bg-secondary/50 animate-pulse border border-border/50"></div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

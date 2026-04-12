@@ -12,7 +12,7 @@ import {
   Calendar,
   DollarSign
 } from 'lucide-react';
-import { supabase } from '../../src/utils/supabase/info'; // ✅ Corregido: ruta correcta
+import { supabase } from '../../utils/supabase/info'; // ✅ Corregido: ruta correcta
 import { createClient } from '@supabase/supabase-js';
 import { toast } from 'sonner';
 
@@ -42,7 +42,6 @@ export function GeneradorDatosDemo() {
 
   const addLog = (tipo: 'success' | 'error' | 'info', mensaje: string) => {
     setLogs(prev => [...prev, { tipo, mensaje, timestamp: new Date() }]);
-    console.log(`[${tipo.toUpperCase()}] ${mensaje}`);
   };
 
   // Función para generar cliente aleatorio

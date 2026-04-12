@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { X, CreditCard, Banknote, Smartphone, Upload, CheckCircle, AlertCircle } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { useCarrito } from '../src/app/components/CarritoContext';
-import { useInventory } from '../src/app/components/InventoryContext';
+import { useCarrito } from '../app/components/CarritoContext';
+import { useInventory } from '../app/components/InventoryContext';
 import { toast } from 'sonner';
-import { uploadComprobante } from '../src/utils/supabase/uploadComprobante';
+import { uploadComprobante } from '../utils/supabase/uploadComprobante';
 
 interface CheckoutBoutiqueModalProps {
   isOpen: boolean;
@@ -96,7 +96,7 @@ export function CheckoutBoutiqueModal({
       setUrlComprobante(url);
       toast.success('Comprobante subido correctamente');
     } catch (error) {
-      console.error('Error al subir comprobante:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Error al subir comprobante:', error);
       toast.error('Error al subir el comprobante');
       setComprobante(null);
     } finally {
@@ -132,7 +132,7 @@ export function CheckoutBoutiqueModal({
       toast.success('¡Compra realizada con éxito!');
       onClose();
     } catch (error) {
-      console.error('Error al finalizar compra:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Error al finalizar compra:', error);
       toast.error('Error al procesar la compra');
     } finally {
       setProcesando(false);

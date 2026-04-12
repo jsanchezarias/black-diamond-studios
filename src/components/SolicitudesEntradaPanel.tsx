@@ -6,7 +6,7 @@ import { Badge } from './ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
-import { useAsistencia, SolicitudEntrada } from '../src/app/components/AsistenciaContext';
+import { useAsistencia, SolicitudEntrada } from '../app/components/AsistenciaContext';
 import { toast } from 'sonner';
 
 interface SolicitudesEntradaPanelProps {

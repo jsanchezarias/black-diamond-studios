@@ -9,10 +9,10 @@ import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Textarea } from './ui/textarea';
 import { Separator } from './ui/separator';
-import { useServicios, Servicio } from '../src/app/components/ServiciosContext';
-import { useInventory } from '../src/app/components/InventoryContext';
+import { useServicios, Servicio } from '../app/components/ServiciosContext';
+import { useInventory } from '../app/components/InventoryContext';
 import { toast } from 'sonner';
-import { uploadComprobante } from '../src/utils/supabase/uploadComprobante';
+import { uploadComprobante } from '../utils/supabase/uploadComprobante';
 
 interface ServicioActivoCardProps {
   servicio: Servicio;
@@ -227,7 +227,7 @@ export function ServicioActivoCard({ servicio, onFinalizar }: ServicioActivoCard
       setProductosAgregados([]);
       setMostrarBoutique(false);
     } catch (error) {
-      console.error('Error confirmando venta de boutique:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Error confirmando venta de boutique:', error);
       toast.error('Error al actualizar el stock de productos');
     }
   };

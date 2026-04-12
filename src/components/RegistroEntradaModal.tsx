@@ -1,6 +1,10 @@
+import { useState, useEffect, useRef } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
+import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { useAsistencia } from '../src/app/components/AsistenciaContext';
-import { supabase } from '../src/utils/supabase/info'; // ✅ Corregido: ruta correcta
+import { AlertCircle, Camera, CheckCircle, Info, Loader2, RefreshCw, Upload, X } from 'lucide-react';
+import { useAsistencia } from '../app/components/AsistenciaContext';
+import { supabase } from '../utils/supabase/info'; // ✅ Corregido: ruta correcta
 import { Alert, AlertDescription } from './ui/alert';
 
 interface RegistroEntradaModalProps {
@@ -73,7 +77,7 @@ export function RegistroEntradaModal({ isOpen, onClose, modeloEmail, modeloNombr
       setTipoError(null);
     } catch (err: any) {
       // Log informativo en lugar de error (es normal que algunos usuarios no den permiso)
-      console.info('Acceso a cámara no disponible:', err.name);
+      if (process.env.NODE_ENV === 'development') console.info('Acceso a cámara no disponible:', err.name);
       
       // Manejar diferentes tipos de errores
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
@@ -211,7 +215,7 @@ export function RegistroEntradaModal({ isOpen, onClose, modeloEmail, modeloNombr
       }, 3000);
 
     } catch (err) {
-      console.error('Error al enviar solicitud:', err);
+      if (process.env.NODE_ENV === 'development') console.error('Error al enviar solicitud:', err);
       setError('Hubo un error al enviar la solicitud. Por favor, intenta de nuevo.');
       setPaso('error');
     }

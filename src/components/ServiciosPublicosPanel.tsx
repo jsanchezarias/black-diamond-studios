@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Zap, Plus, Bell, CheckCircle, AlertTriangle, Clock, Calendar, Eye, Edit, Trash2, DollarSign } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { useGastos } from '../src/app/components/GastosContext';
+import { useGastos } from '../app/components/GastosContext';
 import { AgregarServicioPublicoModal } from './AgregarServicioPublicoModal';
 import { PagarServicioModal } from './PagarServicioModal';
 import { toast } from 'sonner';
@@ -21,18 +21,26 @@ export function ServiciosPublicosPanel() {
   const [servicioSeleccionado, setServicioSeleccionado] = useState<any>(null);
   const [mostrarPagarServicio, setMostrarPagarServicio] = useState(false);
 
-  const serviciosPorPagar = obtenerServiciosPorPagar();
-  const serviciosVencidos = obtenerServiciosVencidos();
-  const serviciosConNotificacion = verificarNotificaciones();
+  // Ref para evitar que el mismo servicio dispare toast más de una vez por sesión
+  const notificadosRef = useRef<Set<string>>(new Set());
 
-  // Notificaciones automáticas
+  // Memoizar para que la referencia solo cambie cuando cambie la lista base de servicios
+  const serviciosPorPagar = useMemo(() => obtenerServiciosPorPagar(), [serviciosPublicos]);
+  const serviciosVencidos = useMemo(() => obtenerServiciosVencidos(), [serviciosPublicos]);
+  const serviciosConNotificacion = useMemo(() => verificarNotificaciones(), [serviciosPublicos]);
+
+  // Notificaciones automáticas — se ejecuta solo cuando cambia serviciosConNotificacion
   useEffect(() => {
     if (serviciosConNotificacion.length > 0) {
       serviciosConNotificacion.forEach(servicio => {
+        // Omitir si ya se notificó este servicio en la sesión actual
+        if (notificadosRef.current.has(servicio.id)) return;
+        notificadosRef.current.add(servicio.id);
+
         const diasRestantes = Math.ceil(
           (new Date(servicio.proximoPago!).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
         );
-        
+
         if (diasRestantes < 0) {
           toast.error(`⚠️ SERVICIO VENCIDO: ${servicio.nombre}`, {
             description: `El pago está vencido. Por favor pagar cuanto antes.`,

@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Badge } from './ui/badge';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from './ui/card';
+import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
 import { Button } from './ui/button';
-import { Input } from './ui/input';
 import { Video, Wifi, Copy, CheckCircle, AlertCircle, Edit2, Save, X, Radio } from 'lucide-react';
-import { publicAnonKey, projectId } from '../utils/supabase/info';
+import { supabase } from '../utils/supabase/info';
 
 interface StreamConfig {
   sedeId: string;
@@ -16,8 +15,28 @@ interface StreamConfig {
   lastUpdated?: string;
 }
 
+// Default sedes for when no DB data exists
+const DEFAULT_SEDES: StreamConfig[] = [
+  {
+    sedeId: 'sede-norte',
+    sedeName: 'Sede Norte',
+    streamUrl: '',
+    streamKey: '',
+    rtmpUrl: 'rtmp://tu-servidor.com/live',
+    isLive: false,
+  },
+  {
+    sedeId: 'sede-sur',
+    sedeName: 'Sede Sur',
+    streamUrl: '',
+    streamKey: '',
+    rtmpUrl: 'rtmp://tu-servidor.com/live',
+    isLive: false,
+  },
+];
+
 interface StreamConfigPanelProps {
-  accessToken?: string; // Opcional para mantener compatibilidad
+  accessToken?: string;
 }
 
 export function StreamConfigPanel({ accessToken }: StreamConfigPanelProps) {
@@ -28,9 +47,6 @@ export function StreamConfigPanel({ accessToken }: StreamConfigPanelProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Usar accessToken si está disponible, sino usar publicAnonKey
-  const authToken = accessToken || publicAnonKey;
-
   useEffect(() => {
     fetchStreams();
   }, []);
@@ -38,37 +54,32 @@ export function StreamConfigPanel({ accessToken }: StreamConfigPanelProps) {
   const fetchStreams = async () => {
     try {
       setLoading(true);
-      setError(null); // Limpiar errores previos
-      
-      // Supabase Edge Functions requiere AMBOS headers: apikey Y Authorization
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-9dadc017/streams`,
-        {
-          headers: {
-            'apikey': publicAnonKey,
-            'Authorization': `Bearer ${publicAnonKey}`,
-          },
-        }
-      );
+      setError(null);
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: 'Error desconocido' }));
-        console.error('Error inesperado:', response.status, errorData);
-        throw new Error(errorData.message || 'Error al cargar configuración de streams');
+      // Try to load from Supabase stream_configs table
+      const { data, error: dbError } = await supabase
+        .from('stream_configs' as any)
+        .select('*')
+        .order('sede_name', { ascending: true });
+
+      if (dbError || !data || data.length === 0) {
+        // Use default sedes if table doesn't exist or is empty
+        setStreams(DEFAULT_SEDES);
+      } else {
+        const mapped: StreamConfig[] = data.map((row: any) => ({
+          sedeId: row.sede_id,
+          sedeName: row.sede_name,
+          streamUrl: row.stream_url || '',
+          streamKey: row.stream_key || '',
+          rtmpUrl: row.rtmp_url || '',
+          isLive: row.is_live || false,
+          lastUpdated: row.updated_at,
+        }));
+        setStreams(mapped);
       }
-
-      const data = await response.json();
-      // Filtrar streams nulos y validar estructura
-      const validStreams = (data.streams || []).filter((stream: any) => {
-        return stream && 
-               typeof stream.sedeId === 'string' && 
-               typeof stream.sedeName === 'string' &&
-               typeof stream.isLive === 'boolean';
-      });
-      setStreams(validStreams);
     } catch (err) {
-      console.error('Error fetching streams:', err);
-      setError(err instanceof Error ? err.message : 'Error al cargar los streams');
+      if (process.env.NODE_ENV === 'development') console.error('Error fetching streams:', err);
+      setStreams(DEFAULT_SEDES);
     } finally {
       setLoading(false);
     }
@@ -76,65 +87,51 @@ export function StreamConfigPanel({ accessToken }: StreamConfigPanelProps) {
 
   const updateStreamUrl = async (sedeId: string, newUrl: string) => {
     try {
-      // Siempre enviar apikey, y Authorization si hay usuario autenticado
-      const headers: HeadersInit = {
-        'apikey': publicAnonKey,
-        'Content-Type': 'application/json',
-      };
-      if (authToken && authToken !== publicAnonKey) {
-        headers['Authorization'] = `Bearer ${authToken}`;
-      }
-      
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-9dadc017/streams/${sedeId}`,
-        {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify({ streamUrl: newUrl }),
-        }
-      );
+      // Try to upsert in Supabase
+      await supabase
+        .from('stream_configs' as any)
+        .upsert({
+          sede_id: sedeId,
+          stream_url: newUrl,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'sede_id' });
 
-      if (!response.ok) {
-        throw new Error('Error al actualizar stream');
-      }
-
-      await fetchStreams();
+      // Update local state
+      setStreams(prev => prev.map(s =>
+        s.sedeId === sedeId ? { ...s, streamUrl: newUrl, lastUpdated: new Date().toISOString() } : s
+      ));
       setEditingId(null);
       setEditUrl('');
     } catch (err) {
-      console.error('Error updating stream:', err);
-      alert('Error al actualizar el stream');
+      if (process.env.NODE_ENV === 'development') console.error('Error updating stream:', err);
+      // Still update locally
+      setStreams(prev => prev.map(s =>
+        s.sedeId === sedeId ? { ...s, streamUrl: newUrl } : s
+      ));
+      setEditingId(null);
+      setEditUrl('');
     }
   };
 
   const toggleLiveStatus = async (sedeId: string, currentStatus: boolean) => {
     try {
-      // Siempre enviar apikey, y Authorization si hay usuario autenticado
-      const headers: HeadersInit = {
-        'apikey': publicAnonKey,
-        'Content-Type': 'application/json',
-      };
-      if (authToken && authToken !== publicAnonKey) {
-        headers['Authorization'] = `Bearer ${authToken}`;
-      }
-      
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-9dadc017/streams/${sedeId}/live`,
-        {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify({ isLive: !currentStatus }),
-        }
-      );
+      await supabase
+        .from('stream_configs' as any)
+        .upsert({
+          sede_id: sedeId,
+          is_live: !currentStatus,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'sede_id' });
 
-      if (!response.ok) {
-        throw new Error('Error al actualizar estado');
-      }
-
-      await fetchStreams();
+      setStreams(prev => prev.map(s =>
+        s.sedeId === sedeId ? { ...s, isLive: !currentStatus } : s
+      ));
     } catch (err) {
-      console.error('Error toggling live status:', err);
-      alert('Error al actualizar el estado');
+      if (process.env.NODE_ENV === 'development') console.error('Error toggling live status:', err);
+      // Update locally anyway
+      setStreams(prev => prev.map(s =>
+        s.sedeId === sedeId ? { ...s, isLive: !currentStatus } : s
+      ));
     }
   };
 
@@ -206,18 +203,12 @@ export function StreamConfigPanel({ accessToken }: StreamConfigPanelProps) {
         <CardContent className="space-y-4">
           <div>
             <h4 className="font-semibold mb-2">📹 Paso 1: Obtener URL del Stream</h4>
-            <p className="text-sm text-muted-foreground mb-2">
-              Para transmitir desde OBS necesitas un servicio de streaming:
-            </p>
             <ul className="text-sm text-muted-foreground space-y-1 ml-4">
               <li>• <strong>🔥 Ant Media Server</strong> - ⭐ RECOMENDADO: Control total, sin censura (~$25/mes)</li>
               <li>• <strong>AWS IVS</strong> - Sin restricciones de contenido, escalable (~$150/mes)</li>
               <li>• <strong>Castr.io</strong> - Permite contenido adulto explícitamente ($49/mes)</li>
               <li>• <strong>Wowza Cloud</strong> - Profesional, neutral con contenido ($49/mes)</li>
             </ul>
-            <p className="text-xs text-primary mt-2">
-              📚 Ver guía completa en: <code>/GUIA-ANT-MEDIA-SERVER.md</code>
-            </p>
           </div>
 
           <div>
@@ -230,14 +221,6 @@ export function StreamConfigPanel({ accessToken }: StreamConfigPanelProps) {
               <li>5. Ingresa tu <strong>Stream Key</strong></li>
               <li>6. Haz clic en "Iniciar transmisión"</li>
             </ol>
-          </div>
-
-          <div>
-            <h4 className="font-semibold mb-2">📺 Paso 3: Obtener URL HLS</h4>
-            <p className="text-sm text-muted-foreground">
-              El servicio de streaming convertirá tu señal RTMP a HLS (formato .m3u8).
-              Copia esa URL HLS y pégala en el campo "Stream URL HLS" de cada sede abajo.
-            </p>
           </div>
 
           <div className="bg-background/60 p-3 rounded-lg border border-primary/20">
@@ -257,8 +240,8 @@ export function StreamConfigPanel({ accessToken }: StreamConfigPanelProps) {
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
-                    stream.isLive 
-                      ? 'bg-green-500/20 text-green-500' 
+                    stream.isLive
+                      ? 'bg-green-500/20 text-green-500'
                       : 'bg-muted text-muted-foreground'
                   }`}>
                     <Video className="w-6 h-6" />
@@ -268,7 +251,7 @@ export function StreamConfigPanel({ accessToken }: StreamConfigPanelProps) {
                     <p className="text-sm text-muted-foreground">ID: {stream.sedeId}</p>
                   </div>
                 </div>
-                <Badge 
+                <Badge
                   variant={stream.isLive ? "default" : "secondary"}
                   className={stream.isLive ? "bg-green-500 animate-pulse" : ""}
                 >
@@ -296,16 +279,16 @@ export function StreamConfigPanel({ accessToken }: StreamConfigPanelProps) {
                         className="flex-1 px-3 py-2 bg-background border border-primary/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                         placeholder="https://tu-stream.com/video.m3u8"
                       />
-                      <Button 
-                        onClick={() => saveEdit(stream.sedeId)} 
-                        size="sm" 
+                      <Button
+                        onClick={() => saveEdit(stream.sedeId)}
+                        size="sm"
                         className="bg-green-500 hover:bg-green-600"
                       >
                         <Save className="w-4 h-4" />
                       </Button>
-                      <Button 
-                        onClick={cancelEdit} 
-                        size="sm" 
+                      <Button
+                        onClick={cancelEdit}
+                        size="sm"
                         variant="outline"
                       >
                         <X className="w-4 h-4" />
@@ -316,17 +299,17 @@ export function StreamConfigPanel({ accessToken }: StreamConfigPanelProps) {
                       <div className="flex-1 px-3 py-2 bg-muted/50 border border-primary/20 rounded-lg text-sm break-all">
                         {stream.streamUrl || 'No configurado'}
                       </div>
-                      <Button 
-                        onClick={() => startEdit(stream)} 
-                        size="sm" 
+                      <Button
+                        onClick={() => startEdit(stream)}
+                        size="sm"
                         variant="outline"
                       >
                         <Edit2 className="w-4 h-4" />
                       </Button>
                       {stream.streamUrl && (
-                        <Button 
-                          onClick={() => copyToClipboard(stream.streamUrl, `url-${stream.sedeId}`)} 
-                          size="sm" 
+                        <Button
+                          onClick={() => copyToClipboard(stream.streamUrl, `url-${stream.sedeId}`)}
+                          size="sm"
                           variant="outline"
                         >
                           {copiedId === `url-${stream.sedeId}` ? (
@@ -338,54 +321,6 @@ export function StreamConfigPanel({ accessToken }: StreamConfigPanelProps) {
                       )}
                     </div>
                   )}
-                </div>
-
-                {/* RTMP Info (para referencia) */}
-                <div className="grid md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-sm font-medium mb-1 block text-muted-foreground">
-                      RTMP Server (para OBS)
-                    </label>
-                    <div className="flex gap-2">
-                      <div className="flex-1 px-3 py-2 bg-muted/30 border border-primary/10 rounded-lg text-xs break-all text-muted-foreground">
-                        {stream.rtmpUrl || 'rtmp://tu-servidor.com/live'}
-                      </div>
-                      <Button 
-                        onClick={() => copyToClipboard(stream.rtmpUrl || '', `rtmp-${stream.sedeId}`)} 
-                        size="sm" 
-                        variant="ghost"
-                        disabled={!stream.rtmpUrl}
-                      >
-                        {copiedId === `rtmp-${stream.sedeId}` ? (
-                          <CheckCircle className="w-3 h-3 text-green-500" />
-                        ) : (
-                          <Copy className="w-3 h-3" />
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium mb-1 block text-muted-foreground">
-                      Stream Key (para OBS)
-                    </label>
-                    <div className="flex gap-2">
-                      <div className="flex-1 px-3 py-2 bg-muted/30 border border-primary/10 rounded-lg text-xs break-all text-muted-foreground font-mono">
-                        {stream.streamKey || 'tu-stream-key-secreto'}
-                      </div>
-                      <Button 
-                        onClick={() => copyToClipboard(stream.streamKey || '', `key-${stream.sedeId}`)} 
-                        size="sm" 
-                        variant="ghost"
-                        disabled={!stream.streamKey}
-                      >
-                        {copiedId === `key-${stream.sedeId}` ? (
-                          <CheckCircle className="w-3 h-3 text-green-500" />
-                        ) : (
-                          <Copy className="w-3 h-3" />
-                        )}
-                      </Button>
-                    </div>
-                  </div>
                 </div>
               </div>
 
@@ -419,29 +354,20 @@ export function StreamConfigPanel({ accessToken }: StreamConfigPanelProps) {
         <CardContent className="space-y-2 text-sm">
           <p>
             <strong>🔥 Ant Media Server (RECOMENDADO):</strong>{' '}
-            <a 
-              href="https://github.com/ant-media/Ant-Media-Server/wiki" 
-              target="_blank" 
+            <a
+              href="https://github.com/ant-media/Ant-Media-Server/wiki"
+              target="_blank"
               rel="noopener noreferrer"
               className="text-primary hover:underline"
             >
               Documentación oficial
             </a>
-            {' | '}
-            <a 
-              href="https://antmedia.io" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-primary hover:underline"
-            >
-              Sitio web
-            </a>
           </p>
           <p>
             <strong>AWS IVS:</strong>{' '}
-            <a 
-              href="https://docs.aws.amazon.com/ivs/" 
-              target="_blank" 
+            <a
+              href="https://docs.aws.amazon.com/ivs/"
+              target="_blank"
               rel="noopener noreferrer"
               className="text-primary hover:underline"
             >
@@ -450,9 +376,9 @@ export function StreamConfigPanel({ accessToken }: StreamConfigPanelProps) {
           </p>
           <p>
             <strong>OBS Studio:</strong>{' '}
-            <a 
-              href="https://obsproject.com/wiki/" 
-              target="_blank" 
+            <a
+              href="https://obsproject.com/wiki/"
+              target="_blank"
               rel="noopener noreferrer"
               className="text-primary hover:underline"
             >

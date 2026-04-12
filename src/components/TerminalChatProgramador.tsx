@@ -4,8 +4,8 @@ import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Send, Users, MessageSquare, Gem, Phone, Clock, Archive, Search, User, Image as ImageIcon, Loader2, ChevronLeft, Circle, X, BellRing } from 'lucide-react';
-import { supabase } from '../src/utils/supabase/info'; // ✅ Corregido: ruta correcta
-import { useClientes } from '../src/app/components/ClientesContext';
+import { supabase } from '../utils/supabase/info'; // ✅ Corregido: ruta correcta
+import { useClientes } from '../app/components/ClientesContext';
 import { ScrollArea } from './ui/scroll-area';
 
 // 🔔 Notificación tipo WhatsApp
@@ -131,7 +131,7 @@ export function TerminalChatProgramador({ userId, userEmail }: TerminalChatProgr
         }
       }
     } catch (err) {
-      console.error('Error inicializando programador:', err);
+      if (process.env.NODE_ENV === 'development') console.error('Error inicializando programador:', err);
     } finally {
       setLoading(false);
     }
@@ -155,7 +155,7 @@ export function TerminalChatProgramador({ userId, userEmail }: TerminalChatProgr
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('❌ Error cargando conversaciones:', error);
+        if (process.env.NODE_ENV === 'development') console.error('❌ Error cargando conversaciones:', error);
         return;
       }
 
@@ -218,7 +218,7 @@ export function TerminalChatProgramador({ userId, userEmail }: TerminalChatProgr
 
       setConversaciones(conversacionesArray);
     } catch (err) {
-      console.error('❌ Error completo cargando conversaciones:', err);
+      if (process.env.NODE_ENV === 'development') console.error('❌ Error completo cargando conversaciones:', err);
     }
   };
 
@@ -241,7 +241,7 @@ export function TerminalChatProgramador({ userId, userEmail }: TerminalChatProgr
         .order('created_at', { ascending: true });
 
       if (error) {
-        console.error('❌ Error cargando mensajes:', error);
+        if (process.env.NODE_ENV === 'development') console.error('❌ Error cargando mensajes:', error);
         return;
       }
 
@@ -272,7 +272,7 @@ export function TerminalChatProgramador({ userId, userEmail }: TerminalChatProgr
         }
       }
     } catch (err) {
-      console.error('❌ Error completo:', err);
+      if (process.env.NODE_ENV === 'development') console.error('❌ Error completo:', err);
     }
   };
 
@@ -396,7 +396,7 @@ export function TerminalChatProgramador({ userId, userEmail }: TerminalChatProgr
         .upload(filePath, file);
 
       if (uploadError) {
-        console.error('Error subiendo imagen:', uploadError);
+        if (process.env.NODE_ENV === 'development') console.error('Error subiendo imagen:', uploadError);
         alert('Error al subir la imagen');
         return;
       }
@@ -417,7 +417,7 @@ export function TerminalChatProgramador({ userId, userEmail }: TerminalChatProgr
         });
 
       if (messageError) {
-        console.error('Error enviando mensaje con imagen:', messageError);
+        if (process.env.NODE_ENV === 'development') console.error('Error enviando mensaje con imagen:', messageError);
         alert('Error al enviar la imagen');
         return;
       }
@@ -425,7 +425,7 @@ export function TerminalChatProgramador({ userId, userEmail }: TerminalChatProgr
       await loadMensajesConversacion(conversacionActiva);
       await loadConversaciones();
     } catch (err) {
-      console.error('Error completo:', err);
+      if (process.env.NODE_ENV === 'development') console.error('Error completo:', err);
       alert('Error al procesar la imagen');
     } finally {
       setUploadingImage(false);
@@ -452,7 +452,7 @@ export function TerminalChatProgramador({ userId, userEmail }: TerminalChatProgr
         });
 
       if (error) {
-        console.error('❌ Error enviando mensaje:', error);
+        if (process.env.NODE_ENV === 'development') console.error('❌ Error enviando mensaje:', error);
         alert('Error al enviar mensaje');
         return;
       }
@@ -461,7 +461,7 @@ export function TerminalChatProgramador({ userId, userEmail }: TerminalChatProgr
       await loadMensajesConversacion(conversacionActiva);
       await loadConversaciones();
     } catch (err) {
-      console.error('❌ Error completo:', err);
+      if (process.env.NODE_ENV === 'development') console.error('❌ Error completo:', err);
       alert('Error al enviar mensaje');
     }
   };

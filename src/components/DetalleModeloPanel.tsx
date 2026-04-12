@@ -5,10 +5,10 @@ import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Label } from './ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Modelo, useModelos } from '../src/app/components/ModelosContext';
-import { useServicios } from '../src/app/components/ServiciosContext';
-import { useMultas } from '../src/app/components/MultasContext';
-import { usePagos } from '../src/app/components/PagosContext';
+import { Modelo, useModelos } from '../app/components/ModelosContext';
+import { useServicios } from '../app/components/ServiciosContext';
+import { useMultas } from '../app/components/MultasContext';
+import { usePagos } from '../app/components/PagosContext';
 import { toast } from 'sonner';
 
 interface DetalleModeloPanelProps {
@@ -56,7 +56,7 @@ export function DetalleModeloPanel({ modelo, onClose, onEdit }: DetalleModeloPan
       toast.success(`${modelo.nombreArtistico || modelo.nombre} ha sido archivada`);
       onClose();
     } catch (error) {
-      console.error('Error archivando modelo:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Error archivando modelo:', error);
       toast.error('Error al archivar la modelo');
     }
   };

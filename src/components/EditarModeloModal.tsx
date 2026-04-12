@@ -6,7 +6,7 @@ import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Switch } from './ui/switch';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
-import { useModelos, Modelo } from '../src/app/components/ModelosContext';
+import { useModelos, Modelo } from '../app/components/ModelosContext';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Badge } from './ui/badge';
@@ -264,56 +264,23 @@ export function EditarModeloModal({ open, onClose, modelo }: EditarModeloModalPr
   // Función para subir una imagen a Supabase Storage
   const subirImagenASupabase = async (archivo: File, tipo: string): Promise<string | null> => {
     try {
-      const { projectId, publicAnonKey } = await import('../utils/supabase/info');
-      const serverUrl = `https://${projectId}.supabase.co/functions/v1/make-server-9dadc017`;
-
-      // Asegurar que el bucket existe
-      const bucketResponse = await fetch(`${serverUrl}/upload/ensure-bucket`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${publicAnonKey}`
-        }
-      });
-
-      if (!bucketResponse.ok) {
-        throw new Error('Error preparando almacenamiento');
-      }
-
-      // Convertir archivo a base64
-      const reader = new FileReader();
-      const base64Data = await new Promise<string>((resolve) => {
-        reader.onload = () => {
-          const base64 = (reader.result as string).split(',')[1];
-          resolve(base64);
-        };
-        reader.readAsDataURL(archivo);
-      });
-
+      const { supabase } = await import('../utils/supabase/info');
       const fileName = `${formData.email.split('@')[0]}/${tipo}-${Date.now()}.${archivo.name.split('.').pop()}`;
 
-      // Subir foto
-      const uploadResponse = await fetch(`${serverUrl}/upload/foto`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${publicAnonKey}`
-        },
-        body: JSON.stringify({
-          fileName,
-          fileData: base64Data,
-          contentType: archivo.type
-        })
-      });
+      const { error: uploadError } = await supabase.storage
+        .from('modelos-fotos')
+        .upload(fileName, archivo, { upsert: true });
 
-      if (!uploadResponse.ok) {
-        throw new Error(`Error subiendo ${tipo}`);
-      }
+      if (uploadError) throw new Error(uploadError.message);
 
-      const { url } = await uploadResponse.json();
+      const { data: urlData } = supabase.storage
+        .from('modelos-fotos')
+        .getPublicUrl(fileName);
+
+      const url = urlData?.publicUrl || null;
       return url;
     } catch (error) {
-      console.error(`Error subiendo ${tipo}:`, error);
+      if (process.env.NODE_ENV === 'development') console.error(`Error subiendo ${tipo}:`, error);
       return null;
     }
   };
@@ -383,11 +350,9 @@ export function EditarModeloModal({ open, onClose, modelo }: EditarModeloModalPr
 
       // Subir foto de perfil si hay un archivo nuevo
       if (archivoFotoPerfil) {
-        console.log('📸 Subiendo nueva foto de perfil...');
         const urlFotoPerfil = await subirImagenASupabase(archivoFotoPerfil, 'perfil');
         if (urlFotoPerfil) {
           updateData.fotoPerfil = urlFotoPerfil;
-          console.log('✅ Foto de perfil actualizada');
         } else {
           toast.warning('No se pudo actualizar la foto de perfil');
         }
@@ -404,14 +369,11 @@ export function EditarModeloModal({ open, onClose, modelo }: EditarModeloModalPr
       const fotosAdicionalesUrls = [...formData.fotosAdicionales];
       
       if (archivosFotosAdicionales.length > 0) {
-        console.log(`📸 Subiendo ${archivosFotosAdicionales.length} fotos adicionales...`);
-        
         for (let i = 0; i < archivosFotosAdicionales.length; i++) {
           const archivo = archivosFotosAdicionales[i];
           const url = await subirImagenASupabase(archivo, `adicional-${i + 1}`);
           if (url) {
             fotosAdicionalesUrls.push(url);
-            console.log(`✅ Foto adicional ${i + 1} subida`);
           }
         }
       }
@@ -436,7 +398,7 @@ export function EditarModeloModal({ open, onClose, modelo }: EditarModeloModalPr
       
       handleClose();
     } catch (error) {
-      console.error('Error actualizando modelo:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Error actualizando modelo:', error);
       toast.error(`❌ Error al actualizar modelo`, {
         description: 'Hubo un problema al guardar los cambios. Por favor intenta de nuevo.'
       });

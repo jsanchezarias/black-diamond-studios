@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { useAgendamientos, Agendamiento } from '../src/app/components/AgendamientosContext';
-import { useClientes } from '../src/app/components/ClientesContext';
-import { Logo } from '../src/app/components/Logo';
+import { useAgendamientos, Agendamiento } from '../app/components/AgendamientosContext';
+import { useClientes } from '../app/components/ClientesContext';
+import { Logo } from '../app/components/Logo';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Button } from './ui/button';
 import { Label } from './ui/label';
@@ -110,7 +110,7 @@ export function CancelarAgendamientoModal({
         handleClose();
       }, 2000);
     } catch (error) {
-      console.error('Error al procesar agendamiento:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Error al procesar agendamiento:', error);
       setError('Error al procesar la solicitud. Intenta nuevamente.');
       setLoading(false);
     }

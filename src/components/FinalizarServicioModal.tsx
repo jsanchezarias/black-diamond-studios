@@ -3,10 +3,10 @@ import { X, StopCircle, Clock, DollarSign, Image as ImageIcon, CheckCircle2, Mes
 import { Button } from './ui/button';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
-import { useServicios, Servicio } from '../src/app/components/ServiciosContext';
-import { useTurnos } from '../src/app/components/TurnosContext';
-import { useAgendamientos } from '../src/app/components/AgendamientosContext';
-import { useClientes } from '../src/app/components/ClientesContext';
+import { useServicios, Servicio } from '../app/components/ServiciosContext';
+import { useTurnos } from '../app/components/TurnosContext';
+import { useAgendamientos } from '../app/components/AgendamientosContext';
+import { useClientes } from '../app/components/ClientesContext';
 
 interface FinalizarServicioModalProps {
   isOpen: boolean;

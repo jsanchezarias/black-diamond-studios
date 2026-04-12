@@ -20,9 +20,9 @@ import {
   Eye,
   Package
 } from 'lucide-react';
-import { Agendamiento } from '../src/app/components/AgendamientosContext';
-import { useClientes } from '../src/app/components/ClientesContext';
-import { useServicios } from '../src/app/components/ServiciosContext';
+import { Agendamiento } from '../app/components/AgendamientosContext';
+import { useClientes } from '../app/components/ClientesContext';
+import { useServicios } from '../app/components/ServiciosContext';
 
 interface DetalleAgendamientoModalProps {
   isOpen: boolean;
@@ -71,7 +71,7 @@ export function DetalleAgendamientoModal({
         setHistorialServicios(serviciosCliente);
       }
     } catch (error) {
-      console.error('Error cargando detalle del cliente:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Error cargando detalle del cliente:', error);
     } finally {
       setLoading(false);
     }

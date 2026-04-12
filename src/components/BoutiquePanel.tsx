@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
-import { useInventory } from '../src/app/components/InventoryContext';
+import { useInventory } from '../app/components/InventoryContext';
 import { GestionBoutiqueModal } from './GestionBoutiqueModal';
 import { toast } from 'sonner';
 

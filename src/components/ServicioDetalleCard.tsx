@@ -16,7 +16,7 @@ import { Card, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
 import { Button } from './ui/button';
-import { Servicio } from '../src/app/components/ServiciosContext';
+import { Servicio } from '../app/components/ServiciosContext';
 
 interface ServicioDetalleCardProps {
   servicio: Servicio;

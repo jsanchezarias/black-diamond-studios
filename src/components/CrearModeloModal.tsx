@@ -1,7 +1,13 @@
+import { useState, useEffect } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from './ui/dialog';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { Textarea } from './ui/textarea';
 import { Switch } from './ui/switch';
 import { UserPlus, Loader2, Upload, X, Image as ImageIcon } from 'lucide-react';
-import { supabase } from '../src/utils/supabase/info'; // ✅ Corregido: ruta correcta
-import { useModelos } from '../src/app/components/ModelosContext';
+import { supabase } from '../utils/supabase/info'; // ✅ Corregido: ruta correcta
+import { useModelos } from '../app/components/ModelosContext';
 import { toast } from 'sonner';
 import { CredencialesModal } from './CredencialesModal';
 
@@ -239,7 +245,6 @@ export function CrearModeloModal({ open, onClose }: CrearModeloModalProps) {
       // ✅ NUEVO FLUJO: Crear usuario directamente con Supabase (sin servidor)
       
       // Paso 0: Verificar que el email no esté registrado
-      console.log(`🔍 Verificando si ${email} ya existe...`);
       const { data: existingUser, error: checkError } = await supabase
         .from('usuarios')
         .select('email, role')
@@ -258,33 +263,23 @@ export function CrearModeloModal({ open, onClose }: CrearModeloModalProps) {
       let documentoFrenteUrl: string | null = null;
       let documentoReversoUrl: string | null = null;
 
-      console.log('📸 Fotos a procesar:');
-      console.log('  - ¿Tiene foto de perfil?:', !!archivoFoto);
-      console.log('  - Cantidad fotos adicionales:', archivosFotosAdicionales.length);
-      console.log('  - ¿Tiene documento frente?:', !!archivoDocumentoFrente);
-      console.log('  - ¿Tiene documento reverso?:', !!archivoDocumentoReverso);
-
       // Crear bucket si no existe
       const bucketName = 'make-9dadc017-modelos-fotos';
       const { data: buckets } = await supabase.storage.listBuckets();
       const bucketExists = buckets?.some(bucket => bucket.name === bucketName);
       
       if (!bucketExists) {
-        console.log('🪣 Creando bucket de fotos...');
         const { error: bucketError } = await supabase.storage.createBucket(bucketName, {
           public: false,
           fileSizeLimit: 5242880 // 5MB
         });
         if (bucketError) {
-          console.error('❌ Error creando bucket:', bucketError);
-        } else {
-          console.log('✅ Bucket creado exitosamente');
+          if (process.env.NODE_ENV === 'development') console.error('❌ Error creando bucket:', bucketError);
         }
       }
 
       // Subir foto de perfil
       if (archivoFoto) {
-        console.log('📸 Subiendo foto de perfil...');
         try {
           const fileName = `${email.split('@')[0]}/perfil-${Date.now()}.${archivoFoto.name.split('.').pop()}`;
           const { data: uploadData, error: uploadError } = await supabase.storage
@@ -302,16 +297,14 @@ export function CrearModeloModal({ open, onClose }: CrearModeloModalProps) {
             .createSignedUrl(fileName, 365 * 24 * 60 * 60); // 1 año
 
           fotoPerfilUrl = urlData?.signedUrl || null;
-          console.log('✅ Foto de perfil subida:', fotoPerfilUrl);
         } catch (error) {
-          console.error('❌ Error subiendo foto de perfil:', error);
+          if (process.env.NODE_ENV === 'development') console.error('❌ Error subiendo foto de perfil:', error);
           toast.warning('No se pudo subir la foto de perfil, se creará sin imagen');
         }
       }
 
       // Subir fotos adicionales
       if (archivosFotosAdicionales.length > 0) {
-        console.log(`📸 Subiendo ${archivosFotosAdicionales.length} fotos adicionales...`);
         for (let i = 0; i < archivosFotosAdicionales.length; i++) {
           const archivo = archivosFotosAdicionales[i];
           try {
@@ -331,17 +324,15 @@ export function CrearModeloModal({ open, onClose }: CrearModeloModalProps) {
 
             if (urlData?.signedUrl) {
               fotosAdicionalesUrls.push(urlData.signedUrl);
-              console.log(`✅ Foto adicional ${i + 1} subida`);
             }
           } catch (error) {
-            console.error(`❌ Error subiendo foto adicional ${i + 1}:`, error);
+            if (process.env.NODE_ENV === 'development') console.error(`❌ Error subiendo foto adicional ${i + 1}:`, error);
           }
         }
       }
 
       // Subir documento de identidad (frente)
       if (archivoDocumentoFrente) {
-        console.log('📸 Subiendo documento de identidad (frente)...');
         try {
           const fileName = `${email.split('@')[0]}/doc-frente-${Date.now()}.${archivoDocumentoFrente.name.split('.').pop()}`;
           const { data: uploadData, error: uploadError } = await supabase.storage
@@ -358,16 +349,14 @@ export function CrearModeloModal({ open, onClose }: CrearModeloModalProps) {
             .createSignedUrl(fileName, 365 * 24 * 60 * 60);
 
           documentoFrenteUrl = urlData?.signedUrl || null;
-          console.log('✅ Documento frente subido:', documentoFrenteUrl);
         } catch (error) {
-          console.error('❌ Error subiendo documento frente:', error);
+          if (process.env.NODE_ENV === 'development') console.error('❌ Error subiendo documento frente:', error);
           toast.warning('No se pudo subir el documento de identidad (frente)');
         }
       }
 
       // Subir documento de identidad (reverso)
       if (archivoDocumentoReverso) {
-        console.log('📸 Subiendo documento de identidad (reverso)...');
         try {
           const fileName = `${email.split('@')[0]}/doc-reverso-${Date.now()}.${archivoDocumentoReverso.name.split('.').pop()}`;
           const { data: uploadData, error: uploadError } = await supabase.storage
@@ -384,16 +373,13 @@ export function CrearModeloModal({ open, onClose }: CrearModeloModalProps) {
             .createSignedUrl(fileName, 365 * 24 * 60 * 60);
 
           documentoReversoUrl = urlData?.signedUrl || null;
-          console.log('✅ Documento reverso subido:', documentoReversoUrl);
         } catch (error) {
-          console.error('❌ Error subiendo documento reverso:', error);
+          if (process.env.NODE_ENV === 'development') console.error('❌ Error subiendo documento reverso:', error);
           toast.warning('No se pudo subir el documento de identidad (reverso)');
         }
       }
 
       // Paso 2: Crear usuario en Auth con signUp
-      console.log(`🔐 Creando usuario en Supabase Auth: ${email}`);
-      
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: email,
         password: password,
@@ -407,26 +393,22 @@ export function CrearModeloModal({ open, onClose }: CrearModeloModalProps) {
       });
 
       if (authError) {
-        console.error('❌ Error creando usuario en Auth:', authError);
+        if (process.env.NODE_ENV === 'development') console.error('❌ Error creando usuario en Auth:', authError);
         toast.error(`Error al crear usuario: ${authError.message}`);
         setLoading(false);
         return;
       }
 
       if (!authData.user) {
-        console.error('❌ No se obtuvo el usuario de Auth');
+        if (process.env.NODE_ENV === 'development') console.error('❌ No se obtuvo el usuario de Auth');
         toast.error('Error al crear usuario en el sistema');
         setLoading(false);
         return;
       }
 
       const userId = authData.user.id;
-      console.log('✅ Usuario creado en Auth con ID:', userId);
 
       // Paso 3: Insertar datos completos en tabla usuarios
-      // El trigger handle_new_user() ya insertó el registro básico,
-      // ahora lo actualizamos con TODOS los datos
-      console.log('💾 Guardando datos completos de la modelo...');
 
       const { error: updateError } = await supabase
         .from('usuarios')
@@ -453,18 +435,14 @@ export function CrearModeloModal({ open, onClose }: CrearModeloModalProps) {
         .eq('id', userId);
 
       if (updateError) {
-        console.error('❌ Error actualizando datos de modelo:', updateError);
+        if (process.env.NODE_ENV === 'development') console.error('❌ Error actualizando datos de modelo:', updateError);
         toast.error(`Error guardando datos: ${updateError.message}`);
         setLoading(false);
         return;
       }
 
-      console.log('✅ Modelo creada exitosamente');
-
       // Paso 4: Recargar lista de modelos
-      console.log('🔄 Recargando lista de modelos...');
       await recargarModelos();
-      console.log('✅ Lista de modelos recargada');
 
       // Mostrar credenciales
       toast.success(`✅ Modelo ${nombre} creada exitosamente`);
@@ -479,7 +457,7 @@ export function CrearModeloModal({ open, onClose }: CrearModeloModalProps) {
       resetForm();
       
     } catch (error: any) {
-      console.error('❌ Error inesperado:', error);
+      if (process.env.NODE_ENV === 'development') console.error('❌ Error inesperado:', error);
       toast.error(error.message || 'Error al crear la modelo');
     } finally {
       setLoading(false);

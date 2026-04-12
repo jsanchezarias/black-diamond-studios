@@ -4,7 +4,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { AlertTriangle, Trash2 } from 'lucide-react';
-import { Modelo } from '../src/app/components/ModelosContext';
+import { Modelo } from '../app/components/ModelosContext';
 
 interface EliminarModeloModalProps {
   open: boolean;

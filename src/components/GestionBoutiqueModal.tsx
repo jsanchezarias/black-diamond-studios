@@ -5,7 +5,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
-import { useInventory, Producto } from '../src/app/components/InventoryContext'; // ✅ Importar Producto desde el contexto
+import { useInventory, Producto } from '../app/components/InventoryContext'; // ✅ Importar Producto desde el contexto
 
 interface GestionBoutiqueModalProps {
   open: boolean;
@@ -121,7 +121,7 @@ export function GestionBoutiqueModal({ open, onClose, producto, modo }: GestionB
         });
         setImagePreview('');
       } catch (error) {
-        console.error('Error guardando producto:', error);
+        if (process.env.NODE_ENV === 'development') console.error('Error guardando producto:', error);
         toast.error('Error al guardar el producto en la base de datos');
       }
     };

@@ -4,7 +4,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
-import { useServicios } from '../src/app/components/ServiciosContext';
+import { useServicios } from '../app/components/ServiciosContext';
 
 interface AgregarAdicionalModalProps {
   isOpen: boolean;

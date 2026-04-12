@@ -946,7 +946,13 @@ app.post("/make-server-9dadc017/diagnostico/recrear-auth-desde-bd", async (c) =>
 
     const resultados = [];
     let recreados = 0;
-    const passwordTemporal = 'BlackDiamond2024!';
+    const passwordTemporal = Deno.env.get('DEFAULT_TEMP_PASSWORD') ?? (() => {
+      // Generar contraseña temporal aleatoria si no hay variable de entorno
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%&*';
+      return Array.from(crypto.getRandomValues(new Uint8Array(16)))
+        .map(b => chars[b % chars.length])
+        .join('');
+    })();
 
     for (const usuario of sinAuth) {
       try {
@@ -1043,7 +1049,25 @@ app.post("/make-server-9dadc017/diagnostico/recrear-auth-desde-bd", async (c) =>
 
 // ==================== MIGRACIÓN DE MODELOS ====================
 
-// Datos de las modelos reales
+/**
+ * Obtiene la contraseña inicial para una modelo durante la migración.
+ * Prioridad: variable de entorno MODEL_PASSWORD_<ID> → contraseña aleatoria segura.
+ * La contraseña generada se retorna en la respuesta de la migración para que el
+ * administrador pueda anotarla. NUNCA se almacena en el código fuente.
+ */
+function getModelPassword(modeloId: string): string {
+  const envKey = `MODEL_PASSWORD_${modeloId.replace(/-/g, '_').toUpperCase()}`;
+  const fromEnv = Deno.env.get(envKey);
+  if (fromEnv) return fromEnv;
+
+  // Generar contraseña segura aleatoria (misma lógica que passwordTemporal)
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%&*';
+  return Array.from(crypto.getRandomValues(new Uint8Array(16)))
+    .map(b => chars[b % chars.length])
+    .join('');
+}
+
+// Datos de las modelos reales — sin contraseñas en el código fuente
 const modelosReales = [
   {
     id: 'annie-001',
@@ -1073,7 +1097,6 @@ const modelosReales = [
     telefono: '+57 300 123 4567',
     cedula: '1000000001',
     direccion: 'Sede Norte',
-    password: 'Annie2024!',
     disponible: true
   },
   {
@@ -1097,7 +1120,6 @@ const modelosReales = [
     telefono: '+57 301 234 5678',
     cedula: '1000000002',
     direccion: 'Sede Norte',
-    password: 'Luci2024!',
     disponible: true
   },
   {
@@ -1135,7 +1157,6 @@ const modelosReales = [
     telefono: '+57 302 345 6789',
     cedula: '1000000003',
     direccion: 'Sede Norte',
-    password: 'Isabella2024!',
     disponible: true
   },
   {
@@ -1165,7 +1186,6 @@ const modelosReales = [
     telefono: '+57 303 456 7890',
     cedula: '1000000004',
     direccion: 'Sede Norte',
-    password: 'Natalia2024!',
     disponible: true
   },
   {
@@ -1195,7 +1215,6 @@ const modelosReales = [
     telefono: '+57 304 567 8901',
     cedula: '1000000005',
     direccion: 'Sede Norte',
-    password: 'Ximena2024!',
     disponible: false // ❌ NO DISPONIBLE
   },
   {
@@ -1222,7 +1241,6 @@ const modelosReales = [
     telefono: '+57 305 678 9012',
     cedula: '1000000006',
     direccion: 'Sede Norte',
-    password: 'Xiomara2024!',
     disponible: true
   },
   {
@@ -1250,7 +1268,6 @@ const modelosReales = [
     telefono: '+57 306 789 0123',
     cedula: '1000000007',
     direccion: 'Sede Norte',
-    password: 'Roxxy2024!',
     disponible: false // ❌ NO DISPONIBLE
   }
 ];
@@ -1385,7 +1402,7 @@ app.post("/make-server-9dadc017/migration/migrar-modelos", async (c) => {
           // Usuario no existe, lo creamos
           const { data: authData, error: authError } = await supabase.auth.admin.createUser({
             email: modelo.email,
-            password: modelo.password,
+            password: getModelPassword(modelo.id),
             email_confirm: true,
             user_metadata: {
               nombre: modelo.nombre,
@@ -1519,7 +1536,7 @@ app.post("/make-server-9dadc017/migration/migrar-todo", async (c) => {
           console.log(`✨ Creando nuevo usuario: ${modelo.nombre}`);
           const { data: authData, error: authError } = await supabase.auth.admin.createUser({
             email: modelo.email,
-            password: modelo.password,
+            password: getModelPassword(modelo.id),
             email_confirm: true,
             user_metadata: {
               nombre: modelo.nombre,
@@ -2276,6 +2293,81 @@ app.get("/make-server-9dadc017/payments/:reference", async (c) => {
   } catch (error) {
     console.error(`❌ Error al consultar pago: ${error}`);
     return c.json({ error: error.message }, 500);
+  }
+});
+
+// ==================== GESTIÓN DE USUARIOS (ADMIN/PROGRAMADOR) ====================
+
+// Crear usuario admin o programador con email confirmado (evita el problema de confirmación de email)
+app.post("/make-server-9dadc017/admin/crear-usuario", async (c) => {
+  try {
+    const body = await c.req.json();
+    const { email, password, nombre, role } = body;
+
+    if (!email || !password || !nombre || !role) {
+      return c.json({ error: 'Email, contraseña, nombre y rol son requeridos' }, 400);
+    }
+
+    if (!['admin', 'programador'].includes(role)) {
+      return c.json({ error: 'Rol inválido. Debe ser admin o programador' }, 400);
+    }
+
+    if (password.length < 6) {
+      return c.json({ error: 'La contraseña debe tener al menos 6 caracteres' }, 400);
+    }
+
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+
+    // Verificar si el email ya existe en la tabla usuarios
+    const { data: existingUser } = await supabase
+      .from('usuarios')
+      .select('email, role')
+      .eq('email', email)
+      .maybeSingle();
+
+    if (existingUser) {
+      return c.json({ error: `El email ${email} ya está registrado como ${existingUser.role}` }, 400);
+    }
+
+    // Crear usuario con Admin API → email_confirm: true (no requiere confirmación por email)
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { nombre, role }
+    });
+
+    if (authError || !authData.user) {
+      console.error('❌ Error creando usuario en Auth:', authError);
+      if (authError?.message.includes('already registered') || authError?.message.includes('already exists')) {
+        return c.json({ error: `El email ${email} ya está registrado en el sistema` }, 400);
+      }
+      return c.json({ error: `Error al crear usuario: ${authError?.message}` }, 500);
+    }
+
+    const userId = authData.user.id;
+
+    // Crear registro en tabla usuarios
+    const { error: dbError } = await supabase
+      .from('usuarios')
+      .upsert({ id: userId, email, nombre, role }, { onConflict: 'id' });
+
+    if (dbError) {
+      console.error('❌ Error creando registro en BD:', dbError);
+      await supabase.auth.admin.deleteUser(userId);
+      return c.json({ error: `Error al guardar en base de datos: ${dbError.message}` }, 500);
+    }
+
+    console.log(`✅ Usuario ${role} creado: ${email}`);
+    return c.json({ success: true, userId, email, nombre, role });
+
+  } catch (error) {
+    console.error('❌ Error inesperado creando usuario:', error);
+    return c.json({ error: error.message || 'Error inesperado' }, 500);
   }
 });
 

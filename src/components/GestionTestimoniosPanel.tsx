@@ -4,7 +4,7 @@ import { Card, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
-import { useTestimonios } from '../src/app/components/TestimoniosContext';
+import { useTestimonios } from '../app/components/TestimoniosContext';
 import { useState } from 'react';
 import { toast } from 'sonner';
 

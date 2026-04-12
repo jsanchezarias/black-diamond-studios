@@ -6,7 +6,7 @@ import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { useModelos } from '../src/app/components/ModelosContext';
+import { useModelos } from '../app/components/ModelosContext';
 
 interface NuevaMultaModalProps {
   open: boolean;

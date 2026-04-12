@@ -4,7 +4,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from './ui/
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { useModelos } from '../src/app/components/ModelosContext';
+import { useModelos } from '../app/components/ModelosContext';
 import { toast } from 'sonner';
 
 export function ModelosArchivadasPanel() {

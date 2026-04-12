@@ -7,8 +7,8 @@ import {
   Clock, ChevronUp, ChevronDown, ChevronLeft, ChevronRight,
   LogIn, LogOut, Users, Calendar, FileDown, User, TrendingUp
 } from 'lucide-react';
-import { useAsistencia } from '../src/app/components/AsistenciaContext';
-import { useModelos } from '../src/app/components/ModelosContext';
+import { useAsistencia } from '../app/components/AsistenciaContext';
+import { useModelos } from '../app/components/ModelosContext';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 

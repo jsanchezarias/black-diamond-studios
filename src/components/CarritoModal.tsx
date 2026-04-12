@@ -1,7 +1,7 @@
 import { ShoppingCart, X, Plus, Minus, Trash2, CreditCard } from 'lucide-react';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
-import { useCarrito } from '../src/app/components/CarritoContext';
+import { useCarrito } from '../app/components/CarritoContext';
 import { Badge } from './ui/badge';
 
 interface CarritoModalProps {

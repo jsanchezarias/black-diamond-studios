@@ -4,11 +4,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { toast } from 'sonner';
-import { UserPlus, Copy, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { UserPlus, Copy, CheckCircle, AlertCircle, Loader2, RefreshCw } from 'lucide-react';
 import { Badge } from './ui/badge';
-import { projectId, publicAnonKey } from '../utils/supabase/info';
+import { supabase } from '../utils/supabase/info';
 
-// Datos de las modelos reales extraídos de sedesData.ts
+// Datos de las modelos reales — sin contraseñas hardcodeadas
 const modelosReales = [
   {
     id: 'annie-001',
@@ -18,7 +18,6 @@ const modelosReales = [
     cedula: '',
     telefono: '',
     email: 'annie@blackdiamondapp.com',
-    passwordDefault: 'Annie2025*',
     fotoPerfil: 'https://lh3.googleusercontent.com/d/1qYdBfWfotlCxuJKD4TXTp3aHotIJ9Ep1',
     altura: '165 cm',
     medidas: '90-65-96',
@@ -33,7 +32,6 @@ const modelosReales = [
     cedula: '',
     telefono: '',
     email: 'luci@blackdiamondapp.com',
-    passwordDefault: 'Luci2025*',
     fotoPerfil: 'https://lh3.googleusercontent.com/d/1b1P4V-apOjcNgqE_MgqO_2Q2o6dTCy2B',
     altura: '150 cm',
     medidas: '85-58-87',
@@ -48,7 +46,6 @@ const modelosReales = [
     cedula: '',
     telefono: '',
     email: 'isabella@blackdiamondapp.com',
-    passwordDefault: 'Isabella2025*',
     fotoPerfil: 'https://lh3.googleusercontent.com/d/1yO0C4m5vR8pL2xK9dT3jE7fU6nW8qA2B',
     altura: '170 cm',
     medidas: '90-63-94',
@@ -63,7 +60,6 @@ const modelosReales = [
     cedula: '',
     telefono: '',
     email: 'natalia@blackdiamondapp.com',
-    passwordDefault: 'Natalia2025*',
     fotoPerfil: 'https://lh3.googleusercontent.com/d/1sP9uR7kL4xJ2nY5vE8tC6mW3dQ1oA7B',
     altura: '154 cm',
     medidas: '88-56-87',
@@ -78,7 +74,6 @@ const modelosReales = [
     cedula: '',
     telefono: '',
     email: 'ximena@blackdiamondapp.com',
-    passwordDefault: 'Ximena2025*',
     fotoPerfil: 'https://lh3.googleusercontent.com/d/1vS4yN1pO7zM5rX8wW2lV9gE6fU3qD1C',
     altura: '148 cm',
     medidas: '92-73-96',
@@ -86,6 +81,55 @@ const modelosReales = [
     sede: 'Sede Norte',
   },
 ];
+
+/**
+ * Genera una contraseña segura aleatoria.
+ * - Mínimo 14 caracteres
+ * - Al menos 1 mayúscula, 1 minúscula, 1 dígito, 1 símbolo
+ * - Diferente en cada llamada
+ */
+function generarPasswordSegura(): string {
+  const mayusculas = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const minusculas = 'abcdefghjkmnpqrstuvwxyz';
+  const digitos = '23456789';
+  const simbolos = '!@#$%&*+-?';
+
+  const todos = mayusculas + minusculas + digitos + simbolos;
+
+  const array = new Uint32Array(14);
+  crypto.getRandomValues(array);
+
+  // Garantizar al menos uno de cada tipo en posiciones fijas
+  const chars: string[] = [
+    mayusculas[array[0] % mayusculas.length],
+    mayusculas[array[1] % mayusculas.length],
+    minusculas[array[2] % minusculas.length],
+    minusculas[array[3] % minusculas.length],
+    digitos[array[4] % digitos.length],
+    digitos[array[5] % digitos.length],
+    simbolos[array[6] % simbolos.length],
+  ];
+
+  // Rellenar el resto hasta 14 caracteres con caracteres aleatorios del pool completo
+  for (let i = 7; i < 14; i++) {
+    chars.push(todos[array[i] % todos.length]);
+  }
+
+  // Mezclar con Fisher-Yates usando valores adicionales del CSPRNG
+  const shuffle = new Uint32Array(chars.length);
+  crypto.getRandomValues(shuffle);
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = shuffle[i] % (i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+
+  return chars.join('');
+}
+
+/** Genera un mapa inicial con contraseñas únicas para cada modelo */
+function inicializarPasswords(): Record<string, string> {
+  return Object.fromEntries(modelosReales.map(m => [m.id, generarPasswordSegura()]));
+}
 
 interface CrearModelosRealesPanelProps {
   onClose: () => void;
@@ -97,7 +141,10 @@ export function CrearModelosRealesPanel({ onClose, onModeloCreada }: CrearModelo
   const [modelosCreadas, setModelosCreadas] = useState<string[]>([]);
   const [errores, setErrores] = useState<string[]>([]);
 
-  // Estados para personalizar credenciales
+  // Contraseñas generadas de forma segura al montar el componente
+  const [passwordsGeneradas, setPasswordsGeneradas] = useState<Record<string, string>>(inicializarPasswords);
+
+  // Credenciales personalizadas opcionales ingresadas por el admin
   const [credencialesPersonalizadas, setCredencialesPersonalizadas] = useState<{
     [key: string]: { email: string; password: string; cedula: string; telefono: string }
   }>({});
@@ -107,9 +154,26 @@ export function CrearModelosRealesPanel({ onClose, onModeloCreada }: CrearModelo
       ...prev,
       [modeloId]: {
         ...prev[modeloId],
-        [field]: value
-      }
+        [field]: value,
+      },
     }));
+  };
+
+  const regenerarPassword = (modeloId: string) => {
+    const nueva = generarPasswordSegura();
+    setPasswordsGeneradas(prev => ({ ...prev, [modeloId]: nueva }));
+    // Limpiar contraseña personalizada para que se use la regenerada
+    setCredencialesPersonalizadas(prev => ({
+      ...prev,
+      [modeloId]: { ...prev[modeloId], password: '' },
+    }));
+    toast.success('Contraseña regenerada');
+  };
+
+  /** Devuelve la contraseña efectiva: personalizada si fue escrita, generada si no */
+  const getPasswordEfectiva = (modeloId: string): string => {
+    const custom = credencialesPersonalizadas[modeloId]?.password;
+    return custom && custom.trim() !== '' ? custom : passwordsGeneradas[modeloId];
   };
 
   const crearTodasLasModelos = async () => {
@@ -120,9 +184,9 @@ export function CrearModelosRealesPanel({ onClose, onModeloCreada }: CrearModelo
     for (const modelo of modelosReales) {
       try {
         await crearModelo(modelo);
-        await new Promise(resolve => setTimeout(resolve, 500)); // Delay entre creaciones
+        await new Promise(resolve => setTimeout(resolve, 500));
       } catch (error) {
-        console.error(`Error creando ${modelo.nombre}:`, error);
+        if (process.env.NODE_ENV === 'development') console.error('Error creando modelo:', error);
       }
     }
 
@@ -131,59 +195,51 @@ export function CrearModelosRealesPanel({ onClose, onModeloCreada }: CrearModelo
 
   const crearModelo = async (modelo: typeof modelosReales[0]) => {
     try {
-      // Obtener credenciales (personalizadas o por defecto)
       const credenciales = credencialesPersonalizadas[modelo.id];
       const email = credenciales?.email || modelo.email;
-      const password = credenciales?.password || modelo.passwordDefault;
+      const password = getPasswordEfectiva(modelo.id);
       const cedula = credenciales?.cedula || '';
       const telefono = credenciales?.telefono || '';
 
-      console.log(`🔄 Creando modelo: ${modelo.nombre} (${email})`);
-
-      // Llamada al endpoint de Supabase para crear usuario
-      const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-9dadc017/modelos/crear`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${publicAnonKey}`,
-        },
-        body: JSON.stringify({
-          email,
-          password,
-          nombre: modelo.nombre,
-          nombreArtistico: modelo.nombreArtistico,
-          edad: modelo.edad,
-          cedula,
-          telefono,
-          fotoPerfil: modelo.fotoPerfil,
-          altura: modelo.altura,
-          medidas: modelo.medidas,
-          descripcion: modelo.descripcion,
-          sede: modelo.sede,
-        }),
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { nombre: modelo.nombre, role: 'modelo' } },
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Error ${response.status}: ${errorText}`);
-      }
+      if (authError) throw new Error(authError.message);
 
-      const data = await response.json();
-      
+      const { error: dbError } = await supabase.from('usuarios').upsert({
+        id: authData.user?.id,
+        email,
+        nombre: modelo.nombre,
+        nombreArtistico: modelo.nombreArtistico,
+        edad: modelo.edad,
+        cedula,
+        telefono,
+        fotoPerfil: modelo.fotoPerfil,
+        altura: modelo.altura,
+        medidas: modelo.medidas,
+        descripcion: modelo.descripcion,
+        sede: modelo.sede,
+        role: 'modelo',
+        activo: true,
+        disponible: true,
+      }, { onConflict: 'email' });
+
+      if (dbError) throw new Error(dbError.message);
+
       setModelosCreadas(prev => [...prev, modelo.nombre]);
       toast.success(`✅ ${modelo.nombre} creada exitosamente`, {
-        description: `Email: ${email}`
+        description: `Email: ${email}`,
       });
 
-      if (onModeloCreada) {
-        onModeloCreada();
-      }
+      if (onModeloCreada) onModeloCreada();
 
     } catch (error: any) {
-      console.error(`❌ Error creando ${modelo.nombre}:`, error);
       setErrores(prev => [...prev, `${modelo.nombre}: ${error.message}`]);
       toast.error(`❌ Error creando ${modelo.nombre}`, {
-        description: error.message
+        description: error.message,
       });
     }
   };
@@ -192,27 +248,21 @@ export function CrearModelosRealesPanel({ onClose, onModeloCreada }: CrearModelo
     const modelo = modelosReales.find(m => m.id === modeloId);
     if (!modelo) return;
 
-    const credenciales = credencialesPersonalizadas[modeloId];
-    const email = credenciales?.email || modelo.email;
-    const password = credenciales?.password || modelo.passwordDefault;
+    const email = credencialesPersonalizadas[modeloId]?.email || modelo.email;
+    const password = getPasswordEfectiva(modeloId);
 
-    const texto = `${modelo.nombre}\nEmail: ${email}\nContraseña: ${password}`;
-    navigator.clipboard.writeText(texto);
-    
-    toast.success('📋 Credenciales copiadas', {
-      description: `${modelo.nombre}`
-    });
+    navigator.clipboard.writeText(`${modelo.nombre}\nEmail: ${email}\nContraseña: ${password}`);
+    toast.success('📋 Credenciales copiadas', { description: modelo.nombre });
   };
 
   const copiarTodasCredenciales = () => {
-    const textoCompleto = modelosReales.map(modelo => {
-      const credenciales = credencialesPersonalizadas[modelo.id];
-      const email = credenciales?.email || modelo.email;
-      const password = credenciales?.password || modelo.passwordDefault;
+    const texto = modelosReales.map(modelo => {
+      const email = credencialesPersonalizadas[modelo.id]?.email || modelo.email;
+      const password = getPasswordEfectiva(modelo.id);
       return `${modelo.nombre}\nEmail: ${email}\nContraseña: ${password}\n`;
     }).join('\n---\n\n');
 
-    navigator.clipboard.writeText(textoCompleto);
+    navigator.clipboard.writeText(texto);
     toast.success('📋 Todas las credenciales copiadas');
   };
 
@@ -235,7 +285,7 @@ export function CrearModelosRealesPanel({ onClose, onModeloCreada }: CrearModelo
 
         <CardContent className="space-y-6">
           {/* Botones de acción masiva */}
-          <div className="flex gap-3">
+          <div className="flex gap-3 flex-wrap">
             <Button
               onClick={crearTodasLasModelos}
               disabled={cargando}
@@ -253,10 +303,7 @@ export function CrearModelosRealesPanel({ onClose, onModeloCreada }: CrearModelo
                 </>
               )}
             </Button>
-            <Button
-              onClick={copiarTodasCredenciales}
-              variant="outline"
-            >
+            <Button onClick={copiarTodasCredenciales} variant="outline">
               <Copy className="w-4 h-4 mr-2" />
               Copiar Todas las Credenciales
             </Button>
@@ -286,6 +333,7 @@ export function CrearModelosRealesPanel({ onClose, onModeloCreada }: CrearModelo
               const credenciales = credencialesPersonalizadas[modelo.id];
               const isCreated = modelosCreadas.includes(modelo.nombre);
               const hasError = errores.some(e => e.startsWith(modelo.nombre));
+              const passwordEfectiva = getPasswordEfectiva(modelo.id);
 
               return (
                 <Card key={modelo.id} className={`border ${
@@ -331,16 +379,39 @@ export function CrearModelosRealesPanel({ onClose, onModeloCreada }: CrearModelo
                               className="h-8 text-sm"
                             />
                           </div>
+
                           <div>
-                            <Label className="text-xs">Contraseña</Label>
-                            <Input
-                              type="text"
-                              placeholder={modelo.passwordDefault}
-                              value={credenciales?.password || ''}
-                              onChange={(e) => handleInputChange(modelo.id, 'password', e.target.value)}
-                              className="h-8 text-sm"
-                            />
+                            <Label className="text-xs">
+                              Contraseña{' '}
+                              <span className="text-muted-foreground">(generada automáticamente)</span>
+                            </Label>
+                            <div className="flex gap-1">
+                              <Input
+                                type="text"
+                                placeholder={passwordEfectiva}
+                                value={credenciales?.password || ''}
+                                onChange={(e) => handleInputChange(modelo.id, 'password', e.target.value)}
+                                className="h-8 text-sm font-mono"
+                              />
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-8 px-2 shrink-0"
+                                onClick={() => regenerarPassword(modelo.id)}
+                                title="Regenerar contraseña"
+                              >
+                                <RefreshCw className="w-3 h-3" />
+                              </Button>
+                            </div>
+                            {/* Mostrar contraseña generada activa */}
+                            {(!credenciales?.password || credenciales.password.trim() === '') && (
+                              <p className="text-xs text-primary font-mono mt-1 break-all">
+                                Activa: {passwordEfectiva}
+                              </p>
+                            )}
                           </div>
+
                           <div>
                             <Label className="text-xs">Cédula (opcional)</Label>
                             <Input
@@ -380,7 +451,7 @@ export function CrearModelosRealesPanel({ onClose, onModeloCreada }: CrearModelo
                             onClick={() => copiarCredenciales(modelo.id)}
                           >
                             <Copy className="w-3 h-3 mr-1" />
-                            Copiar
+                            Copiar credenciales
                           </Button>
                         </div>
                       </div>
@@ -396,28 +467,22 @@ export function CrearModelosRealesPanel({ onClose, onModeloCreada }: CrearModelo
             <CardContent className="p-4">
               <h4 className="font-medium text-blue-400 mb-2">📋 Instrucciones:</h4>
               <ul className="text-sm text-blue-300/90 space-y-1">
-                <li>1. Puedes personalizar email, contraseña, cédula y teléfono para cada modelo</li>
-                <li>2. Si dejas los campos vacíos, se usarán los valores por defecto</li>
-                <li>3. Click en "Crear Todas" o crea una por una</li>
-                <li>4. Las fotos y datos se sincronizan automáticamente con la página web</li>
-                <li>5. Copia las credenciales para enviarlas a las modelos</li>
+                <li>1. Cada modelo recibe una contraseña segura única generada aleatoriamente</li>
+                <li>2. Usa el botón 🔄 para regenerar una contraseña si no te convence</li>
+                <li>3. Puedes escribir una contraseña propia en el campo — si lo dejas vacío se usa la generada</li>
+                <li>4. Copia las credenciales ANTES de crear — no se volverán a mostrar igual</li>
+                <li>5. Click en "Crear Todas" o crea una por una</li>
               </ul>
             </CardContent>
           </Card>
 
-          {/* Credenciales por defecto */}
+          {/* Advertencia de seguridad */}
           <Card className="bg-yellow-950/20 border-yellow-500/30">
-            <CardContent className="p-4">
-              <h4 className="font-medium text-yellow-400 mb-3">🔑 Credenciales por Defecto:</h4>
-              <div className="space-y-2 text-sm">
-                {modelosReales.map(modelo => (
-                  <div key={modelo.id} className="flex justify-between items-center py-1 border-b border-yellow-500/20 last:border-0">
-                    <span className="text-yellow-300">{modelo.nombre}</span>
-                    <code className="text-xs bg-yellow-500/20 px-2 py-1 rounded">
-                      {modelo.email} / {modelo.passwordDefault}
-                    </code>
-                  </div>
-                ))}
+            <CardContent className="p-4 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-yellow-400 shrink-0 mt-0.5" />
+              <div className="text-sm text-yellow-300/90 space-y-1">
+                <p className="font-medium">⚠️ Guarda las contraseñas ahora</p>
+                <p>Las contraseñas se generan solo durante esta sesión. Si cierras este panel sin copiarlas, deberás resetear las contraseñas desde el panel de administración de Supabase.</p>
               </div>
             </CardContent>
           </Card>

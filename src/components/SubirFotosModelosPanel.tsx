@@ -4,7 +4,7 @@
  */
 
 import { useState } from 'react';
-import { supabase } from '../src/utils/supabase/info'; // ✅ Corregido: ruta correcta
+import { supabase } from '../utils/supabase/info'; // ✅ Corregido: ruta correcta
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { toast } from 'sonner';
@@ -70,148 +70,54 @@ export function SubirFotosModelosPanel() {
 
   const subirFotos = async () => {
     setUploading(true);
-    console.log('📸 Iniciando subida de fotos a Supabase Storage...\n');
 
     try {
-      const { projectId, publicAnonKey } = await import('../utils/supabase/info');
-      const serverUrl = `https://${projectId}.supabase.co/functions/v1/make-server-9dadc017`;
+      const { supabase } = await import('../utils/supabase/info');
 
-      // 1. Crear bucket si no existe (usando el servidor con service role)
-      console.log('📦 Asegurando que el bucket existe...');
-      const bucketResponse = await fetch(`${serverUrl}/upload/ensure-bucket`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${publicAnonKey}`
-        }
-      });
+      const uploadFile = async (file: File, path: string): Promise<string | null> => {
+        const { error } = await supabase.storage.from('modelos-fotos').upload(path, file, { upsert: true });
+        if (error) { if (process.env.NODE_ENV === 'development') console.error('❌ Upload error:', error.message); return null; }
+        const { data } = supabase.storage.from('modelos-fotos').getPublicUrl(path);
+        return data?.publicUrl || null;
+      };
 
-      if (!bucketResponse.ok) {
-        const error = await bucketResponse.json();
-        console.error('❌ Error creando bucket:', error);
-        toast.error('Error preparando almacenamiento');
-        return;
-      }
-
-      console.log('✅ Bucket listo');
-
-      // 2. Subir fotos de cada modelo
+      // Subir fotos de cada modelo
       for (const [email, data] of Object.entries(modelosData)) {
-        console.log(`\n📤 Procesando ${data.nombre}...`);
 
         let fotoPerfilUrl: string | null = null;
         const fotosAdicionalesUrls: string[] = [];
 
-        // Subir foto de perfil
         if (data.fotoPerfil) {
-          console.log(`   📸 Subiendo foto de perfil...`);
-
-          // Convertir File a base64
-          const reader = new FileReader();
-          const base64Data = await new Promise<string>((resolve) => {
-            reader.onload = () => {
-              const base64 = (reader.result as string).split(',')[1];
-              resolve(base64);
-            };
-            reader.readAsDataURL(data.fotoPerfil!);
-          });
-
-          const fileName = `${email.split('@')[0]}/perfil-${Date.now()}.${data.fotoPerfil.name.split('.').pop()}`;
-
-          const uploadResponse = await fetch(`${serverUrl}/upload/foto`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${publicAnonKey}`
-            },
-            body: JSON.stringify({
-              fileName,
-              fileData: base64Data,
-              contentType: data.fotoPerfil.type
-            })
-          });
-
-          if (!uploadResponse.ok) {
-            const error = await uploadResponse.json();
-            console.error(`   ❌ Error subiendo foto de perfil:`, error);
-            toast.error(`Error subiendo foto de perfil de ${data.nombre}`);
-            continue;
-          }
-
-          const { url } = await uploadResponse.json();
-          fotoPerfilUrl = url;
-          console.log(`   ✅ Foto de perfil subida`);
+          const path = `${email.split('@')[0]}/perfil-${Date.now()}.${data.fotoPerfil.name.split('.').pop()}`;
+          fotoPerfilUrl = await uploadFile(data.fotoPerfil, path);
+          if (!fotoPerfilUrl) { toast.error(`Error subiendo foto de perfil de ${data.nombre}`); continue; }
         }
 
-        // Subir fotos adicionales
         for (let i = 0; i < data.fotosAdicionales.length; i++) {
           const foto = data.fotosAdicionales[i];
-          console.log(`   📸 Subiendo foto adicional ${i + 1}/${data.fotosAdicionales.length}`);
-
-          // Convertir File a base64
-          const reader = new FileReader();
-          const base64Data = await new Promise<string>((resolve) => {
-            reader.onload = () => {
-              const base64 = (reader.result as string).split(',')[1];
-              resolve(base64);
-            };
-            reader.readAsDataURL(foto);
-          });
-
-          const fileName = `${email.split('@')[0]}/adicional-${i + 1}-${Date.now()}.${foto.name.split('.').pop()}`;
-
-          const uploadResponse = await fetch(`${serverUrl}/upload/foto`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${publicAnonKey}`
-            },
-            body: JSON.stringify({
-              fileName,
-              fileData: base64Data,
-              contentType: foto.type
-            })
-          });
-
-          if (!uploadResponse.ok) {
-            console.error(`   ❌ Error subiendo foto adicional ${i + 1}`);
-            continue;
-          }
-
-          const { url } = await uploadResponse.json();
-          fotosAdicionalesUrls.push(url);
-          console.log(`   ✅ Foto adicional ${i + 1} subida`);
+          const path = `${email.split('@')[0]}/adicional-${i + 1}-${Date.now()}.${foto.name.split('.').pop()}`;
+          const url = await uploadFile(foto, path);
+          if (url) { fotosAdicionalesUrls.push(url); }
         }
 
-        // 3. Actualizar registro en la base de datos
         if (fotoPerfilUrl || fotosAdicionalesUrls.length > 0) {
-          console.log(`\n💾 Actualizando registro en BD para ${data.nombre}...`);
+          const updateData: any = {};
+          if (fotoPerfilUrl) updateData.fotoPerfil = fotoPerfilUrl;
+          if (fotosAdicionalesUrls.length > 0) updateData.fotosAdicionales = fotosAdicionalesUrls;
 
-          const updateResponse = await fetch(`${serverUrl}/upload/update-modelo`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${publicAnonKey}`
-            },
-            body: JSON.stringify({
-              email,
-              fotoPerfil: fotoPerfilUrl,
-              fotosAdicionales: fotosAdicionalesUrls.length > 0 ? fotosAdicionalesUrls : undefined
-            })
-          });
+          const { error: dbError } = await supabase
+            .from('usuarios')
+            .update(updateData)
+            .eq('email', email);
 
-          if (!updateResponse.ok) {
-            const error = await updateResponse.json();
-            console.error(`   ❌ Error actualizando BD:`, error);
+          if (dbError) {
             toast.error(`Error guardando URLs de ${data.nombre}`);
           } else {
-            console.log(`   ✅ ${data.nombre} actualizada en BD`);
             toast.success(`✅ ${data.nombre} actualizada correctamente`);
           }
         }
       }
 
-      console.log('\n🎉 Proceso de subida completado!');
       toast.success('¡Todas las fotos se subieron correctamente!');
 
       // Recargar la página para ver los cambios
@@ -220,7 +126,7 @@ export function SubirFotosModelosPanel() {
       }, 2000);
 
     } catch (error) {
-      console.error('❌ Error inesperado:', error);
+      if (process.env.NODE_ENV === 'development') console.error('❌ Error inesperado:', error);
       toast.error('Error inesperado al subir fotos');
     } finally {
       setUploading(false);

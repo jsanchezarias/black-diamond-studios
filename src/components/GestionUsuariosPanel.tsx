@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { UserPlus, Trash2, Mail, Calendar, User, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '../src/utils/supabase/info'; // ✅ Corregido: ruta correcta
+import { supabase } from '../utils/supabase/info'; // ✅ Corregido: ruta correcta
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
@@ -26,7 +26,8 @@ export function GestionUsuariosPanel({ userRole }: GestionUsuariosPanelProps) {
   const [loading, setLoading] = useState(true);
   const [modalAbierto, setModalAbierto] = useState(false);
   const [creando, setCreando] = useState(false);
-  
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; email: string } | null>(null);
+
   // Form states
   const [nuevoEmail, setNuevoEmail] = useState('');
   const [nuevoPassword, setNuevoPassword] = useState('');
@@ -54,14 +55,14 @@ export function GestionUsuariosPanel({ userRole }: GestionUsuariosPanelProps) {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Error cargando usuarios:', error);
+        if (process.env.NODE_ENV === 'development') console.error('Error cargando usuarios:', error);
         toast.error('Error al cargar usuarios: ' + error.message);
         return;
       }
 
       setUsuarios(data || []);
     } catch (error) {
-      console.error('Error inesperado:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Error inesperado:', error);
       toast.error('Error inesperado al cargar usuarios');
     } finally {
       setLoading(false);
@@ -87,78 +88,33 @@ export function GestionUsuariosPanel({ userRole }: GestionUsuariosPanelProps) {
     }
 
     try {
-      console.log('📝 Creando usuario con role:', roleACrear);
-      
-      // Verificar si el email ya existe
-      const { data: existingUser, error: checkError } = await supabase
-        .from('usuarios')
-        .select('email, role')
-        .eq('email', nuevoEmail)
-        .single();
-
-      if (existingUser && !checkError) {
-        setError(`El email ${nuevoEmail} ya está registrado como ${existingUser.role}`);
-        setCreando(false);
-        return;
-      }
-
-      // Paso 1: Crear usuario en Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: nuevoEmail,
-        password: nuevoPassword,
-        options: {
-          data: {
-            nombre: nuevoNombre,
-            role: roleACrear
-          },
-          emailRedirectTo: undefined // Desactivar confirmación por email
+      // Crear usuario vía Edge Function (usa Admin API con email_confirm: true)
+      // Esto evita el problema de confirmación de email que bloquea el login
+      const { data, error: fnError } = await supabase.functions.invoke('server', {
+        method: 'POST',
+        headers: { 'x-invoke-path': '/make-server-9dadc017/admin/crear-usuario' },
+        body: {
+          email: nuevoEmail,
+          password: nuevoPassword,
+          nombre: nuevoNombre,
+          role: roleACrear,
+          _path: '/make-server-9dadc017/admin/crear-usuario'
         }
       });
 
-      if (authError) {
-        console.error('Error creando usuario en Auth:', authError);
-        
-        if (authError.message.includes('already registered') || authError.message.includes('User already registered')) {
-          setError(`El email ${nuevoEmail} ya está registrado en el sistema`);
-        } else if (authError.message.includes('Invalid email')) {
-          setError('El formato del email no es válido');
-        } else {
-          setError(`Error al crear credenciales: ${authError.message}`);
-        }
+      // La Edge Function devuelve error en el body con { error: '...' }
+      const responseError = fnError || (data?.error ? new Error(data.error) : null);
+
+      if (responseError) {
+        if (process.env.NODE_ENV === 'development') console.error('Error creando usuario:', responseError);
+        setError(responseError.message || 'Error al crear el usuario');
         setCreando(false);
         return;
       }
-
-      if (!authData.user) {
-        setError('No se pudo crear el usuario en Auth');
-        setCreando(false);
-        return;
-      }
-
-      // Paso 2: Crear registro en la tabla usuarios
-      const { error: dbError } = await supabase
-        .from('usuarios')
-        .upsert({
-          id: authData.user.id,
-          email: nuevoEmail,
-          nombre: nuevoNombre,
-          role: roleACrear
-        }, {
-          onConflict: 'id'
-        });
-
-      if (dbError) {
-        console.error('Error creando usuario en tabla:', dbError);
-        setError(`Error al guardar en base de datos: ${dbError.message}`);
-        setCreando(false);
-        return;
-      }
-
-      console.log('✅ Usuario creado exitosamente');
 
       // Recargar lista
       await cargarUsuarios();
-      
+
       // Limpiar form
       setNuevoEmail('');
       setNuevoPassword('');
@@ -166,7 +122,7 @@ export function GestionUsuariosPanel({ userRole }: GestionUsuariosPanelProps) {
       setModalAbierto(false);
       toast.success(`✅ ${roleNombre} ${nuevoNombre} creado exitosamente`);
     } catch (err: any) {
-      console.error('❌ Error completo:', err);
+      if (process.env.NODE_ENV === 'development') console.error('❌ Error completo:', err);
       setError(err.message || 'Error desconocido al crear usuario');
       toast.error(err.message || 'Error al crear usuario');
     } finally {
@@ -175,26 +131,29 @@ export function GestionUsuariosPanel({ userRole }: GestionUsuariosPanelProps) {
   };
 
   const eliminarUsuario = async (usuarioId: string, usuarioEmail: string) => {
-    if (!confirm(`¿Estás seguro de eliminar a ${usuarioEmail}?`)) {
-      return;
-    }
+    setConfirmDelete({ id: usuarioId, email: usuarioEmail });
+  };
 
+  const confirmarEliminar = async () => {
+    if (!confirmDelete) return;
+    const { id: usuarioId, email: usuarioEmail } = confirmDelete;
+    setConfirmDelete(null);
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('usuarios')
         .delete()
         .eq('id', usuarioId);
 
       if (error) {
-        console.error('Error eliminando usuario:', error);
-        alert(error.message || 'Error eliminando usuario');
+        if (process.env.NODE_ENV === 'development') console.error('Error eliminando usuario:', error);
+        toast.error(error.message || 'Error eliminando usuario');
       } else {
         await cargarUsuarios();
         toast.success(`Usuario ${usuarioEmail} eliminado exitosamente`);
       }
     } catch (error) {
-      console.error('Error eliminando usuario:', error);
-      alert('Error eliminando usuario');
+      if (process.env.NODE_ENV === 'development') console.error('Error eliminando usuario:', error);
+      toast.error('Error eliminando usuario');
     }
   };
 
@@ -355,6 +314,28 @@ export function GestionUsuariosPanel({ userRole }: GestionUsuariosPanelProps) {
           ))
         )}
       </div>
+
+      {/* Dialog de confirmación de eliminación */}
+      {confirmDelete && (
+        <Dialog open={!!confirmDelete} onOpenChange={() => setConfirmDelete(null)}>
+          <DialogContent className="bg-[#1a1a24] border-red-500/30 shadow-2xl">
+            <DialogHeader>
+              <DialogTitle className="text-white">Eliminar Usuario</DialogTitle>
+              <DialogDescription className="text-muted-foreground">
+                ¿Estás seguro de eliminar a <span className="text-white font-semibold">{confirmDelete.email}</span>? Esta acción no se puede deshacer.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex gap-2 pt-2">
+              <Button variant="outline" onClick={() => setConfirmDelete(null)} className="flex-1">
+                Cancelar
+              </Button>
+              <Button onClick={confirmarEliminar} className="flex-1 bg-red-600 hover:bg-red-700 text-white">
+                Eliminar
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

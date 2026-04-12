@@ -21,12 +21,12 @@ export class SelectErrorBoundary extends React.Component<Props, State> {
   }
 
   static getDerivedStateFromError(error: any) {
-    console.error('🚨 SelectErrorBoundary capturó error:', error);
+    if (process.env.NODE_ENV === 'development') console.error('🚨 SelectErrorBoundary capturó error:', error);
     return { hasError: true, error };
   }
 
   componentDidCatch(error: any, errorInfo: any) {
-    console.error('🚨 SelectErrorBoundary - Error completo:', {
+    if (process.env.NODE_ENV === 'development') console.error('🚨 SelectErrorBoundary - Error completo:', {
       error,
       errorInfo,
       errorType: typeof error,

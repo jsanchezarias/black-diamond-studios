@@ -6,10 +6,10 @@ import { Textarea } from './ui/textarea';
 import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Calendar, Clock, User, Phone, MapPin, FileText, Plus, Loader2, AlertCircle, DollarSign, Timer } from 'lucide-react';
-import { useAgendamientos } from '../src/app/components/AgendamientosContext';
-import { useModelos } from '../src/app/components/ModelosContext';
-import { useClientes } from '../src/app/components/ClientesContext';
-import { ClienteStatusChecker } from '../src/app/components/ClienteStatusChecker'; // 🆕 Checker de estado del cliente
+import { useAgendamientos } from '../app/components/AgendamientosContext';
+import { useModelos } from '../app/components/ModelosContext';
+import { useClientes } from '../app/components/ClientesContext';
+import { ClienteStatusChecker } from '../app/components/ClienteStatusChecker'; // 🆕 Checker de estado del cliente
 import { toast } from 'sonner';
 import { SelectErrorBoundary } from './SelectErrorBoundary';
 
@@ -117,39 +117,28 @@ export function CrearAgendamientoModal({
     setLoading(true);
 
     try {
-      console.log('📝 Iniciando creación de agendamiento...');
-      console.log('📋 Datos del form:', formData);
-
       // 1. Obtener o crear cliente
-      console.log('1️⃣ Obteniendo/creando cliente...');
       const cliente = await clientesCtx!.obtenerOCrearCliente(
         formData.clienteTelefono.trim(),
         formData.clienteNombre.trim()
       );
 
       if (!cliente) {
-        console.error('❌ No se pudo crear/obtener cliente');
+        if (process.env.NODE_ENV === 'development') console.error('❌ No se pudo crear/obtener cliente');
         toast.error('❌ Error al crear/obtener cliente');
         return;
       }
 
-      console.log('✅ Cliente obtenido:', cliente);
-
       // 2. Obtener datos de la modelo seleccionada
-      console.log('2️⃣ Buscando modelo...');
       const modelo = modelosCtx!.modelos.find(m => m.email === formData.modeloEmail);
-      
+
       if (!modelo) {
-        console.error('❌ Modelo no encontrada');
+        if (process.env.NODE_ENV === 'development') console.error('❌ Modelo no encontrada');
         toast.error('❌ Modelo no encontrada');
         return;
       }
 
-      console.log('✅ Modelo encontrada:', modelo);
-
       // 3. Crear agendamiento
-      console.log('3️⃣ Creando agendamiento...');
-      
       // ✅ Calcular el precio según el tipo de servicio
       const precioServicio = formData.tipoServicio === 'domicilio' 
         ? (tarifaActual!.priceHome || tarifaActual!.price)
@@ -175,19 +164,16 @@ export function CrearAgendamientoModal({
         tarifaDescripcion: tarifaActual!.description,
       };
 
-      console.log('📦 Datos a enviar:', nuevoAgendamiento);
-
       const resultado = await agendamientosCtx!.agregarAgendamiento(nuevoAgendamiento);
 
       if (!resultado.success) {
-        console.error('❌ Error al guardar:', resultado.error);
+        if (process.env.NODE_ENV === 'development') console.error('❌ Error al guardar:', resultado.error);
         toast.error('❌ Error al crear agendamiento', {
           description: resultado.error?.message || 'No se pudo guardar en la base de datos'
         });
         return;
       }
 
-      console.log('✅ ¡Agendamiento creado exitosamente!');
       toast.success('✅ Agendamiento creado exitosamente', {
         description: `${formData.clienteNombre} agendado con ${modelo.nombreArtistico || modelo.nombre}`
       });
@@ -195,9 +181,7 @@ export function CrearAgendamientoModal({
       onClose();
       
     } catch (error: any) {
-      console.error('❌ Error creando agendamiento:', error);
-      console.error('📋 Stack trace:', error?.stack);
-      console.error('📋 Error completo:', JSON.stringify(error, null, 2));
+      if (process.env.NODE_ENV === 'development') console.error('❌ Error creando agendamiento:', error);
       
       toast.error('❌ Error al crear agendamiento', {
         description: error?.message || 'Hubo un problema al guardar. Por favor intenta de nuevo.'
@@ -397,7 +381,7 @@ export function CrearAgendamientoModal({
                       try {
                         setFormData(prev => ({ ...prev, tipoServicio: value }));
                       } catch (error) {
-                        console.error('Error en onValueChange tipoServicio:', error);
+                        if (process.env.NODE_ENV === 'development') console.error('Error en onValueChange tipoServicio:', error);
                       }
                     }}
                   >
@@ -428,7 +412,7 @@ export function CrearAgendamientoModal({
                         setTarifaActual(JSON.parse(value));
                         setErrors(prev => ({ ...prev, tarifaSeleccionada: '' }));
                       } catch (error) {
-                        console.error('Error en onValueChange tarifaSeleccionada:', error);
+                        if (process.env.NODE_ENV === 'development') console.error('Error en onValueChange tarifaSeleccionada:', error);
                       }
                     }}
                   >

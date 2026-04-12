@@ -1,13 +1,69 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&display=swap');
+@import 'tailwindcss';
+
 /* =================================================================
    BLACK DIAMOND - TEMA PREMIUM SIMPLIFICADO
    Colores con sentido: Negro, Gris, Dorado, Blanco
    ================================================================= */
 
-@import 'tailwindcss';
 
-/* Fuentes */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&display=swap');
+/* =================================================================
+   TAILWIND v4 — MAPEO SEMÁNTICO GOLD/BLACK
+   Conecta los colores de la marca al sistema de utilidades de Tailwind
+   ================================================================= */
+
+@theme {
+  /* Fondos */
+  --color-background: #000000;
+  --color-foreground: #f0e8c8;
+  --color-card: #0d0d0a;
+  --color-card-foreground: #f0e8c8;
+  --color-popover: #0a0a08;
+  --color-popover-foreground: #f0e8c8;
+
+  /* Primario (Gold) */
+  --color-primary: #d4af37;
+  --color-primary-foreground: #000000;
+
+  /* Secundario */
+  --color-secondary: #1a1a10;
+  --color-secondary-foreground: #f0e8c8;
+
+  /* Muted */
+  --color-muted: #111108;
+  --color-muted-foreground: #7a6020;
+
+  /* Accent */
+  --color-accent: #d4af37;
+  --color-accent-foreground: #000000;
+
+  /* Destructivo */
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #ffffff;
+
+  /* Bordes e inputs */
+  --color-border: #2a2210;
+  --color-input: #2a2210;
+  --color-ring: #d4af37;
+
+  /* Gráficos / Charts */
+  --color-chart-1: #d4af37;
+  --color-chart-2: #e5c158;
+  --color-chart-3: #b8941f;
+  --color-chart-4: #10b981;
+  --color-chart-5: #ef4444;
+
+  /* Sidebar */
+  --color-sidebar-background: #0a0a08;
+  --color-sidebar-foreground: #f0e8c8;
+  --color-sidebar-primary: #d4af37;
+  --color-sidebar-primary-foreground: #000000;
+  --color-sidebar-accent: #1a1a10;
+  --color-sidebar-accent-foreground: #f0e8c8;
+  --color-sidebar-border: #2a2210;
+  --color-sidebar-ring: #d4af37;
+}
 
 /* =================================================================
    TEMA SIMPLE Y ELEGANTE

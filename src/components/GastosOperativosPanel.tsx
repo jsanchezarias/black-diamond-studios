@@ -3,7 +3,7 @@ import { DollarSign, Plus, TrendingUp, Calendar, Filter, CheckCircle, XCircle, C
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { useGastos } from '../src/app/components/GastosContext';
+import { useGastos } from '../app/components/GastosContext';
 import { AgregarGastoModal } from './AgregarGastoModal';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 

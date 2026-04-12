@@ -15,11 +15,11 @@ import {
   TrendingUp,
   History
 } from 'lucide-react';
-import { useServicios, Servicio } from '../src/app/components/ServiciosContext';
-import { useModelos } from '../src/app/components/ModelosContext';
-import { useClientes } from '../src/app/components/ClientesContext';
+import { useServicios, Servicio } from '../app/components/ServiciosContext';
+import { useModelos } from '../app/components/ModelosContext';
+import { useClientes } from '../app/components/ClientesContext';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
-import { ClienteInfoModal } from './ClienteInfoModal';
+import { ClienteInfoModal } from '../app/components/ClienteInfoModal';
 import { ServicioDetalleCard } from './ServicioDetalleCard';
 
 type VistaCalendario = 'dia' | 'semana' | 'mes' | 'lista';

@@ -28,11 +28,11 @@ import {
   PlayCircle,
   Trash2
 } from 'lucide-react';
-import { useServicios } from '../src/app/components/ServiciosContext';
-import { useTurnos } from '../src/app/components/TurnosContext';
-import { useAgendamientos } from '../src/app/components/AgendamientosContext';
-import { useClientes, Cliente } from '../src/app/components/ClientesContext';
-import { useInventory } from '../src/app/components/InventoryContext';
+import { useServicios } from '../app/components/ServiciosContext';
+import { useTurnos } from '../app/components/TurnosContext';
+import { useAgendamientos } from '../app/components/AgendamientosContext';
+import { useClientes, Cliente } from '../app/components/ClientesContext';
+import { useInventory } from '../app/components/InventoryContext';
 import { ClienteHistorialCard } from './ClienteHistorialCard';
 
 interface IniciarServicioModalProps {
@@ -225,7 +225,7 @@ export function IniciarServicioModal({ isOpen, onClose, modeloEmail, modeloNombr
           clienteId = nuevoCliente.id;
         }
       } catch (error) {
-        console.error('Error al gestionar cliente:', error);
+        if (process.env.NODE_ENV === 'development') console.error('Error al gestionar cliente:', error);
       }
     }
 
@@ -469,7 +469,7 @@ export function IniciarServicioModal({ isOpen, onClose, modeloEmail, modeloNombr
                         try {
                           setFormData(prev => ({ ...prev, tipoServicio: tipo }));
                         } catch (error) {
-                          console.error('❌ Error al seleccionar tipo de servicio:', error);
+                          if (process.env.NODE_ENV === 'development') console.error('❌ Error al seleccionar tipo de servicio:', error);
                         }
                       }}
                       className={`p-3 rounded-lg border-2 transition-all font-medium ${
@@ -497,7 +497,7 @@ export function IniciarServicioModal({ isOpen, onClose, modeloEmail, modeloNombr
                           try {
                             setFormData(prev => ({ ...prev, habitacion: hab }));
                           } catch (error) {
-                            console.error('❌ Error al seleccionar habitación:', error);
+                            if (process.env.NODE_ENV === 'development') console.error('❌ Error al seleccionar habitación:', error);
                           }
                         }}
                         className={`p-3 rounded-lg border-2 font-bold transition-all ${
@@ -525,7 +525,7 @@ export function IniciarServicioModal({ isOpen, onClose, modeloEmail, modeloNombr
                         try {
                           setFormData(prev => ({ ...prev, tiempoServicio: tiempo }));
                         } catch (error) {
-                          console.error('❌ Error al seleccionar tiempo de servicio:', error);
+                          if (process.env.NODE_ENV === 'development') console.error('❌ Error al seleccionar tiempo de servicio:', error);
                         }
                       }}
                       className={`p-2.5 rounded-lg border-2 text-sm transition-all font-medium ${

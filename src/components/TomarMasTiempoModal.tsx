@@ -3,7 +3,7 @@ import { X, Clock, DollarSign, Upload, Image as ImageIcon } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { useServicios } from '../src/app/components/ServiciosContext';
+import { useServicios } from '../app/components/ServiciosContext';
 
 interface TomarMasTiempoModalProps {
   isOpen: boolean;

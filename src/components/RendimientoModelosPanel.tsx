@@ -3,8 +3,8 @@ import { TrendingUp, TrendingDown, Star, DollarSign, Clock, ShoppingBag, Award, 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
-import { useModelos } from '../src/app/components/ModelosContext';
-import { useServicios } from '../src/app/components/ServiciosContext';
+import { useModelos } from '../app/components/ModelosContext';
+import { useServicios } from '../app/components/ServiciosContext';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 type SortOption = 'ingresos' | 'servicios' | 'rating' | 'nombre';

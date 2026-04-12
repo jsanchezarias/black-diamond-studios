@@ -20,7 +20,7 @@ import {
   ThumbsUp,
   ThumbsDown
 } from 'lucide-react';
-import { Cliente, ServicioCliente, ObservacionModelo } from '../src/app/components/ClientesContext';
+import { Cliente, ServicioCliente, ObservacionModelo } from '../app/components/ClientesContext';
 
 // Función helper para formatear moneda
 const formatCurrency = (amount: number) => {

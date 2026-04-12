@@ -4,7 +4,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
-import { useServicios, Servicio } from '../src/app/components/ServiciosContext';
+import { useServicios, Servicio } from '../app/components/ServiciosContext';
 
 interface EditarServicioModalProps {
   isOpen: boolean;

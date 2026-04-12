@@ -14,8 +14,8 @@ import {
   FileText,
   MessageSquare
 } from 'lucide-react';
-import { Adelanto } from '../src/app/components/PagosContext';
-import { Logo } from '../src/app/components/Logo';
+import { Adelanto } from '../app/components/PagosContext';
+import { Logo } from '../app/components/Logo';
 
 interface GestionarAdelantoModalProps {
   isOpen: boolean;

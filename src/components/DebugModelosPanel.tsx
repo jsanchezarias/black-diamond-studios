@@ -3,7 +3,6 @@ import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Loader2, Eye, RefreshCw, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
-import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { toast } from 'sonner';
 
 interface Modelo {
@@ -38,27 +37,21 @@ export function DebugModelosPanel({ onClose }: { onClose: () => void }) {
   const cargarDebug = async () => {
     setCargando(true);
     try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-9dadc017/migration/debug-modelos`,
-        {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${publicAnonKey}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      const { supabase } = await import('../utils/supabase/info');
+      const { data: modelos, error } = await supabase
+        .from('usuarios')
+        .select('*')
+        .eq('role', 'modelo');
 
-      const result = await response.json();
-      
-      if (result.success) {
-        setData(result);
-        toast.success(`✅ Debug completado: ${result.total} modelos encontradas`);
-      } else {
-        toast.error(`❌ Error: ${result.error}`);
+      if (error) {
+        toast.error(`❌ Error: ${error.message}`);
+        return;
       }
+
+      setData({ success: true, total: modelos?.length || 0, modelos: modelos || [] });
+      toast.success(`✅ Debug completado: ${modelos?.length || 0} modelos encontradas`);
     } catch (error) {
-      console.error('Error en debug:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Error en debug:', error);
       toast.error('❌ Error ejecutando debug');
     } finally {
       setCargando(false);

@@ -4,7 +4,7 @@ import { Button } from './ui/button';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
-import { Modelo } from '../src/app/components/ModelosContext';
+import { Modelo } from '../app/components/ModelosContext';
 
 interface ArchivarModeloModalProps {
   open: boolean;

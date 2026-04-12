@@ -1,6 +1,10 @@
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Save, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
-import { supabase } from '../src/utils/supabase/info'; // ✅ Corregido: ruta correcta
+import { supabase } from '../utils/supabase/info'; // ✅ Corregido: ruta correcta
 import { toast } from 'sonner';
 
 export function ConfiguracionChatPanel() {
@@ -29,13 +33,11 @@ export function ConfiguracionChatPanel() {
         setProgramadorId(data.id);
         setUsername(data.nombre);
         setEmail(data.email);
-        console.log('✅ Usuario programador encontrado:', data);
       } else {
         setProgramadorExists(false);
-        console.log('⚠️ Usuario programador no encontrado');
       }
     } catch (error) {
-      console.error('Error cargando datos del programador:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Error cargando datos del programador:', error);
     }
   };
 
@@ -67,7 +69,7 @@ export function ConfiguracionChatPanel() {
         .single();
 
       if (error) {
-        console.error('❌ Error creando programador:', error);
+        if (process.env.NODE_ENV === 'development') console.error('❌ Error creando programador:', error);
         toast.error('Error al crear usuario programador');
         return;
       }
@@ -80,7 +82,7 @@ export function ConfiguracionChatPanel() {
       // Crear mensaje de sistema si no existe
       await crearMensajeSistema();
     } catch (error) {
-      console.error('Error creando programador:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Error creando programador:', error);
       toast.error('Error al crear usuario');
     } finally {
       setLoading(false);
@@ -109,7 +111,7 @@ export function ConfiguracionChatPanel() {
         .eq('id', programadorId);
 
       if (error) {
-        console.error('❌ Error actualizando programador:', error);
+        if (process.env.NODE_ENV === 'development') console.error('❌ Error actualizando programador:', error);
         toast.error('Error al actualizar usuario');
         return;
       }
@@ -117,7 +119,7 @@ export function ConfiguracionChatPanel() {
       setPassword('');
       toast.success('Usuario programador actualizado exitosamente');
     } catch (error) {
-      console.error('Error actualizando programador:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Error actualizando programador:', error);
       toast.error('Error al actualizar usuario');
     } finally {
       setLoading(false);
@@ -133,7 +135,6 @@ export function ConfiguracionChatPanel() {
         .limit(1);
 
       if (mensajesExistentes && mensajesExistentes.length > 0) {
-        console.log('✅ Ya existen mensajes en el chat');
         return;
       }
 
@@ -145,7 +146,6 @@ export function ConfiguracionChatPanel() {
         .single();
 
       if (!programador) {
-        console.warn('⚠️ Usuario programador no existe');
         return;
       }
 
@@ -158,9 +158,8 @@ export function ConfiguracionChatPanel() {
           mensaje: '¡Bienvenidos al chat de Black Diamond! 💬 Regístrate para conversar con nuestra programadora'
         });
 
-      console.log('✅ Mensaje de bienvenida creado');
     } catch (error) {
-      console.error('Error creando mensaje del sistema:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Error creando mensaje del sistema:', error);
     }
   };
 

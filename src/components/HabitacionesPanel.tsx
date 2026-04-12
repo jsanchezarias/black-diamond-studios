@@ -1,18 +1,30 @@
 import { DoorOpen, Timer } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { useServicios } from '../src/app/components/ServiciosContext';
-import { useModelos } from '../src/app/components/ModelosContext';
+import { useServicios } from '../app/components/ServiciosContext';
+import { useModelos } from '../app/components/ModelosContext';
 
 export function HabitacionesPanel() {
-  const { habitaciones } = useServicios();
-  const { modelos } = useModelos();
+  const { habitaciones, loading: loadingServicios } = useServicios();
+  const { modelos, loading: loadingModelos } = useModelos();
+  const isLoading = loadingServicios || loadingModelos || !habitaciones || !modelos;
 
-  if (!habitaciones || !modelos) {
+  if (isLoading) {
     return (
-      <Card>
-        <CardContent className="p-8 text-center text-muted-foreground">
-          Cargando habitaciones...
+      <Card className="border-primary/30">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-primary">
+            <DoorOpen className="w-5 h-5 animate-pulse" />
+            Estado de Habitaciones
+          </CardTitle>
+          <CardDescription>Cargando disponibilidad en tiempo real...</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="h-48 rounded-lg bg-secondary/50 animate-pulse border border-border/50"></div>
+            ))}
+          </div>
         </CardContent>
       </Card>
     );

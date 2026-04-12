@@ -13,7 +13,7 @@ import {
   FileText,
   Plus
 } from 'lucide-react';
-import { usePagos } from '../src/app/components/PagosContext';
+import { usePagos } from '../app/components/PagosContext';
 import { SolicitarAdelantoModal } from './SolicitarAdelantoModal';
 
 interface AdelantosPanelProps {

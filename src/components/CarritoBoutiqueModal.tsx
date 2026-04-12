@@ -1,7 +1,7 @@
 import { X, ShoppingCart, Plus, Minus, Trash2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { useCarrito } from '../src/app/components/CarritoContext';
+import { useCarrito } from '../app/components/CarritoContext';
 
 interface CarritoBoutiqueModalProps {
   isOpen: boolean;

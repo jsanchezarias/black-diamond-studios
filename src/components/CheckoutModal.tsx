@@ -5,11 +5,11 @@ import { Badge } from './ui/badge';
 import { Label } from './ui/label';
 import { Input } from './ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
-import { useCarrito } from '../src/app/components/CarritoContext';
-import { useInventory } from '../src/app/components/InventoryContext';
-import { Logo } from '../src/app/components/Logo';
+import { useCarrito } from '../app/components/CarritoContext';
+import { useInventory } from '../app/components/InventoryContext';
+import { Logo } from '../app/components/Logo';
 import { toast } from 'sonner';
-import { uploadComprobante } from '../src/utils/supabase/uploadComprobante';
+import { uploadComprobante } from '../utils/supabase/uploadComprobante';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -54,7 +54,7 @@ export function CheckoutModal({ isOpen, onClose, modeloEmail, modeloNombre }: Ch
       setUrlComprobante(url);
       toast.success('Comprobante subido correctamente');
     } catch (error) {
-      console.error('Error al subir comprobante:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Error al subir comprobante:', error);
       toast.error('Error al subir el comprobante');
       setComprobante(null);
     } finally {
@@ -96,7 +96,7 @@ export function CheckoutModal({ isOpen, onClose, modeloEmail, modeloNombre }: Ch
         onClose();
       }, 2000);
     } catch (error) {
-      console.error('Error al finalizar compra:', error);
+      if (process.env.NODE_ENV === 'development') console.error('Error al finalizar compra:', error);
       toast.error('Error al procesar la compra');
     } finally {
       setProcesando(false);

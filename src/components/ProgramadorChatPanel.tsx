@@ -1,6 +1,31 @@
+/**
+ * ProgramadorChatPanel — Terminal de Chat para rol Programador
+ *
+ * PROPÓSITO:
+ *   Panel de moderación de chat en tiempo real que usa Supabase Realtime
+ *   para recibir nuevos mensajes de `chat_mensajes_publicos` y permite
+ *   al programador enviar mensajes como "Black Diamond" visibles para todos
+ *   los usuarios del chat público.
+ *
+ * POR QUÉ NO ESTÁ EN EL MENÚ DE NINGÚN DASHBOARD:
+ *   Este componente es una versión alternativa/standalone del chat de moderación.
+ *   El flujo activo se gestiona a través de `ChatModeratorPanel` (conectado al
+ *   módulo "chat" del AdminDashboard) y `ConfiguracionChatPanel`.
+ *   Este panel está disponible para ser importado en ProgramadorDashboard si
+ *   se decide dar acceso directo al rol programador sin pasar por AdminDashboard.
+ *
+ * SUSCRIPCIÓN REALTIME:
+ *   - Canal: `chat_programador_panel_${Date.now()}` (único por mount)
+ *   - Tabla: chat_mensajes_publicos (evento INSERT)
+ *   - Cleanup: supabase.removeChannel(channel) en el return del useEffect ✅
+ */
+import { useState, useEffect, useRef } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Send, Users, MessageSquare, Gem, Trash2, AlertCircle, CheckCircle } from 'lucide-react';
-import { supabase } from '../src/utils/supabase/info'; // ✅ Corregido: ruta correcta
+import { supabase } from '../utils/supabase/info'; // ✅ Corregido: ruta correcta
 
 interface Message {
   id: string;
@@ -59,7 +84,7 @@ export function ProgramadorChatPanel({ userId, userEmail }: ProgramadorChatPanel
         .limit(100);
 
       if (error) {
-        console.error('❌ Error cargando mensajes:', error);
+        if (process.env.NODE_ENV === 'development') console.error('❌ Error cargando mensajes:', error);
         return;
       }
 
@@ -84,7 +109,7 @@ export function ProgramadorChatPanel({ userId, userEmail }: ProgramadorChatPanel
         setMessages(formattedMessages);
       }
     } catch (err) {
-      console.error('Error completo:', err);
+      if (process.env.NODE_ENV === 'development') console.error('Error completo:', err);
     } finally {
       setLoading(false);
     }
@@ -122,7 +147,7 @@ export function ProgramadorChatPanel({ userId, userEmail }: ProgramadorChatPanel
         setOnlineUsers(count);
       }
     } catch (err) {
-      console.error('Error cargando usuarios online:', err);
+      if (process.env.NODE_ENV === 'development') console.error('Error cargando usuarios online:', err);
     }
   };
 
@@ -141,7 +166,7 @@ export function ProgramadorChatPanel({ userId, userEmail }: ProgramadorChatPanel
       let programadorChatId = existingUser?.id;
 
       if (!existingUser) {
-        console.error('❌ Usuario programador no encontrado. Debe ser creado primero en la configuración del chat.');
+        if (process.env.NODE_ENV === 'development') console.error('❌ Usuario programador no encontrado. Debe ser creado primero en la configuración del chat.');
         alert('Error: Usuario programador no configurado. Ve a Configuración > Chat para crearlo.');
         return;
       }
@@ -157,7 +182,7 @@ export function ProgramadorChatPanel({ userId, userEmail }: ProgramadorChatPanel
         });
 
       if (sendError) {
-        console.error('❌ Error enviando mensaje:', sendError);
+        if (process.env.NODE_ENV === 'development') console.error('❌ Error enviando mensaje:', sendError);
         alert('Error al enviar mensaje. Intenta de nuevo.');
         return;
       }
@@ -168,7 +193,7 @@ export function ProgramadorChatPanel({ userId, userEmail }: ProgramadorChatPanel
       // Recargar mensajes
       await loadMessages();
     } catch (err) {
-      console.error('Error completo al enviar mensaje:', err);
+      if (process.env.NODE_ENV === 'development') console.error('Error completo al enviar mensaje:', err);
       alert('Error al enviar mensaje. Intenta de nuevo.');
     }
   };
@@ -185,7 +210,7 @@ export function ProgramadorChatPanel({ userId, userEmail }: ProgramadorChatPanel
         .neq('id', '00000000-0000-0000-0000-000000000000'); // Eliminar todos
 
       if (error) {
-        console.error('Error eliminando mensajes:', error);
+        if (process.env.NODE_ENV === 'development') console.error('Error eliminando mensajes:', error);
         alert('Error al eliminar mensajes. Intenta de nuevo.');
         return;
       }
@@ -210,7 +235,7 @@ export function ProgramadorChatPanel({ userId, userEmail }: ProgramadorChatPanel
 
       await loadMessages();
     } catch (err) {
-      console.error('Error completo:', err);
+      if (process.env.NODE_ENV === 'development') console.error('Error completo:', err);
       alert('Error al eliminar mensajes. Intenta de nuevo.');
     }
   };

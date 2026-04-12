@@ -4,7 +4,7 @@ import { Button } from './ui/button';
 import { toast } from 'sonner';
 import { Download, Trash2, CheckCircle, AlertCircle, Loader2, Eye } from 'lucide-react';
 import { Badge } from './ui/badge';
-import { projectId, publicAnonKey } from '../utils/supabase/info';
+import { supabase } from '../utils/supabase/info';
 import { DebugModelosPanel } from './DebugModelosPanel';
 
 // Datos de las modelos reales para mostrar en el panel
@@ -31,51 +31,36 @@ export function MigrarModelosRealesPanel() {
     eliminados?: number;
   } | null>(null);
 
-  const serverUrl = `https://${projectId}.supabase.co/functions/v1/make-server-9dadc017`;
-
   const limpiarPerfilesDemo = async () => {
     try {
       setLimpiando(true);
       setResultado(null);
-      
-      const response = await fetch(`${serverUrl}/migration/limpiar-modelos`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${publicAnonKey}`
-        }
-      });
 
-      const data = await response.json();
+      // Eliminar modelos con email de demo (no reales)
+      const { data: demos, error: fetchError } = await supabase
+        .from('usuarios')
+        .select('id, email')
+        .eq('role', 'modelo')
+        .like('email', '%demo%');
 
-      if (data.success) {
-        toast.success(`✅ ${data.eliminados} perfiles eliminados correctamente`);
-        setResultado({
-          exitosas: data.eliminados,
-          fallidas: 0,
-          detalles: data.detalles || []
-        });
-        
-        // Esperar 2 segundos y recargar
-        setTimeout(() => {
-          window.location.reload();
-        }, 2000);
-      } else {
-        toast.error('Error al limpiar perfiles');
-        setResultado({
-          exitosas: 0,
-          fallidas: 1,
-          detalles: [data.error || 'Error desconocido']
-        });
+      if (fetchError) throw fetchError;
+      if (!demos || demos.length === 0) {
+        toast.success('No hay perfiles demo para eliminar');
+        setResultado({ exitosas: 0, fallidas: 0, detalles: ['No se encontraron perfiles demo'] });
+        return;
       }
-    } catch (error) {
-      console.error('Error limpiando perfiles:', error);
-      toast.error('Error al conectar con el servidor');
-      setResultado({
-        exitosas: 0,
-        fallidas: 1,
-        detalles: ['Error de conexión']
-      });
+
+      const ids = demos.map((d: any) => d.id);
+      const { error: delError } = await supabase.from('usuarios').delete().in('id', ids);
+      if (delError) throw delError;
+
+      toast.success(`✅ ${ids.length} perfiles demo eliminados`);
+      setResultado({ exitosas: ids.length, fallidas: 0, detalles: demos.map((d: any) => d.email) });
+      setTimeout(() => window.location.reload(), 2000);
+    } catch (error: any) {
+      if (process.env.NODE_ENV === 'development') console.error('Error limpiando perfiles:', error);
+      toast.error('Error al limpiar perfiles: ' + (error.message || ''));
+      setResultado({ exitosas: 0, fallidas: 1, detalles: [error.message || 'Error'] });
     } finally {
       setLimpiando(false);
     }
@@ -85,110 +70,65 @@ export function MigrarModelosRealesPanel() {
     try {
       setMigrando(true);
       setResultado(null);
-      
-      const response = await fetch(`${serverUrl}/migration/migrar-modelos`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${publicAnonKey}`
+
+      const detalles: string[] = [];
+      let exitosas = 0, fallidas = 0;
+
+      for (const modelo of modelosReales) {
+        const email = `${modelo.id}@blackdiamond.com`;
+        const { error } = await supabase.from('usuarios').upsert({
+          email,
+          nombre: modelo.nombre,
+          nombreArtistico: modelo.nombre,
+          role: 'modelo',
+          activo: true,
+          disponible: modelo.disponible,
+        }, { onConflict: 'email' });
+
+        if (error) {
+          detalles.push(`❌ ${modelo.nombre}: ${error.message}`);
+          fallidas++;
+        } else {
+          detalles.push(`✅ ${modelo.nombre} migrada`);
+          exitosas++;
         }
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        toast.success(`✅ ${data.resultado.exitosas} modelos migradas exitosamente!`);
-        setResultado(data.resultado);
-        
-        // Esperar 2 segundos y recargar
-        setTimeout(() => {
-          window.location.reload();
-        }, 2000);
-      } else {
-        toast.error('Error en la migración');
-        setResultado(data.resultado);
       }
-    } catch (error) {
-      console.error('Error migrando modelos:', error);
-      toast.error('Error al conectar con el servidor');
-      setResultado({
-        exitosas: 0,
-        fallidas: 5,
-        detalles: ['Error de conexión']
-      });
+
+      toast.success(`✅ ${exitosas} modelos migradas`);
+      setResultado({ exitosas, fallidas, detalles });
+      if (exitosas > 0) setTimeout(() => window.location.reload(), 2000);
+    } catch (error: any) {
+      if (process.env.NODE_ENV === 'development') console.error('Error migrando modelos:', error);
+      toast.error('Error en la migración');
+      setResultado({ exitosas: 0, fallidas: modelosReales.length, detalles: [error.message || 'Error'] });
     } finally {
       setMigrando(false);
     }
   };
 
   const procesarTodo = async () => {
-    try {
-      setProcesandoTodo(true);
-      setResultado(null);
-      
-      toast.info('🚀 Iniciando migración completa...');
-      
-      const response = await fetch(`${serverUrl}/migration/migrar-todo`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${publicAnonKey}`
-        }
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        toast.success(`✅ Migración completa: ${data.resultado.eliminados} eliminadas, ${data.resultado.exitosas} migradas!`);
-        setResultado(data.resultado);
-        
-        // Esperar 3 segundos y recargar
-        setTimeout(() => {
-          window.location.reload();
-        }, 3000);
-      } else {
-        toast.error('Error en la migración completa');
-        setResultado(data.resultado);
-      }
-    } catch (error) {
-      console.error('Error en migración completa:', error);
-      toast.error('Error al conectar con el servidor');
-      setResultado({
-        exitosas: 0,
-        fallidas: 5,
-        detalles: ['Error de conexión'],
-        eliminados: 0
-      });
-    } finally {
-      setProcesandoTodo(false);
-    }
+    setProcesandoTodo(true);
+    toast.info('Iniciando migración completa...');
+    await limpiarPerfilesDemo();
+    await migrarModelos();
+    setProcesandoTodo(false);
   };
 
   const actualizarXimena = async () => {
     try {
       setActualizandoXimena(true);
-      
-      const response = await fetch(`${serverUrl}/migration/actualizar-ximena`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${publicAnonKey}`
-        }
-      });
+      const { error } = await supabase
+        .from('usuarios')
+        .update({ disponible: false })
+        .eq('nombreArtistico', 'Ximena')
+        .eq('role', 'modelo');
 
-      const data = await response.json();
-
-      if (data.success) {
-        toast.success('✅ Ximena actualizada: disponible=false');
-        setTimeout(() => {
-          window.location.reload();
-        }, 2000);
-      } else {
-        toast.error(data.error || 'Error actualizando Ximena');
-      }
-    } catch (error) {
-      console.error('Error actualizando Ximena:', error);
-      toast.error('Error al conectar con el servidor');
+      if (error) throw error;
+      toast.success('✅ Ximena actualizada: disponible=false');
+      setTimeout(() => window.location.reload(), 2000);
+    } catch (error: any) {
+      if (process.env.NODE_ENV === 'development') console.error('Error actualizando Ximena:', error);
+      toast.error('Error: ' + (error.message || ''));
     } finally {
       setActualizandoXimena(false);
     }

@@ -14,7 +14,7 @@ import {
   TrendingUp,
   Bell
 } from 'lucide-react';
-import { usePagos, Adelanto } from '../src/app/components/PagosContext';
+import { usePagos, Adelanto } from '../app/components/PagosContext';
 import { GestionarAdelantoModal } from './GestionarAdelantoModal';
 
 interface GestionAdelantosPanelProps {
