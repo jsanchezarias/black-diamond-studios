@@ -194,6 +194,7 @@ interface CurrentUser {
   userId: string;
   email: string;
   role: string;
+  nombre?: string;
 }
 
 export default function App() {
@@ -433,7 +434,7 @@ export default function App() {
                   currentUser={{ id: currentUser.userId, nombre: currentUser.nombre || currentUser.email, email: currentUser.email }} 
                   onLogout={handleLogout} 
                 />
-                <LandingPage onAccessSystem={() => {}} currentUser={currentUser} />
+                <LandingPage onAccessSystem={() => {}} currentUser={{ id: currentUser.userId, email: currentUser.email, role: currentUser.role, nombre: currentUser.nombre }} />
               </>
             )}
 

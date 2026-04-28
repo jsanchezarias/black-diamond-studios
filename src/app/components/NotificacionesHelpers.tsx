@@ -103,6 +103,59 @@ export async function notificarNuevoAgendamiento(params: {
 }
 
 /**
+ * Notificar a todos los programadores/admins sobre un nuevo agendamiento
+ */
+export async function notificarProgramadores(params: {
+  clienteNombre: string;
+  modeloNombre: string;
+  fecha: string;
+  hora: string;
+  tipoServicio: string;
+  agendamientoId: string;
+  duracion: number;
+}): Promise<void> {
+  try {
+    const { data: programadores, error } = await supabase
+      .from('usuarios')
+      .select('id, email')
+      .in('role', ['programador', 'admin', 'owner', 'recepcionista']);
+
+    if (error || !programadores?.length) return;
+
+    const duracionTexto = params.duracion >= 60
+      ? `${params.duracion / 60}h`
+      : `${params.duracion}min`;
+
+    for (const prog of programadores) {
+      const { error: notifError } = await supabase
+        .from('notificaciones' as any)
+        .insert({
+          usuario_id: prog.id,
+          usuario_email: prog.email,
+          tipo: 'agendamiento_nuevo',
+          titulo: '📅 Nuevo Agendamiento Pendiente',
+          mensaje: `${params.clienteNombre} → ${params.modeloNombre} · ${params.fecha} ${params.hora} (${duracionTexto}, ${params.tipoServicio})`,
+          icono: '📅',
+          leida: false,
+          prioridad: 'alta',
+          accion: JSON.stringify({
+            tipo: 'navegar',
+            destino: '/agendamientos',
+            datos: { agendamientoId: params.agendamientoId }
+          }),
+          creado_por: 'sistema',
+          fecha_creacion: new Date().toISOString(),
+        });
+      if (notifError && process.env.NODE_ENV === 'development') {
+        console.warn('⚠️ No se pudo notificar programador:', notifError.message);
+      }
+    }
+  } catch (e) {
+    if (process.env.NODE_ENV === 'development') console.error('❌ notificarProgramadores:', e);
+  }
+}
+
+/**
  * Notificar cuando se confirma un agendamiento
  */
 export async function notificarAgendamientoConfirmado(params: {

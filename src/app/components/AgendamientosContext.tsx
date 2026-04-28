@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '../../utils/supabase/info';
 import { configurarVerificacionPeriodica, AgendamientoParaRecordatorio } from './NotificacionesRecordatorios';
-import { notificarNuevoAgendamiento, notificarAgendamientoConfirmado } from './NotificacionesHelpers';
+import { notificarNuevoAgendamiento, notificarAgendamientoConfirmado, notificarProgramadores } from './NotificacionesHelpers';
 
 export interface Agendamiento {
   id: string;
@@ -256,6 +256,17 @@ export function AgendamientosProvider({ children }: { children: ReactNode }) {
           agendamientoId: nuevo.id,
         }).catch(() => { /* non-critical */ });
       }
+
+      // 🔔 Notificar a todos los programadores/admins
+      notificarProgramadores({
+        clienteNombre: nuevo.clienteNombre,
+        modeloNombre: nuevo.modeloNombre,
+        fecha: nuevo.fecha,
+        hora: nuevo.hora,
+        tipoServicio: nuevo.tipoServicio,
+        agendamientoId: nuevo.id,
+        duracion: nuevo.duracionMinutos,
+      }).catch(() => { /* non-critical */ });
 
       return { success: true, data: nuevo };
     } catch (error) {

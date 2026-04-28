@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../utils/supabase/info';
+import { notificarProgramadores } from './NotificacionesHelpers';
 import { toast } from 'sonner';
 import {
   Calendar, User, LogOut, Plus, Loader2, Bell,
@@ -150,6 +151,8 @@ export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboa
     fecha: mañana,
     hora: '15:00',
     servicioSeleccionado: null as any,
+    duracion: 60,
+    tipoServicio: 'Estándar',
     notas: '',
   });
 
@@ -296,7 +299,7 @@ export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboa
         }
       }
 
-      const { error } = await supabase.from('agendamientos').insert({
+      const { data: nuevoAg, error } = await supabase.from('agendamientos').insert({
         cliente_id: userId,
         cliente_email: userEmail,
         cliente_nombre: perfil?.nombre || '',
@@ -306,20 +309,35 @@ export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboa
         modelo_email: formCita.modeloEmail,
         modelo_nombre: modelo?.nombreArtistico || modelo?.nombre || '',
         tipo_servicio: formCita.servicioSeleccionado?.name || 'Estándar',
+        servicio: formCita.servicioSeleccionado?.name || 'Estándar',
         fecha: formCita.fecha,
         hora: formCita.hora,
         duracion: duracionMinutos,
         duracion_minutos: duracionMinutos,
         precio: precioBruto,
+        monto_pago: precioBruto,
         estado: 'pendiente',
         estado_pago: 'pendiente',
         notas: formCita.notas || null,
-      });
+      }).select().single();
 
       if (error) throw error;
 
+      // 🔔 Notificar a programadores/admins sobre la nueva reserva
+      if (nuevoAg) {
+        notificarProgramadores({
+          clienteNombre: perfil?.nombre || userEmail,
+          modeloNombre: modelo?.nombreArtistico || modelo?.nombre || '',
+          fecha: formCita.fecha,
+          hora: formCita.hora,
+          tipoServicio: formCita.servicioSeleccionado?.name || 'Estándar',
+          agendamientoId: nuevoAg.id,
+          duracion: duracionMinutos,
+        }).catch(() => {});
+      }
+
       toast.success('Solicitud enviada. Te contactaremos para confirmar.');
-      setFormCita({ modeloEmail: '', fecha: mañana, hora: '15:00', duracion: 60, tipoServicio: 'Estándar', notas: '' });
+      setFormCita({ modeloEmail: '', fecha: mañana, hora: '15:00', servicioSeleccionado: null, duracion: 60, tipoServicio: 'Estándar', notas: '' });
       setTab('citas');
       await cargarCitas();
     } catch (e: any) {
