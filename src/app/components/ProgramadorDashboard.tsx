@@ -709,7 +709,105 @@ export function ProgramadorDashboard({ accessToken, userId, userEmail, onLogout 
                       </span>
                     </div>
                     <div className="ml-2">
-                      {citas.map((apt: any) => <CardAg key={apt.id} apt={apt} />)}
+                      {citas.map((apt: any) => {
+  const isNueva = ['pendiente', 'solicitud_cliente'].includes(apt.estado);
+  const isAceptada = apt.estado === 'aprobado';
+  return (
+    <div key={apt.id} className={`rounded-xl p-4 mb-3 border transition-all ${
+      isNueva    ? 'bg-amber-500/8 border-amber-500/40' :
+      isAceptada ? 'bg-blue-500/8 border-blue-500/30' :
+                   'bg-white/3 border-white/10'
+    }`}>
+      <div className="flex items-center justify-between mb-3">
+        <span className={`font-bold text-sm ${isNueva ? 'text-amber-300' : isAceptada ? 'text-blue-300' : 'text-muted-foreground'}`}>
+          📅 {fmtFecha(apt.fecha)} — {apt.hora || '--:--'}
+        </span>
+        <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold ${
+          isNueva    ? 'bg-amber-500/20 text-amber-400' :
+          isAceptada ? 'bg-blue-500/20 text-blue-400' :
+          apt.estado === 'completado' ? 'bg-green-500/20 text-green-400' :
+          apt.estado === 'cancelado'  ? 'bg-red-500/20 text-red-400' :
+                                        'bg-white/10 text-white/50'
+        }`}>
+          {isNueva ? '⏳ Pendiente' : isAceptada ? '✅ Aceptada' :
+           apt.estado === 'completado' ? '🎉 Completada' :
+           apt.estado === 'cancelado'  ? '❌ Cancelada' :
+           apt.estado === 'no_show'    ? '👻 No Show' : apt.estado}
+        </span>
+      </div>
+
+      <div className="space-y-1.5 mb-3">
+        <div className="text-sm"><span className="text-muted-foreground">👤 Cliente:</span>{' '}
+          <span className="text-white font-medium">{apt.clienteNombre || apt.cliente_nombre || '—'}</span>
+          {(apt.clienteTelefono || apt.cliente_telefono) && (
+            <a href={`tel:${apt.clienteTelefono || apt.cliente_telefono}`} className="ml-2 text-green-400 text-xs hover:underline">
+              📞 {apt.clienteTelefono || apt.cliente_telefono}
+            </a>
+          )}
+        </div>
+        <div className="text-sm"><span className="text-muted-foreground">💃 Modelo:</span>{' '}
+          <span className="text-white font-medium">{apt.modeloNombre || apt.modelo_nombre || '—'}</span>
+        </div>
+        <div className="text-sm flex flex-wrap gap-x-4 gap-y-1">
+          <span><span className="text-muted-foreground">⏱️</span> {apt.tipoServicio || apt.tipo_servicio}{apt.duracionMinutos ? ` — ${apt.duracionMinutos} min` : ''}</span>
+          {(apt.montoPago || apt.precio) > 0 && (
+            <span className="text-amber-400 font-semibold">💰 ${(Number(apt.montoPago || apt.precio)).toLocaleString('es-CO')}</span>
+          )}
+        </div>
+      </div>
+
+      {apt.notas && (
+        <div className="text-xs text-muted-foreground bg-white/5 rounded-lg px-3 py-2 mb-3">
+          📝 {apt.notas}
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        <Button size="sm" variant="outline" className="h-8 w-8 p-0 flex-shrink-0"
+          onClick={() => setModalDetalle({ isOpen: true, agendamiento: apt })}>
+          <Eye className="w-4 h-4" />
+        </Button>
+
+        {isNueva && (
+          <>
+            <Button
+              size="sm"
+              className="flex-1 h-9 bg-gradient-to-r from-yellow-700 to-primary hover:from-yellow-600 hover:to-primary/90 text-black font-bold text-sm gap-1.5"
+              disabled={aceptandoId === apt.id}
+              onClick={() => handleAceptarClick(apt)}
+            >
+              {aceptandoId === apt.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+              Aceptar y asignar habitación
+            </Button>
+            <Button size="sm" variant="ghost"
+              className="flex-shrink-0 h-9 px-3 border border-red-500/40 text-red-400 hover:bg-red-950/30 hover:text-red-300 text-sm"
+              onClick={() => handleCancelarClick(apt)}>
+              <XCircle className="w-4 h-4" />
+            </Button>
+          </>
+        )}
+
+        {isAceptada && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                <MoreVertical className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => handleCancelarClick(apt)}>
+                <XCircle className="w-4 h-4 mr-2" /> Cancelar
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => handleNoShowClick(apt)}>
+                <UserX className="w-4 h-4 mr-2" /> No Show
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </div>
+    </div>
+  );
+})}
                     </div>
                   </div>
                 ))
@@ -793,7 +891,105 @@ export function ProgramadorDashboard({ accessToken, userId, userEmail, onLogout 
                           </div>
                           {/* Cards del día */}
                           <div className="ml-2">
-                            {citas.map((apt: any) => <CardAg key={apt.id} apt={apt} />)}
+                            {citas.map((apt: any) => {
+  const isNueva = ['pendiente', 'solicitud_cliente'].includes(apt.estado);
+  const isAceptada = apt.estado === 'aprobado';
+  return (
+    <div key={apt.id} className={`rounded-xl p-4 mb-3 border transition-all ${
+      isNueva    ? 'bg-amber-500/8 border-amber-500/40' :
+      isAceptada ? 'bg-blue-500/8 border-blue-500/30' :
+                   'bg-white/3 border-white/10'
+    }`}>
+      <div className="flex items-center justify-between mb-3">
+        <span className={`font-bold text-sm ${isNueva ? 'text-amber-300' : isAceptada ? 'text-blue-300' : 'text-muted-foreground'}`}>
+          📅 {fmtFecha(apt.fecha)} — {apt.hora || '--:--'}
+        </span>
+        <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold ${
+          isNueva    ? 'bg-amber-500/20 text-amber-400' :
+          isAceptada ? 'bg-blue-500/20 text-blue-400' :
+          apt.estado === 'completado' ? 'bg-green-500/20 text-green-400' :
+          apt.estado === 'cancelado'  ? 'bg-red-500/20 text-red-400' :
+                                        'bg-white/10 text-white/50'
+        }`}>
+          {isNueva ? '⏳ Pendiente' : isAceptada ? '✅ Aceptada' :
+           apt.estado === 'completado' ? '🎉 Completada' :
+           apt.estado === 'cancelado'  ? '❌ Cancelada' :
+           apt.estado === 'no_show'    ? '👻 No Show' : apt.estado}
+        </span>
+      </div>
+
+      <div className="space-y-1.5 mb-3">
+        <div className="text-sm"><span className="text-muted-foreground">👤 Cliente:</span>{' '}
+          <span className="text-white font-medium">{apt.clienteNombre || apt.cliente_nombre || '—'}</span>
+          {(apt.clienteTelefono || apt.cliente_telefono) && (
+            <a href={`tel:${apt.clienteTelefono || apt.cliente_telefono}`} className="ml-2 text-green-400 text-xs hover:underline">
+              📞 {apt.clienteTelefono || apt.cliente_telefono}
+            </a>
+          )}
+        </div>
+        <div className="text-sm"><span className="text-muted-foreground">💃 Modelo:</span>{' '}
+          <span className="text-white font-medium">{apt.modeloNombre || apt.modelo_nombre || '—'}</span>
+        </div>
+        <div className="text-sm flex flex-wrap gap-x-4 gap-y-1">
+          <span><span className="text-muted-foreground">⏱️</span> {apt.tipoServicio || apt.tipo_servicio}{apt.duracionMinutos ? ` — ${apt.duracionMinutos} min` : ''}</span>
+          {(apt.montoPago || apt.precio) > 0 && (
+            <span className="text-amber-400 font-semibold">💰 ${(Number(apt.montoPago || apt.precio)).toLocaleString('es-CO')}</span>
+          )}
+        </div>
+      </div>
+
+      {apt.notas && (
+        <div className="text-xs text-muted-foreground bg-white/5 rounded-lg px-3 py-2 mb-3">
+          📝 {apt.notas}
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        <Button size="sm" variant="outline" className="h-8 w-8 p-0 flex-shrink-0"
+          onClick={() => setModalDetalle({ isOpen: true, agendamiento: apt })}>
+          <Eye className="w-4 h-4" />
+        </Button>
+
+        {isNueva && (
+          <>
+            <Button
+              size="sm"
+              className="flex-1 h-9 bg-gradient-to-r from-yellow-700 to-primary hover:from-yellow-600 hover:to-primary/90 text-black font-bold text-sm gap-1.5"
+              disabled={aceptandoId === apt.id}
+              onClick={() => handleAceptarClick(apt)}
+            >
+              {aceptandoId === apt.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+              Aceptar y asignar habitación
+            </Button>
+            <Button size="sm" variant="ghost"
+              className="flex-shrink-0 h-9 px-3 border border-red-500/40 text-red-400 hover:bg-red-950/30 hover:text-red-300 text-sm"
+              onClick={() => handleCancelarClick(apt)}>
+              <XCircle className="w-4 h-4" />
+            </Button>
+          </>
+        )}
+
+        {isAceptada && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                <MoreVertical className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => handleCancelarClick(apt)}>
+                <XCircle className="w-4 h-4 mr-2" /> Cancelar
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => handleNoShowClick(apt)}>
+                <UserX className="w-4 h-4 mr-2" /> No Show
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </div>
+    </div>
+  );
+})}
                           </div>
                         </div>
                       ))
