@@ -21,6 +21,7 @@ import { ErrorBoundary } from './app/components/ErrorBoundary';
 import { LoginForm } from './app/components/LoginForm';
 import { Toaster } from 'sonner';
 import { LandingPage } from './app/components/LandingPage';
+import { ClienteNavbar } from './app/components/ClienteNavbar';
 
 // Lazy loading de dashboards — solo se cargan cuando el usuario los necesita
 const ProgramadorDashboard = lazy(() => import('./app/components/ProgramadorDashboard').then(m => ({ default: m.ProgramadorDashboard })));
@@ -239,6 +240,7 @@ export default function App() {
           accessToken: session.access_token,
           userId: session.user.id,
           email: session.user.email || localUser.email,
+          nombre: localUser.nombre || session.user.email,
           role: userData.role,
         };
         localStorage.setItem('blackDiamondUser', JSON.stringify(verifiedUser));
@@ -426,11 +428,13 @@ export default function App() {
             )}
 
             {currentUser.role === 'cliente' && (
-              <ClienteDashboard
-                userId={currentUser.userId}
-                userEmail={currentUser.email}
-                onLogout={handleLogout}
-              />
+              <>
+                <ClienteNavbar 
+                  currentUser={{ id: currentUser.userId, nombre: currentUser.nombre || currentUser.email, email: currentUser.email }} 
+                  onLogout={handleLogout} 
+                />
+                <LandingPage onAccessSystem={() => {}} currentUser={currentUser} />
+              </>
             )}
 
             {/* Fallback para roles no reconocidos */}

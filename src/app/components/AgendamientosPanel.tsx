@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Calendar, Clock, CheckCircle, XCircle, AlertCircle,
   User, Phone, ThumbsUp, ThumbsDown, Filter,
   RefreshCw, Plus, Star, X, Loader2, Users, MapPin,
+  Archive, Trash2, RotateCcw, Square, CheckSquare,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
@@ -46,6 +47,11 @@ function AgendamientoRow({
   onCompletar,
   onNoShow,
   onCancelar,
+  onArchivar,
+  onEliminar,
+  onRestaurar,
+  seleccionado,
+  onToggleSelect,
 }: {
   ag: Agendamiento;
   rol: AgendamientosPanelProps['rol'];
@@ -55,6 +61,11 @@ function AgendamientoRow({
   onCompletar: (id: string) => void;
   onNoShow: (id: string) => void;
   onCancelar: (id: string) => void;
+  onArchivar?: (ag: Agendamiento) => void;
+  onEliminar?: (ag: Agendamiento) => void;
+  onRestaurar?: (ag: Agendamiento) => void;
+  seleccionado?: boolean;
+  onToggleSelect?: (id: string) => void;
 }) {
   const cfg = ESTADO_CONFIG[ag.estado] ?? ESTADO_CONFIG.pendiente;
   const puedeAprobar    = (rol === 'supervisor' || rol === 'admin' || rol === 'owner') && ag.estado === 'pendiente';
@@ -62,8 +73,26 @@ function AgendamientoRow({
   const puedeNoShow     = (rol !== 'modelo') && (ag.estado === 'confirmado' || ag.estado === 'aprobado');
   const puedeCancelar   = (rol !== 'modelo') && (ag.estado === 'pendiente' || ag.estado === 'confirmado' || ag.estado === 'aprobado');
 
+  const esAdmin = rol === 'admin' || rol === 'owner';
+  const esArchivado = !!(ag as any).archivado;
+
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-lg border border-white/5 bg-white/[0.02] hover:bg-white/[0.04] transition-colors">
+    <div className={`flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-lg border transition-colors ${
+      seleccionado
+        ? 'border-amber-500/40 bg-amber-500/5'
+        : 'border-white/5 bg-white/[0.02] hover:bg-white/[0.04]'
+    }`}>
+      {/* Checkbox selección múltiple */}
+      {onToggleSelect && esAdmin && (
+        <button
+          onClick={() => onToggleSelect(ag.id)}
+          className="flex-shrink-0 text-white/30 hover:text-amber-400 transition-colors"
+        >
+          {seleccionado
+            ? <CheckSquare className="w-4 h-4 text-amber-400" />
+            : <Square className="w-4 h-4" />}
+        </button>
+      )}
       {/* Hora */}
       <div className="flex-shrink-0 w-24 text-center hidden sm:block">
         <span className="text-sm font-bold" style={{ color: COLOR_PRIMARY }}>{formatearHora(ag.hora)}</span>
@@ -125,6 +154,27 @@ function AgendamientoRow({
           <Button size="sm" onClick={() => onCancelar(ag.id)}
             className="h-7 px-2 text-xs bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20">
             <XCircle className="w-3 h-3 mr-1" />Cancelar
+          </Button>
+        )}
+        {/* Restaurar (solo en vista archivados) */}
+        {esArchivado && onRestaurar && esAdmin && (
+          <Button size="sm" onClick={() => onRestaurar(ag)}
+            className="h-7 px-2 text-xs bg-green-500/10 text-green-400 border border-green-500/20 hover:bg-green-500/20">
+            <RotateCcw className="w-3 h-3 mr-1" />Restaurar
+          </Button>
+        )}
+        {/* Archivar */}
+        {!esArchivado && onArchivar && esAdmin && (
+          <Button size="sm" onClick={() => onArchivar(ag)}
+            className="h-7 px-2 text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20">
+            <Archive className="w-3 h-3 mr-1" />Archivar
+          </Button>
+        )}
+        {/* Eliminar */}
+        {onEliminar && esAdmin && (
+          <Button size="sm" onClick={() => onEliminar(ag)}
+            className="h-7 px-2 text-xs bg-red-900/20 text-red-400 border border-red-900/30 hover:bg-red-900/30">
+            <Trash2 className="w-3 h-3" />
           </Button>
         )}
       </div>
@@ -746,10 +796,99 @@ export function AgendamientosPanel({ rol, userEmail = '', modeloEmail }: Agendam
   const [mostrarNuevoAgendamiento, setMostrarNuevoAgendamiento] = useState(false);
   const [mostrarCrearEvento, setMostrarCrearEvento] = useState(false);
 
+  // Archivar / Eliminar / Selección múltiple
+  const [mostrarArchivados, setMostrarArchivados] = useState(false);
+  const [archivados, setArchivados] = useState<any[]>([]);
+  const [cargandoArchivados, setCargandoArchivados] = useState(false);
+  const [modalArchivado, setModalArchivado] = useState<Agendamiento | null>(null);
+  const [modalEliminacion, setModalEliminacion] = useState<Agendamiento | null>(null);
+  const [seleccionados, setSeleccionados] = useState<string[]>([]);
+
   const esAdmin = rol === 'admin' || rol === 'owner';
 
+  // Cargar archivados cuando se activa el toggle
+  useEffect(() => {
+    if (!mostrarArchivados || !esAdmin) return;
+    const cargar = async () => {
+      setCargandoArchivados(true);
+      const { data } = await supabase
+        .from('agendamientos')
+        .select('*')
+        .eq('archivado', true)
+        .order('fecha_archivado', { ascending: false })
+        .limit(100);
+      setArchivados(data || []);
+      setCargandoArchivados(false);
+    };
+    cargar();
+  }, [mostrarArchivados]);
+
+  // ── Handlers archivar / eliminar / restaurar ──────────────────────────────────
+  const ejecutarArchivado = async () => {
+    if (!modalArchivado) return;
+    const { error } = await supabase
+      .from('agendamientos')
+      .update({
+        archivado: true,
+        archivado_por: userEmail,
+        fecha_archivado: new Date().toISOString(),
+      })
+      .eq('id', modalArchivado.id);
+    if (error) { toast.error('Error al archivar'); return; }
+    toast.success('Agendamiento archivado');
+    setModalArchivado(null);
+    await recargarAgendamientos();
+  };
+
+  const ejecutarEliminacion = async () => {
+    if (!modalEliminacion) return;
+    const { error } = await supabase.from('agendamientos').delete().eq('id', modalEliminacion.id);
+    if (error) { toast.error('Error al eliminar'); return; }
+    toast.success('Agendamiento eliminado permanentemente');
+    setModalEliminacion(null);
+    if (mostrarArchivados) {
+      setArchivados(prev => prev.filter(a => a.id !== modalEliminacion.id));
+    } else {
+      await recargarAgendamientos();
+    }
+  };
+
+  const restaurarAgendamiento = async (ag: any) => {
+    const { error } = await supabase
+      .from('agendamientos')
+      .update({ archivado: false, archivado_por: null, fecha_archivado: null })
+      .eq('id', ag.id);
+    if (error) { toast.error('Error al restaurar'); return; }
+    toast.success('Agendamiento restaurado');
+    setArchivados(prev => prev.filter(a => a.id !== ag.id));
+    await recargarAgendamientos();
+  };
+
+  const toggleSeleccionado = (id: string) => {
+    setSeleccionados(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const archivarSeleccionados = async () => {
+    if (!seleccionados.length) return;
+    await supabase
+      .from('agendamientos')
+      .update({ archivado: true, archivado_por: userEmail, fecha_archivado: new Date().toISOString() })
+      .in('id', seleccionados);
+    toast.success(`${seleccionados.length} agendamiento(s) archivados`);
+    setSeleccionados([]);
+    await recargarAgendamientos();
+  };
+
+  const eliminarSeleccionados = async () => {
+    if (!seleccionados.length) return;
+    await supabase.from('agendamientos').delete().in('id', seleccionados);
+    toast.success(`${seleccionados.length} agendamiento(s) eliminados`);
+    setSeleccionados([]);
+    await recargarAgendamientos();
+  };
+
   // ── Selección y Ordenamiento ─────────────────────────────────────
-  let rawList = [...agendamientos];
+  let rawList = [...agendamientos].filter(a => !(a as any).archivado);
   
   if (rol === 'modelo' && modeloEmail) {
     rawList = rawList.filter(a => a.modeloEmail === modeloEmail);
@@ -915,6 +1054,21 @@ export function AgendamientosPanel({ rol, userEmail = '', modeloEmail }: Agendam
                 </SelectContent>
               </Select>
 
+              {/* Toggle archivados — solo admin/owner */}
+              {esAdmin && (
+                <Button
+                  size="sm"
+                  onClick={() => { setMostrarArchivados(v => !v); setSeleccionados([]); }}
+                  className={`h-8 px-3 text-xs border ${mostrarArchivados
+                    ? 'bg-amber-500/15 border-amber-500/40 text-amber-400'
+                    : 'bg-transparent border-white/10 text-gray-400 hover:bg-white/5'
+                  }`}
+                >
+                  <Archive className="w-3 h-3 mr-1" />
+                  {mostrarArchivados ? 'Ver activos' : 'Ver archivados'}
+                </Button>
+              )}
+
               <Button size="sm" variant="ghost" onClick={handleRecargar} disabled={cargando}
                 className="h-8 w-8 p-0 border border-white/10 hover:bg-white/5">
                 <RefreshCw className={`w-3.5 h-3.5 ${cargando ? 'animate-spin' : ''}`} />
@@ -924,7 +1078,81 @@ export function AgendamientosPanel({ rol, userEmail = '', modeloEmail }: Agendam
         </CardHeader>
       </Card>
 
-      {rawList.length === 0 ? (
+      {/* Barra de selección múltiple */}
+      {seleccionados.length > 0 && (
+        <div className="sticky top-0 z-10 flex items-center gap-3 px-4 py-2.5 bg-[#111] border border-amber-500/20 rounded-lg">
+          <span className="text-xs text-amber-400 font-medium">{seleccionados.length} seleccionado(s)</span>
+          <Button size="sm" onClick={archivarSeleccionados}
+            className="h-7 px-2 text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20">
+            <Archive className="w-3 h-3 mr-1" />Archivar todos
+          </Button>
+          <Button size="sm" onClick={eliminarSeleccionados}
+            className="h-7 px-2 text-xs bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20">
+            <Trash2 className="w-3 h-3 mr-1" />Eliminar todos
+          </Button>
+          <button onClick={() => setSeleccionados([])}
+            className="ml-auto text-xs text-white/40 hover:text-white/70">
+            Cancelar
+          </button>
+        </div>
+      )}
+
+      {/* VISTA ARCHIVADOS */}
+      {mostrarArchivados && (
+        <Card className="border-amber-500/20 bg-amber-500/5">
+          <CardHeader className="pb-3 pt-4 px-4 border-b border-amber-500/10">
+            <CardTitle className="text-sm font-semibold flex items-center justify-between text-amber-400">
+              <div className="flex items-center gap-2">
+                <Archive className="w-4 h-4" />
+                Archivados
+              </div>
+              <span className="text-xs font-normal text-amber-400/60">{archivados.length} registro(s)</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4">
+            {cargandoArchivados ? (
+              <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-amber-400" /></div>
+            ) : archivados.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <Archive className="w-8 h-8 mx-auto mb-2 opacity-20" />
+                <p className="text-sm">No hay agendamientos archivados</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {archivados.map(ag => {
+                  const agNorm: Agendamiento = {
+                    id: ag.id,
+                    clienteId: ag.cliente_id || '',
+                    clienteNombre: ag.cliente_nombre || ag.clienteNombre || '',
+                    clienteTelefono: ag.cliente_telefono || ag.clienteTelefono || '',
+                    modeloEmail: ag.modelo_email || ag.modeloEmail || '',
+                    modeloNombre: ag.modelo_nombre || ag.modeloNombre || '',
+                    tipoServicio: ag.servicio_tipo || ag.tipoServicio || '',
+                    fecha: ag.fecha_servicio || ag.fecha || '',
+                    hora: ag.hora_inicio || ag.hora || '',
+                    duracionMinutos: ag.duracion_minutos || ag.duracionMinutos || 0,
+                    montoPago: ag.precio || ag.montoPago || 0,
+                    estadoPago: ag.estado_pago || ag.estadoPago || 'pendiente',
+                    estado: ag.estado || 'cancelado',
+                    archivado: true,
+                  } as any;
+                  return (
+                    <div key={ag.id} className="opacity-80">
+                      <AgendamientoRow ag={agNorm} rol={rol} userEmail={userEmail}
+                        onAprobar={() => {}} onRechazar={() => {}} onCompletar={() => {}} onNoShow={() => {}} onCancelar={() => {}}
+                        onRestaurar={restaurarAgendamiento}
+                        onEliminar={setModalEliminacion}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {!mostrarArchivados && rawList.length === 0 ? (
         <Card className="border-white/10 bg-black/20">
           <CardContent className="pt-12 pb-12">
             <div className="text-center text-gray-500">
@@ -933,7 +1161,7 @@ export function AgendamientosPanel({ rol, userEmail = '', modeloEmail }: Agendam
             </div>
           </CardContent>
         </Card>
-      ) : (
+      ) : !mostrarArchivados && (
         <div className="space-y-6">
           
           {/* SECCIÓN HOY */}
@@ -952,7 +1180,11 @@ export function AgendamientosPanel({ rol, userEmail = '', modeloEmail }: Agendam
               </CardHeader>
               <CardContent className="p-4 space-y-2">
                 {hoyList.map(ag => (
-                  <AgendamientoRow key={ag.id} ag={ag} rol={rol} userEmail={userEmail} onAprobar={handleAprobar} onRechazar={handleRechazar} onCompletar={handleCompletar} onNoShow={handleNoShow} onCancelar={handleCancelar} />
+                  <AgendamientoRow key={ag.id} ag={ag} rol={rol} userEmail={userEmail}
+                    onAprobar={handleAprobar} onRechazar={handleRechazar} onCompletar={handleCompletar} onNoShow={handleNoShow} onCancelar={handleCancelar}
+                    onArchivar={setModalArchivado} onEliminar={setModalEliminacion}
+                    seleccionado={seleccionados.includes(ag.id)} onToggleSelect={toggleSeleccionado}
+                  />
                 ))}
               </CardContent>
             </Card>
@@ -978,7 +1210,11 @@ export function AgendamientosPanel({ rol, userEmail = '', modeloEmail }: Agendam
                     </h4>
                     <div className="pl-2 border-l border-white/5 space-y-2 relative before:absolute before:left-[-1px] before:top-4 before:bottom-4 before:w-[2px] before:bg-white/5">
                       {ags.map(ag => (
-                        <AgendamientoRow key={ag.id} ag={ag} rol={rol} userEmail={userEmail} onAprobar={handleAprobar} onRechazar={handleRechazar} onCompletar={handleCompletar} onNoShow={handleNoShow} onCancelar={handleCancelar} />
+                        <AgendamientoRow key={ag.id} ag={ag} rol={rol} userEmail={userEmail}
+                          onAprobar={handleAprobar} onRechazar={handleRechazar} onCompletar={handleCompletar} onNoShow={handleNoShow} onCancelar={handleCancelar}
+                          onArchivar={setModalArchivado} onEliminar={setModalEliminacion}
+                          seleccionado={seleccionados.includes(ag.id)} onToggleSelect={toggleSeleccionado}
+                        />
                       ))}
                     </div>
                   </div>
@@ -1001,7 +1237,11 @@ export function AgendamientosPanel({ rol, userEmail = '', modeloEmail }: Agendam
               <CardContent className="p-4 space-y-2">
                 {historialPaginado.map(ag => (
                   <div key={ag.id} className="opacity-80 grayscale-[30%]">
-                    <AgendamientoRow ag={ag} rol={rol} userEmail={userEmail} onAprobar={handleAprobar} onRechazar={handleRechazar} onCompletar={handleCompletar} onNoShow={handleNoShow} onCancelar={handleCancelar} />
+                    <AgendamientoRow ag={ag} rol={rol} userEmail={userEmail}
+                      onAprobar={handleAprobar} onRechazar={handleRechazar} onCompletar={handleCompletar} onNoShow={handleNoShow} onCancelar={handleCancelar}
+                      onArchivar={setModalArchivado} onEliminar={setModalEliminacion}
+                      seleccionado={seleccionados.includes(ag.id)} onToggleSelect={toggleSeleccionado}
+                    />
                   </div>
                 ))}
 
@@ -1033,6 +1273,46 @@ export function AgendamientosPanel({ rol, userEmail = '', modeloEmail }: Agendam
             </Card>
           )}
 
+        </div>
+      )}
+
+      {/* Modal: Confirmar Archivar */}
+      {modalArchivado && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#111] border border-white/10 rounded-xl p-6 max-w-sm w-full">
+            <div className="text-3xl text-center mb-3">📦</div>
+            <h3 className="text-center font-semibold text-white mb-1">¿Archivar agendamiento?</h3>
+            <p className="text-center text-sm text-gray-400 mb-1">
+              {modalArchivado.clienteNombre} — {formatearFecha(modalArchivado.fecha)}
+            </p>
+            <p className="text-center text-xs text-gray-500 mb-5">
+              Se moverá a Archivados y podrás recuperarlo cuando quieras.
+            </p>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1 border-white/10 text-gray-400" onClick={() => setModalArchivado(null)}>Cancelar</Button>
+              <Button className="flex-1 bg-amber-500 hover:bg-amber-400 text-black font-semibold" onClick={ejecutarArchivado}>Sí, archivar</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Confirmar Eliminar */}
+      {modalEliminacion && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#111] border border-red-500/20 rounded-xl p-6 max-w-sm w-full">
+            <div className="text-3xl text-center mb-3">🗑️</div>
+            <h3 className="text-center font-semibold text-red-400 mb-1">¿Eliminar permanentemente?</h3>
+            <p className="text-center text-sm text-gray-400 mb-1">
+              {(modalEliminacion as any).clienteNombre || (modalEliminacion as any).cliente_nombre} — {formatearFecha((modalEliminacion as any).fecha || (modalEliminacion as any).fecha_servicio)}
+            </p>
+            <p className="text-center text-xs text-red-400/70 mb-5">
+              ⚠️ Esta acción no se puede deshacer.
+            </p>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1 border-white/10 text-gray-400" onClick={() => setModalEliminacion(null)}>Cancelar</Button>
+              <Button className="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold" onClick={ejecutarEliminacion}>Sí, eliminar</Button>
+            </div>
+          </div>
         </div>
       )}
 

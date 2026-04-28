@@ -26,6 +26,7 @@ import { TipModal } from './TipModal';
 import { usePublicUsers } from './PublicUsersContext';
 import { useModelos } from './ModelosContext';
 import { supabase } from '../../utils/supabase/info';
+import { PerfilModeloPublico } from './PerfilModeloPublico';
 
 
 // ✅ Agregar tipos necesarios
@@ -54,15 +55,17 @@ function TipNotificationsContainer({ tips, onRemoveTip }: { tips: TipData[], onR
 
 interface LandingPageProps {
   onAccessSystem: () => void;
+  currentUser?: { id: string; email: string; nombre?: string; role?: string } | null;
 }
 
-export function LandingPage({ onAccessSystem }: LandingPageProps) {
+export function LandingPage({ onAccessSystem, currentUser: currentUserProp }: LandingPageProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
-  const [sedeActual, setSedeActual] = useState('sede-1'); // Estado para la sede seleccionada
-  const [streamUrl, setStreamUrl] = useState(sedes[0].streamUrl); // URL del stream actual
-  const [loadingStream, setLoadingStream] = useState(false); // Estado de carga de streams
-  const [isScrolled, setIsScrolled] = useState(false); // ✅ Estado de scroll para el nav
+  const [sedeActual, setSedeActual] = useState('sede-1');
+  const [streamUrl, setStreamUrl] = useState(sedes[0].streamUrl);
+  const [loadingStream, setLoadingStream] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [perfilModeloAbierto, setPerfilModeloAbierto] = useState<string | null>(null);
   
   // Estados para sistema de propinas
   const [showTipModal, setShowTipModal] = useState(false);
@@ -529,9 +532,20 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
 
             {/* Mobile/Tablet Menu - Para pantallas < lg */}
             <div className="lg:hidden flex items-center gap-2 sm:gap-3">
+              {/* Botón Sistema siempre visible sin abrir el menú */}
+              {!clienteActual && (
+                <Button
+                  onClick={onAccessSystem}
+                  size="sm"
+                  className="bg-primary text-black font-semibold text-xs h-8 px-3 whitespace-nowrap"
+                >
+                  Sistema
+                </Button>
+              )}
+
               {/* Language Selector en móvil */}
               <LanguageSelector />
-              
+
               {/* Menu Button */}
               <Button
                 variant="outline"
@@ -859,7 +873,15 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
               {modelosDisponibles.length > 0 ? (
                 modelosDisponibles.map((modelo) => (
-                  <ModelCard key={modelo.id} model={modelo} onContact={handleContactModel} />
+                  <div key={modelo.id} className="relative">
+                    <ModelCard model={modelo} onContact={handleContactModel} />
+                    <button
+                      onClick={() => setPerfilModeloAbierto(modelo.id)}
+                      className="w-full mt-2 py-2.5 rounded-xl text-sm font-bold text-black bg-gradient-to-r from-amber-600 to-amber-400 hover:from-amber-500 hover:to-amber-300 transition-all active:scale-95"
+                    >
+                      Ver perfil y reservar
+                    </button>
+                  </div>
                 ))
               ) : (
                 <div className="text-center py-12 bg-gradient-to-br from-card to-primary/5 rounded-2xl border border-primary/20">
@@ -890,11 +912,18 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
               
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 opacity-75 hover:opacity-100 transition-opacity">
                 {modelosNoDisponibles.map((modelo) => (
-                  <ModelCard 
-                    key={modelo.id} 
-                    model={{...modelo, available: false}} 
-                    onContact={handleContactModel} 
-                  />
+                  <div key={modelo.id} className="relative">
+                    <ModelCard 
+                      model={{...modelo, available: false}} 
+                      onContact={handleContactModel} 
+                    />
+                    <button
+                      onClick={() => setPerfilModeloAbierto(modelo.id)}
+                      className="w-full mt-2 py-2.5 rounded-xl text-sm font-bold text-black/60 bg-white/10 hover:bg-white/20 transition-all cursor-not-allowed"
+                    >
+                      Ver perfil
+                    </button>
+                  </div>
                 ))}
               </div>
             </div>
@@ -1310,6 +1339,19 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
 
       {/* ✨ Scroll Progress Bar & Back to top */}
       <ScrollUI />
+
+      {/* 🎭 Perfil Público de Modelo */}
+      {perfilModeloAbierto && (
+        <PerfilModeloPublico
+          modeloId={perfilModeloAbierto}
+          onClose={() => setPerfilModeloAbierto(null)}
+          currentUser={currentUserProp || (clienteActual ? { id: clienteActual.id, email: clienteActual.email || '', nombre: clienteActual.nombre } : null)}
+          onLoginRequired={() => {
+            setPerfilModeloAbierto(null);
+            setShowClienteLogin(true);
+          }}
+        />
+      )}
     </div>
   );
 }
