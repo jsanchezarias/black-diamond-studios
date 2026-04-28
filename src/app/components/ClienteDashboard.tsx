@@ -320,7 +320,7 @@ export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboa
         duracion_minutos: modalServicio.duracion_minutos || 60,
         precio: modalServicio.precio,
         monto_pago: modalServicio.precio,
-        ubicacion: modalSede === 'sede_norte' ? 'Sede Norte' : 'Domicilio',
+        ubicacion: modalSede === 'sede_norte' ? 'sede' : 'domicilio',
         habitacion: modalSede === 'sede_norte' ? 'Por asignar' : modalDireccion,
         estado: 'pendiente',
         estado_pago: 'pendiente',

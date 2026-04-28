@@ -113,7 +113,7 @@ export function SolicitudServicioModal({ isOpen, onClose, data, currentUser }: S
           precio: precioActual,
           fecha: fecha,
           hora: hora,
-          ubicacion: sede === 'sede_norte' ? 'Sede Norte' : 'Domicilio',
+          ubicacion: sede === 'sede_norte' ? 'sede' : 'domicilio',
           habitacion: sede === 'domicilio' ? direccion : 'Por asignar',
           notas: notas || null,
           estado: 'pendiente',
