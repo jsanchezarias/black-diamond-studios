@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import IngresosWidget from '../../components/IngresosWidget';
 import {
   DollarSign, BarChart3, CreditCard, LogOut, Calculator,
   Receipt, Zap, PieChart, TrendingUp, TrendingDown,
@@ -228,6 +229,7 @@ export function ContadorDashboard({ userEmail, onLogout }: ContadorDashboardProp
 
           {/* ════════════════════ RESUMEN FINANCIERO ════════════════════ */}
           <TabsContent value="resumen" className="space-y-6">
+            <IngresosWidget rol="contador" mostrarDetalle={true} />
 
             {/* KPI cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

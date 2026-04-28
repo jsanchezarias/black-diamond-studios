@@ -1,4 +1,5 @@
 import { useState, lazy, Suspense } from 'react';
+import IngresosWidget from '../../components/IngresosWidget';
 import { 
   BarChart3, 
   Users, 
@@ -458,10 +459,13 @@ export function AdminDashboard({ accessToken, userId, userEmail = '', onLogout }
       }>
       <div className="space-y-4">
         {moduloActivo === 'general' && (
-          <AdminResumenPanel 
-            recentActivity={recentActivity}
-            financialSummary={financialSummary}
-          />
+          <div className="space-y-6">
+            <IngresosWidget rol="admin" mostrarDetalle={true} />
+            <AdminResumenPanel 
+              recentActivity={recentActivity}
+              financialSummary={financialSummary}
+            />
+          </div>
         )}
 
         {moduloActivo === 'testimonios' && (
@@ -642,18 +646,21 @@ export function AdminDashboard({ accessToken, userId, userEmail = '', onLogout }
         )}
 
         {moduloActivo === 'finanzas' && (
-          <Tabs defaultValue="analisis">
-            <TabsList className="mb-6">
-              <TabsTrigger value="analisis">Análisis Financiero</TabsTrigger>
-              <TabsTrigger value="gastos">Gastos Operativos</TabsTrigger>
-            </TabsList>
-            <TabsContent value="analisis">
-              <FinanzasPanel serviciosFinalizados={serviciosFinalizados} />
-            </TabsContent>
-            <TabsContent value="gastos">
-              <GastosOperativosPanel userEmail={userEmail} />
-            </TabsContent>
-          </Tabs>
+          <div className="space-y-6">
+            <IngresosWidget rol="admin" mostrarDetalle={true} />
+            <Tabs defaultValue="analisis">
+              <TabsList className="mb-6">
+                <TabsTrigger value="analisis">Análisis Financiero</TabsTrigger>
+                <TabsTrigger value="gastos">Gastos Operativos</TabsTrigger>
+              </TabsList>
+              <TabsContent value="analisis">
+                <FinanzasPanel serviciosFinalizados={serviciosFinalizados} />
+              </TabsContent>
+              <TabsContent value="gastos">
+                <GastosOperativosPanel userEmail={userEmail} />
+              </TabsContent>
+            </Tabs>
+          </div>
         )}
 
         {moduloActivo === 'operaciones' && (

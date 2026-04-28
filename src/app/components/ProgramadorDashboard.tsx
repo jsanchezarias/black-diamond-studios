@@ -107,6 +107,10 @@ export function ProgramadorDashboard({ accessToken, userId, userEmail, onLogout 
   const [solicitudesNuevas, setSolicitudesNuevas] = useState<any[]>([]);
   const [aceptadas, setAceptadas] = useState<any[]>([]);
   const [aprobadas, setAprobadas] = useState<any[]>([]);
+  const [modalAceptar, setModalAceptar] = useState<any>(null);
+  const [habitacionesDisponibles, setHabitacionesDisponibles] = useState<any[]>([]);
+  const [habitacionSeleccionada, setHabitacionSeleccionada] = useState<any>(null);
+  const [loadingAceptar, setLoadingAceptar] = useState(false);
 
   const cargarAgendamientos = async () => {
     setLoading(true)
@@ -308,6 +312,10 @@ export function ProgramadorDashboard({ accessToken, userId, userEmail, onLogout 
 
   // 🔔 Toast en tiempo real cuando llega nueva solicitud pendiente
   useEffect(() => {
+    if (modalAceptar) cargarHabitaciones();
+  }, [modalAceptar]);
+
+  useEffect(() => {
     cargarAgendamientos()
     cargarNotificaciones()
 
@@ -318,18 +326,58 @@ export function ProgramadorDashboard({ accessToken, userId, userEmail, onLogout 
         schema: 'public',
         table: 'notificaciones',
         filter: 'usuario_id=eq.' + currentUser.id
-      }, (payload) => {
-        setNotificaciones(prev => [payload.new, ...prev])
-        setNoLeidas(prev => prev + 1)
-        toast('🔔 ' + payload.new.titulo, {
-          duration: 6000,
-          style: {
-            background: 'rgba(255,215,0,0.15)',
-            border: '1px solid rgba(255,215,0,0.4)',
-            color: 'white',
-            fontWeight: '600'
-          }
-        })
+      }, async (payload) => {
+        const notifNueva = payload.new as any;
+        setNotificaciones(prev => [notifNueva, ...prev]);
+        setNoLeidas(prev => prev + 1);
+
+        if (notifNueva.tipo === 'agendamiento_nuevo' && notifNueva.referencia_id) {
+          toast(
+            (t: any) => (
+              <div>
+                <div style={{ fontWeight: 700, marginBottom: 4, fontSize: 13 }}>🔔 {notifNueva.titulo}</div>
+                <div style={{ fontSize: 11, marginBottom: 10, opacity: 0.75, lineHeight: 1.4 }}>{notifNueva.mensaje}</div>
+                <button
+                  onClick={async () => {
+                    toast.dismiss(t.id);
+                    const { data: ag } = await supabase.from('agendamientos').select('*').eq('id', notifNueva.referencia_id).single();
+                    if (ag) setModalAceptar(ag);
+                    else toast.error('Agendamiento no encontrado');
+                  }}
+                  style={{
+                    background: 'linear-gradient(135deg, #B8860B, #FFD700)',
+                    border: 'none', borderRadius: 8,
+                    padding: '8px 14px', color: 'black',
+                    fontWeight: 700, cursor: 'pointer',
+                    fontSize: 12, width: '100%',
+                  }}
+                >
+                  ✅ Aceptar ahora
+                </button>
+              </div>
+            ),
+            {
+              duration: 15000,
+              style: {
+                background: 'rgba(15,12,5,0.97)',
+                border: '1px solid rgba(255,215,0,0.5)',
+                color: 'white',
+                padding: '14px',
+                maxWidth: 320,
+              },
+            }
+          );
+        } else {
+          toast('🔔 ' + notifNueva.titulo, {
+            duration: 6000,
+            style: {
+              background: 'rgba(255,215,0,0.15)',
+              border: '1px solid rgba(255,215,0,0.4)',
+              color: 'white',
+              fontWeight: '600',
+            },
+          });
+        }
       })
       .on('postgres_changes', {
         event: 'INSERT',
@@ -354,30 +402,115 @@ export function ProgramadorDashboard({ accessToken, userId, userEmail, onLogout 
     }
   }, [currentUser.id])
 
-  // ✅ Aceptar agendamiento con asignación automática de habitación
-  const handleAceptarClick = async (apt: Agendamiento) => {
-    setAceptandoId(apt.id);
-    try {
-      let habitacionInfo = '';
-      try {
-        const { data: habitaciones } = await (supabase as any)
-          .from('habitaciones')
-          .select('id, nombre, numero')
-          .order('nombre', { ascending: true })
-          .limit(1);
-        if (habitaciones?.length) {
-          const h = habitaciones[0];
-          habitacionInfo = ` — Hab: ${h.nombre || h.numero || h.id}`;
-        }
-      } catch { /* tabla puede no existir */ }
+  // Abrir modal de aceptación con selección de habitación
+  const handleAceptarClick = (apt: Agendamiento) => {
+    setModalAceptar(apt);
+  };
 
-      await agendamientosCtx.aprobarAgendamiento(apt.id, userEmail);
-      toast.success(`Agendamiento aceptado${habitacionInfo}`);
-    } catch {
-      toast.error('Error al aceptar el agendamiento');
-    } finally {
-      setAceptandoId(null);
+  const cargarHabitaciones = async () => {
+    const { data } = await (supabase as any)
+      .from('habitaciones')
+      .select('id, numero, nombre, estado')
+      .in('estado', ['disponible', 'libre'])
+      .order('numero', { ascending: true });
+    const lista = data || [];
+    setHabitacionesDisponibles(lista);
+    setHabitacionSeleccionada(lista[0] || null);
+  };
+
+  const aceptarConHabitacion = async (agendamiento: any, habitacionId: string) => {
+    if (!habitacionId) return;
+    setLoadingAceptar(true);
+    try {
+      const { data: habitacion } = await (supabase as any)
+        .from('habitaciones')
+        .select('id, numero, nombre')
+        .eq('id', habitacionId)
+        .single();
+
+      if (!habitacion) {
+        toast.error('Habitación no encontrada');
+        setLoadingAceptar(false);
+        return;
+      }
+
+      const { error } = await supabase
+        .from('agendamientos')
+        .update({
+          estado: 'aceptado_programador',
+          habitacion: 'Habitación ' + habitacion.numero,
+          habitacion_id: habitacion.id,
+          habitacion_numero: habitacion.numero,
+          aceptado_por: currentUser.email,
+          fecha_aceptacion: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        } as any)
+        .eq('id', agendamiento.id);
+
+      if (error) {
+        console.error('ERROR ACEPTAR:', error.message, error.code);
+        toast.error('Error: ' + error.message);
+        setLoadingAceptar(false);
+        return;
+      }
+
+      await (supabase as any)
+        .from('habitaciones')
+        .update({ estado: 'reservada', updated_at: new Date().toISOString() })
+        .eq('id', habitacion.id);
+
+      // Notificar admins/owners/recepcionistas
+      const { data: admins } = await supabase
+        .from('usuarios')
+        .select('id, email')
+        .in('role', ['admin', 'owner', 'recepcionista'])
+        .eq('estado', 'activo');
+
+      if (admins?.length) {
+        await (supabase as any).from('notificaciones').insert(
+          admins.map((u: any) => ({
+            usuario_id: u.id,
+            usuario_email: u.email,
+            titulo: '📋 Cita aceptada — Hab. ' + habitacion.numero,
+            mensaje:
+              (agendamiento.clienteNombre || agendamiento.cliente_nombre || 'Cliente') +
+              ' — ' + (agendamiento.tipoServicio || agendamiento.tipo_servicio || 'servicio') +
+              ' el ' + (agendamiento.fecha || '').toString().split('T')[0] +
+              ' a las ' + agendamiento.hora +
+              ' — Habitación ' + habitacion.numero,
+            tipo: 'agendamiento_confirmado',
+            referencia_id: agendamiento.id,
+            leida: false,
+            created_at: new Date().toISOString(),
+          }))
+        );
+      }
+
+      // Notificar cliente
+      const clienteId = agendamiento.cliente_id;
+      if (clienteId) {
+        await (supabase as any).from('notificaciones').insert({
+          usuario_id: clienteId,
+          titulo: '✅ Tu cita fue aceptada',
+          mensaje:
+            'Tu cita del ' + (agendamiento.fecha || '').toString().split('T')[0] +
+            ' a las ' + agendamiento.hora +
+            ' fue aceptada. Habitación ' + habitacion.numero,
+          tipo: 'agendamiento_confirmado',
+          referencia_id: agendamiento.id,
+          leida: false,
+          created_at: new Date().toISOString(),
+        });
+      }
+
+      toast.success('✅ Cita aceptada — Habitación ' + habitacion.numero + ' asignada');
+      setModalAceptar(null);
+      setHabitacionSeleccionada(null);
+      cargarAgendamientos();
+    } catch (e: any) {
+      toast.error('Error inesperado: ' + e.message);
     }
+    setLoadingAceptar(false);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -1049,7 +1182,104 @@ export function ProgramadorDashboard({ accessToken, userId, userEmail, onLogout 
           )}
 
           {activeTab === 'notificaciones' ? (
-            <NotificacionesPanel currentUser={currentUser} />
+            <div className="space-y-4">
+              <Card className="border-primary/30 bg-gradient-to-br from-card to-card/50">
+                <CardHeader className="p-4">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg font-bold flex items-center gap-2">
+                      <Bell className="w-5 h-5 text-primary" />
+                      Notificaciones
+                      {noLeidas > 0 && (
+                        <span className="bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1">
+                          {noLeidas}
+                        </span>
+                      )}
+                    </CardTitle>
+                    {noLeidas > 0 && (
+                      <button
+                        onClick={async () => {
+                          await supabase.from('notificaciones').update({ leida: true }).eq('usuario_id', currentUser.id).eq('leida', false);
+                          setNotificaciones(prev => prev.map((n: any) => ({ ...n, leida: true })));
+                          setNoLeidas(0);
+                        }}
+                        className="text-xs text-primary/70 hover:text-primary underline"
+                      >
+                        Marcar todas como leídas
+                      </button>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0 pb-2">
+                  {notificaciones.length === 0 ? (
+                    <div className="py-16 text-center">
+                      <Bell className="w-12 h-12 mx-auto mb-3 text-muted-foreground/20" />
+                      <p className="text-muted-foreground text-sm">No tienes notificaciones</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-border/30">
+                      {notificaciones.map((notif: any) => (
+                        <div
+                          key={notif.id}
+                          className={`p-4 transition-colors ${!notif.leida ? 'bg-primary/8' : ''}`}
+                        >
+                          <div className="flex gap-3">
+                            <div className="text-2xl flex-shrink-0">
+                              {notif.tipo === 'agendamiento_nuevo' ? '🔔' :
+                               notif.tipo === 'agendamiento_confirmado' ? '✅' :
+                               notif.tipo === 'pago_recibido' ? '💰' : '📢'}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start justify-between gap-2">
+                                <h3 className={`text-sm font-semibold leading-tight ${!notif.leida ? 'text-white' : 'text-muted-foreground'}`}>
+                                  {notif.titulo}
+                                </h3>
+                                {!notif.leida && <div className="w-2 h-2 bg-primary rounded-full flex-shrink-0 mt-1.5" />}
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                                {notif.mensaje}
+                              </p>
+                              <p className="text-xs text-muted-foreground/40 mt-1">
+                                {(() => { try { return new Date(notif.created_at).toLocaleString('es-CO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); } catch { return ''; } })()}
+                              </p>
+
+                              {notif.tipo === 'agendamiento_nuevo' && notif.referencia_id && (
+                                <button
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    const { data: ag } = await supabase
+                                      .from('agendamientos').select('*').eq('id', notif.referencia_id).single();
+                                    if (ag) {
+                                      setModalAceptar(ag);
+                                      if (!notif.leida) {
+                                        await supabase.from('notificaciones').update({ leida: true }).eq('id', notif.id);
+                                        setNotificaciones(prev => prev.map((n: any) => n.id === notif.id ? { ...n, leida: true } : n));
+                                        setNoLeidas(prev => Math.max(0, prev - 1));
+                                      }
+                                    } else {
+                                      toast.error('Agendamiento no encontrado');
+                                    }
+                                  }}
+                                  style={{
+                                    marginTop: 10, width: '100%',
+                                    background: 'linear-gradient(135deg, #B8860B, #FFD700)',
+                                    border: 'none', borderRadius: 8,
+                                    padding: '9px 14px', color: 'black',
+                                    fontWeight: 700, cursor: 'pointer', fontSize: 12,
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                                  }}
+                                >
+                                  ✅ Ver y aceptar agendamiento
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           ) : null}
 
           {activeTab === 'analytics' && (
@@ -1084,6 +1314,138 @@ export function ProgramadorDashboard({ accessToken, userId, userEmail, onLogout 
           onClose={() => setModalDetalle({ isOpen: false, agendamiento: null })}
           agendamiento={modalDetalle.agendamiento}
         />
+      )}
+
+      {/* ─── Modal Aceptar con habitación ───────────────────────────── */}
+      {modalAceptar && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.88)' }}
+          onClick={(e) => { if (e.target === e.currentTarget) { setModalAceptar(null); setHabitacionSeleccionada(null); } }}
+        >
+          <div className="w-full max-w-sm rounded-2xl p-6" style={{ background: '#111', border: '0.5px solid rgba(255,215,0,0.3)' }}>
+            <h3 className="font-bold text-lg mb-4" style={{ color: '#FFD700' }}>✅ Aceptar cita</h3>
+
+            {/* Resumen completo del agendamiento */}
+            <div style={{
+              background: 'rgba(255,255,255,0.05)', borderRadius: 10,
+              padding: 14, marginBottom: 16
+            }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: 13 }}>
+                <div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>CLIENTE</div>
+                  <div style={{ fontWeight: 600, color: 'white' }}>{modalAceptar.clienteNombre || modalAceptar.cliente_nombre || '—'}</div>
+                  {(modalAceptar.clienteTelefono || modalAceptar.cliente_telefono) && (
+                    <a href={'tel:' + (modalAceptar.clienteTelefono || modalAceptar.cliente_telefono)}
+                      style={{ color: '#4CAF50', fontSize: 11, textDecoration: 'none', display: 'block', marginTop: 2 }}>
+                      📞 {modalAceptar.clienteTelefono || modalAceptar.cliente_telefono}
+                    </a>
+                  )}
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>MODELO</div>
+                  <div style={{ fontWeight: 600, color: 'white' }}>{modalAceptar.modeloNombre || modalAceptar.modelo_nombre || 'Sin asignar'}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>FECHA</div>
+                  <div style={{ fontWeight: 600, color: '#FFD700' }}>
+                    {(() => {
+                      const f = (modalAceptar.fecha || '').toString().split('T')[0];
+                      if (!f) return '—';
+                      const [y, m, d] = f.split('-');
+                      return new Date(+y, +m - 1, +d).toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'long' });
+                    })()}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>HORA</div>
+                  <div style={{ fontWeight: 600, color: '#FFD700' }}>
+                    {(() => {
+                      const h = (modalAceptar.hora || '').toString().substring(0, 5);
+                      if (!h) return '—';
+                      const [hh, mm] = h.split(':');
+                      const n = parseInt(hh);
+                      return (n % 12 || 12) + ':' + mm + ' ' + (n >= 12 ? 'PM' : 'AM');
+                    })()}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>SERVICIO</div>
+                  <div style={{ color: 'white' }}>{modalAceptar.tipoServicio || modalAceptar.tipo_servicio || '—'}</div>
+                </div>
+                {(modalAceptar.montoPago || modalAceptar.precio) > 0 && (
+                  <div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>PRECIO</div>
+                    <div style={{ color: '#4CAF50', fontWeight: 700 }}>${Number(modalAceptar.montoPago || modalAceptar.precio).toLocaleString('es-CO')}</div>
+                  </div>
+                )}
+                {(modalAceptar.ubicacion || modalAceptar.habitacion) && (
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>UBICACIÓN</div>
+                    <div style={{ color: 'white' }}>{modalAceptar.ubicacion || modalAceptar.habitacion}</div>
+                  </div>
+                )}
+                {modalAceptar.notas && (
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>NOTAS</div>
+                    <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>{modalAceptar.notas}</div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Habitaciones */}
+            <p className="text-xs text-white/50 mb-2 font-medium uppercase tracking-wider">Selecciona la habitación</p>
+
+            {habitacionesDisponibles.length === 0 ? (
+              <div className="p-4 text-center text-sm rounded-xl mb-4" style={{ background: 'rgba(255,0,0,0.1)', color: '#FF4444' }}>
+                ⚠️ No hay habitaciones disponibles
+              </div>
+            ) : (
+              <div className="grid grid-cols-4 gap-2 mb-4">
+                {habitacionesDisponibles.map((hab: any) => (
+                  <button
+                    key={hab.id}
+                    onClick={() => setHabitacionSeleccionada(hab)}
+                    className="py-3 rounded-xl text-sm font-semibold transition-all"
+                    style={{
+                      border: habitacionSeleccionada?.id === hab.id ? '1.5px solid #FFD700' : '0.5px solid rgba(255,255,255,0.1)',
+                      background: habitacionSeleccionada?.id === hab.id ? 'rgba(255,215,0,0.15)' : 'rgba(255,255,255,0.03)',
+                      color: habitacionSeleccionada?.id === hab.id ? '#FFD700' : 'white',
+                    }}
+                  >
+                    🏠 {hab.numero}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Botones */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setModalAceptar(null); setHabitacionSeleccionada(null); }}
+                className="flex-1 py-2.5 rounded-xl text-sm text-white/60 transition-all hover:text-white"
+                style={{ border: '0.5px solid rgba(255,255,255,0.2)', background: 'transparent' }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => aceptarConHabitacion(modalAceptar, habitacionSeleccionada?.id)}
+                disabled={!habitacionSeleccionada || loadingAceptar}
+                className="flex-[2] py-2.5 rounded-xl text-sm font-bold text-black disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                style={{ background: 'linear-gradient(135deg, #B8860B, #FFD700)' }}
+              >
+                {loadingAceptar ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Aceptando...</>
+                ) : habitacionSeleccionada ? (
+                  `✅ Aceptar — Hab. ${habitacionSeleccionada.numero}`
+                ) : (
+                  'Selecciona habitación'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

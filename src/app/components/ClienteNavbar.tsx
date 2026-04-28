@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, Calendar as CalendarIcon, User, LogOut, ChevronRight, X } from 'lucide-react';
 import { supabase } from '../../utils/supabase/info';
 import { toast } from 'sonner';
 
@@ -30,7 +29,7 @@ export function ClienteNavbar({ currentUser, onLogout }: ClienteNavbarProps) {
   const [citasPendientes, setCitasPendientes] = useState<any[]>([]);
   const [notificaciones, setNotificaciones] = useState<any[]>([]);
   const [mostrarCitas, setMostrarCitas] = useState(false);
-  const [mostrarNotif, setMostrarNotif] = useState(false);
+  const [menuAbierto, setMenuAbierto] = useState(false);
 
   const cargarCitas = async () => {
     const hoy = new Date().toISOString().split('T')[0];
@@ -96,157 +95,243 @@ export function ClienteNavbar({ currentUser, onLogout }: ClienteNavbarProps) {
 
   return (
     <>
-      <nav className="fixed top-0 left-0 right-0 z-[100] bg-black/90 backdrop-blur-md border-b border-amber-500/20 px-4 h-16 flex items-center gap-3">
-        <div className="flex items-center gap-2">
-          <img src="/logo.png" className="h-8 object-contain hidden sm:block" alt="Black Diamond" />
-          <span className="text-amber-500 font-bold tracking-widest text-sm" style={{ fontFamily: 'Playfair Display, serif' }}>
-            BLACK DIAMOND
+      <nav style={{
+        position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
+        background: 'rgba(0,0,0,0.95)',
+        backdropFilter: 'blur(10px)',
+        borderBottom: '0.5px solid rgba(255,215,0,0.2)',
+        height: 56,
+        display: 'flex', alignItems: 'center',
+        padding: '0 16px', gap: 12
+      }}>
+        <img src='/logo.png' style={{ height: 32 }} alt='BDS'
+          onError={(e: any) => {
+            e.target.style.display = 'none'
+          }}
+        />
+
+        <span style={{
+          color: '#FFD700', fontWeight: 700, fontSize: 14,
+          letterSpacing: '0.05em'
+        }}>
+          BLACK DIAMOND
+        </span>
+
+        <div style={{ flex: 1 }} />
+
+        <button
+          onClick={() => setMostrarCitas(!mostrarCitas)}
+          style={{
+            background: 'transparent',
+            border: '0.5px solid rgba(255,215,0,0.3)',
+            color: 'white', borderRadius: 20,
+            padding: '5px 10px', cursor: 'pointer',
+            fontSize: 12, display: 'flex',
+            alignItems: 'center', gap: 5,
+            whiteSpace: 'nowrap'
+          }}
+        >
+          📅
+          <span style={{ display: typeof window !== 'undefined' && window.innerWidth > 480 ? 'inline' : 'none' }}>
+            Mis Citas
           </span>
-        </div>
-        
-        <span className="flex-1" />
+          {citasPendientes.length > 0 && (
+            <span style={{
+              background: '#FF0000', color: 'white',
+              borderRadius: '50%', width: 18, height: 18,
+              fontSize: 10, display: 'flex',
+              alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 0 6px #FF0000', flexShrink: 0
+            }}>
+              {citasPendientes.length}
+            </span>
+          )}
+        </button>
 
-        <div className="flex items-center gap-3 sm:gap-4">
-          <button
-            onClick={() => {
-              setMostrarCitas(!mostrarCitas);
-              setMostrarNotif(false);
-            }}
-            className="flex items-center gap-2 bg-transparent border border-amber-500/30 text-white rounded-full px-3 py-1.5 cursor-pointer text-xs sm:text-sm hover:bg-white/5 transition-colors"
-          >
-            <CalendarIcon className="w-4 h-4 text-amber-500" />
-            <span className="hidden sm:inline">Mis Citas</span>
-            {citasPendientes.length > 0 && (
-              <span className="bg-red-500 text-white rounded-full w-5 h-5 text-[10px] flex items-center justify-center font-bold shadow-[0_0_8px_rgba(255,0,0,0.6)]">
-                {citasPendientes.length}
-              </span>
-            )}
-          </button>
-
-          <button
-            onClick={() => {
-              setMostrarNotif(!mostrarNotif);
-              setMostrarCitas(false);
-              if (mostrarNotif && notificaciones.length > 0) {
-                marcarComoLeidas();
-              }
-            }}
-            className="relative bg-transparent border-none text-white cursor-pointer p-1.5 hover:bg-white/10 rounded-full transition-colors"
-          >
-            <Bell className="w-5 h-5 text-white/80" />
-            {notificaciones.length > 0 && (
-              <span className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-4 h-4 text-[9px] flex items-center justify-center font-bold shadow-[0_0_8px_rgba(255,0,0,0.6)]">
-                {notificaciones.length}
-              </span>
-            )}
-          </button>
-
-          <div className="h-6 w-px bg-white/20 mx-1 hidden sm:block" />
-
-          <div className="hidden sm:flex items-center gap-2 text-sm text-white/80">
-            <User className="w-4 h-4 text-amber-500" />
-            <span className="truncate max-w-[120px]">{currentUser.nombre}</span>
-          </div>
-
-          <button 
-            onClick={onLogout} 
-            className="bg-transparent border border-red-500/40 text-red-400 rounded-lg px-2.5 py-1.5 cursor-pointer text-xs flex items-center gap-1 hover:bg-red-500/10 transition-colors"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Salir</span>
-          </button>
-        </div>
-
-        {mostrarCitas && (
-          <div className="absolute top-[70px] right-4 bg-black/95 border border-amber-500/20 rounded-xl p-4 w-[320px] max-h-[400px] overflow-y-auto shadow-2xl backdrop-blur-xl z-[200]">
-            <div className="flex items-center justify-between mb-4">
-              <h4 className="text-white font-semibold flex items-center gap-2 m-0 text-sm">
-                <CalendarIcon className="w-4 h-4 text-amber-500" /> Mis citas pendientes
-              </h4>
-              <button onClick={() => setMostrarCitas(false)} className="text-white/50 hover:text-white p-1">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            
-            {citasPendientes.length === 0 ? (
-              <p className="text-white/50 text-xs text-center py-6 border border-dashed border-white/10 rounded-lg">
-                No tienes citas pendientes
-              </p>
-            ) : (
-              <div className="space-y-2.5">
-                {citasPendientes.map(cita => (
-                  <div key={cita.id} className={`bg-white/5 rounded-lg p-3 border-l-4 ${
-                    cita.estado === 'aprobado' ? 'border-green-500' :
-                    cita.estado === 'pendiente' ? 'border-amber-500' : 'border-blue-500'
-                  } hover:bg-white/10 transition-colors`}>
-                    <div className="font-semibold text-white text-sm">
-                      {cita.modelo_nombre}
-                    </div>
-                    <div className="text-white/60 text-xs mt-1.5 flex items-center gap-1.5">
-                      <CalendarIcon className="w-3 h-3" />
-                      {formatearFecha(cita.fecha)} — {cita.hora || '--:--'}
-                    </div>
-                    <div className="text-white/50 text-xs mt-1">
-                      {cita.tipo_servicio}
-                    </div>
-                    <div className="mt-2.5">
-                      <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                        cita.estado === 'aprobado' ? 'bg-green-500/20 text-green-400' : 
-                        'bg-amber-500/20 text-amber-400'
-                      }`}>
-                        {cita.estado === 'aprobado' ? '✓ Aprobada' : '⏳ Pendiente de confirmación'}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {mostrarNotif && (
-          <div className="absolute top-[70px] right-4 bg-black/95 border border-amber-500/20 rounded-xl p-4 w-[320px] max-h-[400px] overflow-y-auto shadow-2xl backdrop-blur-xl z-[200]">
-            <div className="flex items-center justify-between mb-4">
-              <h4 className="text-white font-semibold flex items-center gap-2 m-0 text-sm">
-                <Bell className="w-4 h-4 text-amber-500" /> Notificaciones
-              </h4>
-              <button onClick={() => {
-                setMostrarNotif(false);
-                marcarComoLeidas();
-              }} className="text-white/50 hover:text-white p-1">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            
-            {notificaciones.length === 0 ? (
-              <p className="text-white/50 text-xs text-center py-6 border border-dashed border-white/10 rounded-lg">
-                No tienes notificaciones nuevas
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {notificaciones.map(notif => (
-                  <div key={notif.id} className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
-                    <div className="font-semibold text-amber-400 text-xs mb-1">
-                      {notif.titulo}
-                    </div>
-                    <div className="text-white/80 text-xs">
-                      {notif.mensaje}
-                    </div>
-                  </div>
-                ))}
-                <button 
-                  onClick={marcarComoLeidas}
-                  className="w-full mt-3 py-2 text-xs text-white/50 hover:text-white bg-white/5 rounded-lg transition-colors"
-                >
-                  Marcar todas como leídas
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+        <button
+          onClick={() => setMenuAbierto(!menuAbierto)}
+          style={{
+            background: 'transparent',
+            border: '0.5px solid rgba(255,255,255,0.2)',
+            borderRadius: 8, padding: '6px 8px',
+            cursor: 'pointer', color: 'white',
+            display: 'flex', flexDirection: 'column',
+            gap: 4, alignItems: 'center',
+            justifyContent: 'center', width: 36, height: 36
+          }}
+          aria-label='Menú'
+        >
+          <div style={{
+            width: 18, height: 2,
+            background: menuAbierto ? '#FFD700' : 'white',
+            borderRadius: 2,
+            transform: menuAbierto ? 'rotate(45deg) translate(4px, 4px)' : 'none',
+            transition: 'all 0.2s'
+          }} />
+          <div style={{
+            width: 18, height: 2,
+            background: menuAbierto ? '#FFD700' : 'white',
+            borderRadius: 2,
+            opacity: menuAbierto ? 0 : 1,
+            transition: 'all 0.2s'
+          }} />
+          <div style={{
+            width: 18, height: 2,
+            background: menuAbierto ? '#FFD700' : 'white',
+            borderRadius: 2,
+            transform: menuAbierto ? 'rotate(-45deg) translate(4px, -4px)' : 'none',
+            transition: 'all 0.2s'
+          }} />
+        </button>
       </nav>
-      {/* Spacer para que el navbar fixed no tape contenido */}
-      <div className="h-16 w-full" />
+
+      {menuAbierto && (
+        <div
+          style={{
+            position: 'fixed', top: 56, left: 0, right: 0,
+            background: 'rgba(0,0,0,0.98)',
+            borderBottom: '0.5px solid rgba(255,215,0,0.2)',
+            zIndex: 99, padding: 16
+          }}
+          onClick={() => setMenuAbierto(false)}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div style={{
+              padding: '12px 16px',
+              borderRadius: 8,
+              background: 'rgba(255,255,255,0.05)',
+              marginBottom: 8
+            }}>
+              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>
+                Conectado como
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'white', marginTop: 2 }}>
+                {currentUser?.nombre || currentUser?.email}
+              </div>
+            </div>
+
+            {[
+              { icon: '🏠', label: 'Inicio', action: () => { window.scrollTo({ top: 0, behavior: 'smooth' }) } },
+              { icon: '📅', label: 'Mis Citas', badge: citasPendientes.length, action: () => { setMostrarCitas(true); setMenuAbierto(false); } },
+              { icon: '🔔', label: 'Notificaciones', badge: notificaciones.length, action: () => { marcarComoLeidas(); toast.success('Notificaciones marcadas como leídas'); } },
+            ].map(item => (
+              <button
+                key={item.label}
+                onClick={(e) => { e.stopPropagation(); item.action(); }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '12px 16px', borderRadius: 8,
+                  background: 'transparent',
+                  border: '0.5px solid rgba(255,255,255,0.08)',
+                  color: 'white', cursor: 'pointer',
+                  fontSize: 14, textAlign: 'left',
+                  width: '100%'
+                }}
+              >
+                <span style={{ fontSize: 18 }}>{item.icon}</span>
+                <span style={{ flex: 1 }}>{item.label}</span>
+                {item.badge > 0 && (
+                  <span style={{
+                    background: '#FF0000', color: 'white',
+                    borderRadius: '50%', width: 20, height: 20,
+                    fontSize: 11, display: 'flex',
+                    alignItems: 'center', justifyContent: 'center',
+                    boxShadow: '0 0 6px #FF0000'
+                  }}>
+                    {item.badge}
+                  </span>
+                )}
+              </button>
+            ))}
+
+            <button
+              onClick={onLogout}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '12px 16px', borderRadius: 8,
+                background: 'rgba(255,0,0,0.08)',
+                border: '0.5px solid rgba(255,0,0,0.3)',
+                color: '#FF4444', cursor: 'pointer',
+                fontSize: 14, textAlign: 'left',
+                width: '100%', marginTop: 8
+              }}
+            >
+              <span style={{ fontSize: 18 }}>🚪</span>
+              <span>Cerrar sesión</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {mostrarCitas && (
+        <div style={{
+          position: 'fixed', top: 56, left: 0, right: 0,
+          background: 'rgba(0,0,0,0.98)',
+          borderBottom: '0.5px solid rgba(255,215,0,0.2)',
+          zIndex: 99, padding: 16,
+          maxHeight: '60vh', overflowY: 'auto'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
+            <h4 style={{ margin: 0, color: '#FFD700' }}>Mis citas pendientes</h4>
+            <button
+              onClick={() => setMostrarCitas(false)}
+              style={{
+                marginLeft: 'auto', background: 'transparent',
+                border: 'none', color: 'rgba(255,255,255,0.5)',
+                fontSize: 20, cursor: 'pointer'
+              }}
+            >×</button>
+          </div>
+
+          {citasPendientes.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 20, color: 'rgba(255,255,255,0.4)' }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>📅</div>
+              <p style={{ fontSize: 13, margin: 0 }}>No tienes citas pendientes</p>
+            </div>
+          ) : (
+            citasPendientes.map(cita => (
+              <div key={cita.id} style={{
+                background: 'rgba(255,255,255,0.05)',
+                borderRadius: 10, padding: 12, marginBottom: 8,
+                borderLeft: '3px solid ' + (
+                  cita.estado === 'aprobado' ? '#4CAF50' :
+                  cita.estado === 'aceptado_programador' ? '#2196F3' : '#FFA500'
+                )
+              }}>
+                <div style={{ fontWeight: 600, fontSize: 13, color: 'white' }}>
+                  {cita.modelo_nombre}
+                </div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>
+                  📅 {formatearFecha(cita.fecha)} — 🕐 {cita.hora}
+                </div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
+                  {cita.tipo_servicio || cita.servicio}
+                </div>
+                <div style={{ marginTop: 6 }}>
+                  <span style={{
+                    fontSize: 10, fontWeight: 700,
+                    padding: '2px 8px', borderRadius: 20,
+                    background: cita.estado === 'aprobado'
+                      ? 'rgba(76,175,80,0.2)'
+                      : cita.estado === 'aceptado_programador'
+                        ? 'rgba(33,150,243,0.2)'
+                        : 'rgba(255,165,0,0.2)',
+                    color: cita.estado === 'aprobado' ? '#4CAF50'
+                      : cita.estado === 'aceptado_programador' ? '#2196F3'
+                      : '#FFA500'
+                  }}>
+                    {cita.estado === 'aprobado' ? '✓ Aprobada'
+                      : cita.estado === 'aceptado_programador' ? '📋 Confirmada'
+                      : '⏳ Pendiente'}
+                  </span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      <div style={{ height: 56 }} />
     </>
   );
 }

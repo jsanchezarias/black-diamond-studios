@@ -65,7 +65,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp }: La
   const [streamUrl, setStreamUrl] = useState(sedes[0].streamUrl);
   const [loadingStream, setLoadingStream] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  const [perfilModeloAbierto, setPerfilModeloAbierto] = useState<string | null>(null);
+
   
   // Estados para sistema de propinas
   const [showTipModal, setShowTipModal] = useState(false);
@@ -353,21 +353,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp }: La
     setSolicitudData({ model, service, location, price });
   };
 
-  const handleConfirmarSolicitud = async (mensajeChat: string) => {
-    try {
-      if (!sendMessage) {
-        throw new Error('Chat no disponible');
-      }
-      
-      await sendMessage(mensajeChat);
-      toast.success('¡Solicitud enviada! Revisa el chat para comunicarte con nuestro programador.');
-      setSolicitudData(null);
-      // Abrir el chat automáticamente (si es necesario/posible)
-    } catch (error) {
-      if (process.env.NODE_ENV === 'development') console.error('Error al enviar solicitud:', error);
-      toast.error('Hubo un error al enviar tu solicitud. Intenta nuevamente.');
-    }
-  };
+
 
   // Handler para abrir modal de propinas
   const handleTipClick = () => {
@@ -875,12 +861,6 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp }: La
                 modelosDisponibles.map((modelo) => (
                   <div key={modelo.id} className="relative">
                     <ModelCard model={modelo} onContact={handleContactModel} />
-                    <button
-                      onClick={() => setPerfilModeloAbierto(modelo.id)}
-                      className="w-full mt-2 py-2.5 rounded-xl text-sm font-bold text-black bg-gradient-to-r from-amber-600 to-amber-400 hover:from-amber-500 hover:to-amber-300 transition-all active:scale-95"
-                    >
-                      Ver perfil y reservar
-                    </button>
                   </div>
                 ))
               ) : (
@@ -917,12 +897,6 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp }: La
                       model={{...modelo, available: false}} 
                       onContact={handleContactModel} 
                     />
-                    <button
-                      onClick={() => setPerfilModeloAbierto(modelo.id)}
-                      className="w-full mt-2 py-2.5 rounded-xl text-sm font-bold text-black/60 bg-white/10 hover:bg-white/20 transition-all cursor-not-allowed"
-                    >
-                      Ver perfil
-                    </button>
                   </div>
                 ))}
               </div>
@@ -1273,8 +1247,8 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp }: La
       <SolicitudServicioModal 
         isOpen={!!solicitudData}
         onClose={() => setSolicitudData(null)}
-        onConfirm={handleConfirmarSolicitud}
         data={solicitudData}
+        currentUser={currentUserProp || clienteActual || currentUser}
       />
 
       {/* Modal de Registro de Clientes */}
@@ -1340,18 +1314,6 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp }: La
       {/* ✨ Scroll Progress Bar & Back to top */}
       <ScrollUI />
 
-      {/* 🎭 Perfil Público de Modelo */}
-      {perfilModeloAbierto && (
-        <PerfilModeloPublico
-          modeloId={perfilModeloAbierto}
-          onClose={() => setPerfilModeloAbierto(null)}
-          currentUser={currentUserProp || (clienteActual ? { id: clienteActual.id, email: clienteActual.email || '', nombre: clienteActual.nombre } : null)}
-          onLoginRequired={() => {
-            setPerfilModeloAbierto(null);
-            setShowClienteLogin(true);
-          }}
-        />
-      )}
     </div>
   );
 }

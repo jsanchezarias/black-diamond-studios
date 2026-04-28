@@ -1,4 +1,5 @@
 import { useState, lazy, Suspense, useEffect } from 'react';
+import IngresosWidget from '../../components/IngresosWidget';
 import { GaleriaFotosModelo } from '../../components/GaleriaFotosModelo';
 import { format, subMonths, startOfMonth, endOfMonth, getMonth, getYear, parseISO, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -657,6 +658,8 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
               </div>
             </div>
 
+            <IngresosWidget rol="modelo" modeloEmail={userEmail} mostrarDetalle={false} />
+
             {/* KPI Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <KPICard
@@ -908,6 +911,7 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
         {selectedTab === 'ingresos' && (
           <div className="space-y-6">
             <h2 className="text-xl font-bold text-white">Mis Ingresos</h2>
+            <IngresosWidget rol="modelo" modeloEmail={userEmail} mostrarDetalle={false} />
 
             {/* Cards resumen */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1286,11 +1290,12 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
                         onClick={async () => {
                           setEnviandoSolicitud(true);
                           try {
+                            const modeloIdValido = userId && String(userId).includes('-') ? userId : null;
                             const { error } = await supabase
                               .from('boutique_solicitudes')
                               .insert({
                                 modelo_email: emailModelo,
-                                modelo_id: userId,
+                                modelo_id: modeloIdValido,
                                 items: carritoLocal,
                                 total: carritoLocal.reduce((s, i) => s + i.precio * i.cantidad, 0),
                                 estado: 'pendiente',

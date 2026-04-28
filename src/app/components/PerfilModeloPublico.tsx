@@ -108,25 +108,92 @@ export function PerfilModeloPublico({ modeloId, onClose, currentUser, onLoginReq
         .eq('activo', true)
         .order('duracion_minutos', { ascending: true });
 
-      setServicios(serviciosData || []);
+      if (serviciosData && serviciosData.length > 0) {
+        setServicios(serviciosData);
+      } else {
+        const { data: userData } = await supabase
+          .from('usuarios')
+          .select('politica_tarifa')
+          .eq('id', modeloId)
+          .single();
+        
+        const politicaId = userData?.politica_tarifa || 2;
+        
+        const { data: serviciosPolitica } = await supabase
+          .from('servicios_politica')
+          .select('*')
+          .eq('politica_id', politicaId)
+          .order('orden', { ascending: true });
+          
+        if (serviciosPolitica && serviciosPolitica.length > 0) {
+          const mappedServicios = serviciosPolitica.map((s: any) => {
+            let duracionMinutos = 60;
+            const durStr = (s.duracion || '').toLowerCase();
+            if (durStr.includes('hora')) {
+              const match = durStr.match(/(\d+)/);
+              duracionMinutos = match ? parseInt(match[1]) * 60 : 60;
+            } else if (durStr.includes('minuto') || durStr.includes('min')) {
+              const match = durStr.match(/(\d+)/);
+              duracionMinutos = match ? parseInt(match[1]) : 60;
+            }
+            
+            return {
+              id: s.id,
+              modelo_id: modeloId,
+              nombre: s.nombre,
+              descripcion: s.descripcion || '',
+              duracion_minutos: duracionMinutos,
+              precio_sede: s.precio_sede || 0,
+              precio_domicilio: s.precio_domicilio || s.precio_sede || 0,
+              activo: true
+            };
+          });
+          setServicios(mappedServicios);
+        } else {
+          setServicios([]);
+        }
+      }
     } catch (err) {
       console.error('Error cargando perfil:', err);
     }
     setLoading(false);
   };
 
-  const notificarNuevaReserva = async (agendamiento: any) => {
+  const notificarNuevaReserva = async (agendamiento: any, nombreCliente: string, telefonoCliente: string) => {
     try {
       const { data: destinatarios } = await supabase
         .from('usuarios')
         .select('id, email, role')
         .in('role', ['admin', 'owner', 'programador', 'recepcionista']);
 
+      // ✅ Mejora 4: mensaje más informativo con todos los datos clave
+      const fechaLegible = (() => {
+        const [y, m, d] = (agendamiento.fecha || '').split('-');
+        if (!y) return agendamiento.fecha || '';
+        return new Date(+y, +m - 1, +d).toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' });
+      })();
+      const horaLegible = (() => {
+        const h = (agendamiento.hora || '').substring(0, 5);
+        const [hh, mm] = h.split(':');
+        const n = parseInt(hh);
+        return (n % 12 || 12) + ':' + mm + ' ' + (n >= 12 ? 'PM' : 'AM');
+      })();
+      const precioFmt = agendamiento.precio ? '$' + Number(agendamiento.precio).toLocaleString('es-CO') : '';
+      const sedeLabel = agendamiento.ubicacion === 'domicilio' ? 'A domicilio' : 'Sede';
+
+      const mensajeDetallado = [
+        `👤 ${nombreCliente}${telefonoCliente ? ' • 📞 ' + telefonoCliente : ''}`,
+        `💃 ${agendamiento.modelo_nombre || ''}`,
+        `⏱️ ${agendamiento.tipo_servicio || agendamiento.servicio || ''} ${precioFmt}`,
+        `📅 ${fechaLegible} a las ${horaLegible}`,
+        `📍 ${sedeLabel}`,
+      ].filter(Boolean).join('\n');
+
       const notificaciones = (destinatarios || []).map((d: any) => ({
         usuario_id: d.id,
         usuario_email: d.email,
-        titulo: '🔔 Nueva reserva de cliente',
-        mensaje: `${agendamiento.cliente_nombre} reservó ${agendamiento.tipo_servicio} con ${agendamiento.modelo_nombre} para el ${agendamiento.fecha}`,
+        titulo: `🔔 Nueva solicitud — ${nombreCliente}`,
+        mensaje: mensajeDetallado,
         tipo: 'agendamiento_nuevo',
         referencia_id: agendamiento.id,
         leida: false,
@@ -150,6 +217,12 @@ export function PerfilModeloPublico({ modeloId, onClose, currentUser, onLoginReq
       toast.error('Por favor selecciona fecha y hora');
       return;
     }
+    // ✅ Mejora 2: validar que la fecha no sea pasada
+    const hoyCheck = (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`; })();
+    if (fecha < hoyCheck) {
+      toast.error('La fecha seleccionada ya pasó, elige una fecha futura');
+      return;
+    }
     if (ubicacion === 'domicilio' && !direccion.trim()) {
       toast.error('Por favor ingresa la dirección para el servicio a domicilio');
       return;
@@ -157,44 +230,85 @@ export function PerfilModeloPublico({ modeloId, onClose, currentUser, onLoginReq
 
     setEnviando(true);
     try {
-      const { data: clienteData } = await supabase
-        .from('clientes')
-        .select('telefono, nombre')
-        .eq('id', currentUser.id)
-        .maybeSingle();
+      const actualId = currentUser.id || (currentUser as any).userId;
+
+      // ✅ Bug 1 Fix: buscar nombre real en clientes Y en usuarios
+      let query = supabase.from('clientes').select('id, user_id, telefono, nombre, email');
+      if (actualId) {
+        query = query.or(`id.eq.${actualId},user_id.eq.${actualId}`);
+      } else if (currentUser.email) {
+        query = query.eq('email', currentUser.email);
+      }
+      const { data: clienteData } = await query.maybeSingle();
+
+      // Fallback a tabla usuarios si clientes no tiene nombre
+      let nombreCliente = clienteData?.nombre || currentUser.nombre || (currentUser as any).username;
+      if (!nombreCliente || nombreCliente === currentUser.email) {
+        const { data: usuarioData } = await supabase
+          .from('usuarios')
+          .select('nombre')
+          .eq('id', actualId)
+          .maybeSingle();
+        nombreCliente = usuarioData?.nombre || nombreCliente;
+      }
+      // Último recurso: parte antes del @ del email
+      if (!nombreCliente) {
+        nombreCliente = (currentUser.email || 'Cliente').split('@')[0];
+      }
 
       const precio = ubicacion === 'sede'
         ? servicioSeleccionado.precio_sede
         : servicioSeleccionado.precio_domicilio;
 
-      const { data: agendamiento, error } = await supabase
-        .from('agendamientos')
-        .insert({
-          cliente_id: currentUser.id,
-          cliente_nombre: clienteData?.nombre || currentUser.nombre || currentUser.email,
-          cliente_email: currentUser.email,
-          cliente_telefono: clienteData?.telefono || null,
-          modelo_id: perfil.id,
+      const modeloIdValido = perfil.id && String(perfil.id).includes('-') ? perfil.id : null;
+      
+      const rawClienteId = clienteData?.user_id || clienteData?.id || actualId;
+      const clienteIdValido = rawClienteId && String(rawClienteId).includes('-') ? rawClienteId : null;
+
+      // ✅ Bug 2 Fix: fecha y hora se guardan como strings directos del input (sin conversión)
+      const insertData = {
+          cliente_id: clienteIdValido,
+          cliente_nombre: nombreCliente,
+          cliente_email: clienteData?.email || currentUser.email || 'cliente@app.com',
+          cliente_telefono: clienteData?.telefono || (currentUser as any).telefono || 'No registrado',
+          modelo_id: modeloIdValido,
           modelo_email: perfil.email,
           modelo_nombre: perfil.nombre_display,
+          servicio: servicioSeleccionado.nombre,
           tipo_servicio: servicioSeleccionado.nombre,
-          duracion_minutos: servicioSeleccionado.duracion_minutos,
+          duracion: servicioSeleccionado.duracion_minutos || 60,
+          duracion_minutos: servicioSeleccionado.duracion_minutos || 60,
           precio: precio,
+          monto_pago: precio,
           ubicacion: ubicacion,
           direccion: ubicacion === 'domicilio' ? direccion : null,
-          fecha: fecha,
-          hora: hora,
+          fecha: fecha,       // ✅ string '2026-04-28' directo del input
+          hora: hora,         // ✅ string '17:00' directo del select
           notas: notas || null,
           estado: 'pendiente',
-          creado_por: currentUser.email,
+          creado_por: currentUser.email || clienteData?.email || 'cliente@app.com',
           creado_por_rol: 'cliente',
-        })
+      };
+
+      console.log('INSERT DATA (PerfilModeloPublico):', insertData);
+
+      const { data: agendamiento, error } = await supabase
+        .from('agendamientos')
+        .insert(insertData)
         .select()
         .single();
 
+      // ✅ Validar que el nombre sea real antes de guardar
+      if (!nombreCliente || nombreCliente.length < 2) {
+        toast.error('No se pudo obtener tu nombre. Actualiza tu perfil.');
+        setEnviando(false);
+        return;
+      }
+
       if (error) throw error;
 
-      await notificarNuevaReserva(agendamiento);
+      await notificarNuevaReserva(agendamiento, nombreCliente, clienteData?.telefono || '');
+
       toast.success('✅ Reserva enviada. Te notificaremos cuando sea aprobada.');
       setServicioSeleccionado(null);
       setFecha('');
@@ -207,7 +321,14 @@ export function PerfilModeloPublico({ modeloId, onClose, currentUser, onLoginReq
     setEnviando(false);
   };
 
-  const hoyStr = new Date().toISOString().split('T')[0];
+  // ✅ FIX TIMEZONE: usar fecha local (Colombia UTC-5), no toISOString() que es UTC
+  const hoyStr = (() => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  })();
 
   if (loading) {
     return (
@@ -544,6 +665,53 @@ export function PerfilModeloPublico({ modeloId, onClose, currentUser, onLoginReq
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder-white/30 outline-none focus:border-amber-500/50 transition-colors resize-none"
                 />
               </div>
+
+              {/* ✅ Resumen visual antes de confirmar */}
+              {fecha && hora && (
+                <div style={{
+                  background: 'rgba(255,215,0,0.06)',
+                  border: '1px solid rgba(255,215,0,0.25)',
+                  borderRadius: 12, padding: '12px 14px',
+                }}>
+                  <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Resumen de tu reserva</p>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px', fontSize: 12 }}>
+                    <div>
+                      <span style={{ color: 'rgba(255,255,255,0.4)' }}>Modelo</span>
+                      <p style={{ color: 'white', fontWeight: 600, margin: 0 }}>{perfil.nombre_display}</p>
+                    </div>
+                    <div>
+                      <span style={{ color: 'rgba(255,255,255,0.4)' }}>Servicio</span>
+                      <p style={{ color: 'white', fontWeight: 600, margin: 0 }}>{servicioSeleccionado.nombre}</p>
+                    </div>
+                    <div>
+                      <span style={{ color: 'rgba(255,255,255,0.4)' }}>Fecha</span>
+                      <p style={{ color: '#FFD700', fontWeight: 700, margin: 0 }}>
+                        {(() => {
+                          const [y, m, d] = fecha.split('-');
+                          return new Date(+y, +m - 1, +d).toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'long' });
+                        })()}
+                      </p>
+                    </div>
+                    <div>
+                      <span style={{ color: 'rgba(255,255,255,0.4)' }}>Hora</span>
+                      <p style={{ color: '#FFD700', fontWeight: 700, margin: 0 }}>
+                        {(() => {
+                          const [h, min] = hora.split(':');
+                          const n = parseInt(h);
+                          return (n % 12 || 12) + ':' + min + ' ' + (n >= 12 ? 'PM' : 'AM');
+                        })()}
+                      </p>
+                    </div>
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <span style={{ color: 'rgba(255,255,255,0.4)' }}>Precio</span>
+                      <p style={{ color: '#4CAF50', fontWeight: 700, margin: 0 }}>
+                        {formatPrecio(ubicacion === 'sede' ? servicioSeleccionado.precio_sede : servicioSeleccionado.precio_domicilio)}
+                        {' '}<span style={{ color: 'rgba(255,255,255,0.3)', fontWeight: 400 }}>({ubicacion === 'sede' ? 'En sede' : 'A domicilio'})</span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Botón confirmar */}
               <button

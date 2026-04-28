@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import IngresosWidget from '../../components/IngresosWidget';
 import {
   Eye, UserCheck, Bell, LogOut, Activity, Clock,
   DollarSign, Users, ClipboardList, PieChart, TrendingUp,
@@ -67,6 +68,8 @@ function VistaGeneralPanel() {
 
   return (
     <div className="space-y-6">
+      <IngresosWidget rol="supervisor" mostrarDetalle={false} />
+
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Card className="border-white/10 bg-black/20">
           <CardHeader className="pb-1 pt-4 px-4">

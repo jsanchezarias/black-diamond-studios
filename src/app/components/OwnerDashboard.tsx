@@ -1,4 +1,5 @@
 import { useState, lazy, Suspense } from 'react';
+import IngresosWidget from '../../components/IngresosWidget';
 import { 
   BarChart3, 
   Users, 
@@ -418,10 +419,13 @@ export function OwnerDashboard({ accessToken, userId, userEmail = '', onLogout }
       }>
       <div className="space-y-4">
         {moduloActivo === 'general' && (
-          <AdminResumenPanel 
-            recentActivity={recentActivity}
-            financialSummary={financialSummary}
-          />
+          <div className="space-y-6">
+            <IngresosWidget rol="owner" mostrarDetalle={false} />
+            <AdminResumenPanel 
+              recentActivity={recentActivity}
+              financialSummary={financialSummary}
+            />
+          </div>
         )}
 
         {moduloActivo === 'modelos' && (

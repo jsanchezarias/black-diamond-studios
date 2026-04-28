@@ -430,42 +430,28 @@ export function ModelCard({ model, onContact }: ModelCardProps) {
                 </div>
               </div>
 
-              {/* Tarifas adicionales y botón */}
-              <div className="p-3 bg-gradient-to-br from-primary/5 to-transparent border-t border-primary/10">
-                {selectedService && (
-                  <div className="mb-2 p-2 bg-primary/10 rounded-lg border border-primary/30 flex justify-between items-center">
-                    <div>
-                      <p className="font-bold text-xs text-primary">{selectedService.name}</p>
-                      <p className="text-[10px] text-muted-foreground flex items-center gap-1">
-                        {selectedLocation === 'sede' ? (
-                          <><Building2 className="w-2.5 h-2.5 text-primary" /> En Sede</>
-                        ) : (
-                          <><Home className="w-2.5 h-2.5 text-primary" /> A Domicilio</>
-                        )}
-                      </p>
-                    </div>
-                    <p className="text-base font-bold text-primary" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-                      ${selectedLocation === 'sede' ? selectedService.price : (selectedService.priceHome || selectedService.price)}
-                    </p>
-                  </div>
-                )}
-                <Button
-                  onClick={handleReservar}
-                  className={`w-full gap-2 h-9 text-xs transition-colors ${
-                    selectedService
-                      ? 'bg-primary text-background hover:bg-primary/90 shadow-md shadow-primary/20'
-                      : 'bg-primary/20 text-primary hover:bg-primary/30'
-                  }`}
-                  size="sm"
+              {/* Botón de Reserva Directo */}
+              <div className="p-4 border-t border-primary/10 mt-auto">
+                <button
+                  onClick={() => onContact(model)}
+                  style={{
+                    width: '100%',
+                    background: 'linear-gradient(135deg, #B8860B, #FFD700)',
+                    border: 'none',
+                    borderRadius: 10,
+                    padding: '14px',
+                    color: 'black',
+                    fontWeight: 700,
+                    fontSize: 15,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8
+                  }}
                 >
-                  <Send className="w-3 h-3" />
-                  {selectedService ? `Confirmar Reserva` : `Selecciona un servicio`}
-                </Button>
-                {!selectedService && (
-                  <p className="text-[10px] text-muted-foreground text-center mt-1">
-                    Selecciona un servicio para habilitar la reserva
-                  </p>
-                )}
+                  ✅ Reservar ahora
+                </button>
               </div>
             </div>
           </div>

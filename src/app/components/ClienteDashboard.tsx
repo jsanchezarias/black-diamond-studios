@@ -58,6 +58,15 @@ function calcularCuentaRegresiva(fecha: string, hora: string): string {
   return `Faltan ${minutos} minutos`;
 }
 
+const SERVICIOS_MODAL = [
+  { nombre: 'Rato',    duracion: '15 min',  duracion_minutos: 15,  precio: 130000 },
+  { nombre: '30 Min',  duracion: '30 min',  duracion_minutos: 30,  precio: 160000 },
+  { nombre: '1 Hora',  duracion: '1 hora',  duracion_minutos: 60,  precio: 190000 },
+  { nombre: '2 Horas', duracion: '2 horas', duracion_minutos: 120, precio: 360000 },
+  { nombre: '3 Horas', duracion: '3 horas', duracion_minutos: 180, precio: 520000 },
+  { nombre: '6 Horas', duracion: '6 horas', duracion_minutos: 360, precio: 1000000 },
+];
+
 function EstadoBadge({ estado }: { estado: string }) {
   const cfg = ESTADO_CONFIG[estado] || { label: estado, color: 'text-white/50', bg: 'bg-white/5 border-white/10', icon: AlertCircle };
   const Icon = cfg.icon;
@@ -144,17 +153,14 @@ export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboa
 
   const { modelos } = useModelos();
   const modelosActivos = modelos.filter((m: any) => m.activa);
-  const [enviando, setEnviando] = useState(false);
   const mañana = new Date(Date.now() + 86400000).toISOString().split('T')[0];
-  const [formCita, setFormCita] = useState({
-    modeloEmail: '',
-    fecha: mañana,
-    hora: '15:00',
-    servicioSeleccionado: null as any,
-    duracion: 60,
-    tipoServicio: 'Estándar',
-    notas: '',
-  });
+  const [modalReserva, setModalReserva] = useState<any>(null);
+  const [modalServicio, setModalServicio] = useState<any>(null);
+  const [modalFecha, setModalFecha] = useState('');
+  const [modalHora, setModalHora] = useState('');
+  const [modalSede, setModalSede] = useState<'sede_norte' | 'domicilio'>('sede_norte');
+  const [modalDireccion, setModalDireccion] = useState('');
+  const [loadingReserva, setLoadingReserva] = useState(false);
 
   const noLeidas = notificaciones.filter(n => !n.leida).length;
 
@@ -274,80 +280,85 @@ export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboa
     }
   };
 
-  const solicitarCita = async () => {
-    if (!formCita.modeloEmail) { toast.error('Selecciona una modelo'); return; }
-    if (!formCita.fecha) { toast.error('Selecciona una fecha'); return; }
+  const abrirModalReserva = (modelo: any) => {
+    setModalReserva(modelo);
+    setModalServicio(null);
+    setModalFecha('');
+    setModalHora('');
+    setModalSede('sede_norte');
+    setModalDireccion('');
+  };
 
-    setEnviando(true);
+  const cerrarModal = () => { setModalReserva(null); };
+
+  const enviarReserva = async () => {
+    if (!modalServicio || !modalFecha || !modalHora) return;
+    if (modalSede === 'domicilio' && !modalDireccion.trim()) {
+      toast.error('Ingresa tu dirección para el domicilio');
+      return;
+    }
+    setLoadingReserva(true);
     try {
-      const modelo = modelosActivos.find((m: any) => m.email === formCita.modeloEmail);
-      
-      // Parsear precio: quitar puntos y convertir a número
-      const precioBruto = formCita.servicioSeleccionado ? 
-        Number(String(formCita.servicioSeleccionado.price).replace(/\./g, '')) : 0;
-        
-      // Extraer minutos del string duration (ej: "1 hora" -> 60, "30 minutos" -> 30)
-      let duracionMinutos = 60;
-      if (formCita.servicioSeleccionado?.duration) {
-        const durStr = formCita.servicioSeleccionado.duration.toLowerCase();
-        if (durStr.includes('hora')) {
-          const match = durStr.match(/(\d+)/);
-          duracionMinutos = match ? parseInt(match[1]) * 60 : 60;
-        } else if (durStr.includes('minuto') || durStr.includes('min')) {
-          const match = durStr.match(/(\d+)/);
-          duracionMinutos = match ? parseInt(match[1]) : 60;
-        }
-      }
+      const modeloIdValido = modalReserva.id && String(modalReserva.id).includes('-') ? modalReserva.id : null;
+      const clienteIdValido = userId && String(userId).includes('-') ? userId : null;
 
-      const { data: nuevoAg, error } = await supabase.from('agendamientos').insert({
-        cliente_id: userId,
+      const insertData = {
+        cliente_id: clienteIdValido,
         cliente_email: userEmail,
-        cliente_nombre: perfil?.nombre || '',
-        cliente_telefono: perfil?.telefono || '',
+        cliente_nombre: perfil?.nombre || userEmail,
+        cliente_telefono: perfil?.telefono || 'No registrado',
         creado_por: userEmail,
         creado_por_rol: 'cliente',
-        modelo_email: formCita.modeloEmail,
-        modelo_nombre: modelo?.nombreArtistico || modelo?.nombre || '',
-        tipo_servicio: formCita.servicioSeleccionado?.name || 'Estándar',
-        servicio: formCita.servicioSeleccionado?.name || 'Estándar',
-        fecha: formCita.fecha,
-        hora: formCita.hora,
-        duracion: duracionMinutos,
-        duracion_minutos: duracionMinutos,
-        precio: precioBruto,
-        monto_pago: precioBruto,
+        modelo_id: modeloIdValido,
+        modelo_email: modalReserva.email,
+        modelo_nombre: modalReserva.nombreArtistico || modalReserva.nombre || '',
+        tipo_servicio: modalServicio.nombre,
+        servicio: modalServicio.nombre,
+        fecha: modalFecha,
+        hora: modalHora,
+        duracion: modalServicio.duracion_minutos || 60,
+        duracion_minutos: modalServicio.duracion_minutos || 60,
+        precio: modalServicio.precio,
+        monto_pago: modalServicio.precio,
+        ubicacion: modalSede === 'sede_norte' ? 'Sede Norte' : 'Domicilio',
+        habitacion: modalSede === 'sede_norte' ? 'Por asignar' : modalDireccion,
         estado: 'pendiente',
         estado_pago: 'pendiente',
-        notas: formCita.notas || null,
-      }).select().single();
+      };
+
+      console.log('INSERT DATA (ClienteDashboard):', insertData);
+
+      const { data: nuevoAg, error } = await supabase.from('agendamientos').insert(insertData).select().single();
 
       if (error) throw error;
 
-      // 🔔 Notificar a programadores/admins sobre la nueva reserva
       if (nuevoAg) {
         notificarProgramadores({
           clienteNombre: perfil?.nombre || userEmail,
-          modeloNombre: modelo?.nombreArtistico || modelo?.nombre || '',
-          fecha: formCita.fecha,
-          hora: formCita.hora,
-          tipoServicio: formCita.servicioSeleccionado?.name || 'Estándar',
+          modeloNombre: modalReserva.nombreArtistico || modalReserva.nombre || '',
+          fecha: modalFecha,
+          hora: modalHora,
+          tipoServicio: modalServicio.nombre,
           agendamientoId: nuevoAg.id,
-          duracion: duracionMinutos,
+          duracion: modalServicio.duracion_minutos,
         }).catch(() => {});
       }
 
-      toast.success('Solicitud enviada. Te contactaremos para confirmar.');
-      setFormCita({ modeloEmail: '', fecha: mañana, hora: '15:00', servicioSeleccionado: null, duracion: 60, tipoServicio: 'Estándar', notas: '' });
+      toast.success('Reserva enviada. Te notificaremos cuando sea confirmada.');
+      cerrarModal();
       setTab('citas');
       await cargarCitas();
     } catch (e: any) {
-      toast.error('Error al enviar: ' + e.message);
+      toast.error('Error al enviar la reserva: ' + e.message);
     }
-    setEnviando(false);
+    setLoadingReserva(false);
   };
 
   const totalCitas = citasHoy.length + proximas.length + historial.length;
   const citasCompletadas = historial.filter(c => c.estado === 'completado').length;
+  const totalGastado = historial
+    .filter(c => c.estado === 'completado')
+    .reduce((acc, c) => acc + (Number(c.precio) || 0), 0);
 
   const TABS = [
     { key: 'citas' as Tab,          label: 'Mis Citas',        icon: Calendar },
@@ -421,11 +432,7 @@ export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboa
         ) : tab === 'solicitar' ? (
           <TabSolicitar
             modelosActivos={modelosActivos}
-            formCita={formCita}
-            setFormCita={setFormCita}
-            mañana={mañana}
-            enviando={enviando}
-            onEnviar={solicitarCita}
+            onAbrirModal={abrirModalReserva}
           />
         ) : tab === 'notificaciones' ? (
           <TabNotificaciones notificaciones={notificaciones} />
@@ -439,9 +446,176 @@ export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboa
             onGuardar={guardarPerfil}
             totalCitas={totalCitas}
             citasCompletadas={citasCompletadas}
+            totalGastado={totalGastado}
           />
         )}
       </div>
+
+      {/* ─── Modal de Reserva ─────────────────────────────────────────────── */}
+      {modalReserva && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.88)' }}
+          onClick={(e) => { if (e.target === e.currentTarget) cerrarModal(); }}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl overflow-y-auto"
+            style={{ background: '#111', border: '0.5px solid rgba(255,215,0,0.25)', maxHeight: '92vh' }}
+          >
+            {/* Cabecera */}
+            <div className="flex items-center gap-3 p-5 border-b border-white/10">
+              {modalReserva.foto_url && (
+                <img
+                  src={modalReserva.foto_url}
+                  alt=""
+                  className="w-12 h-12 rounded-full object-cover flex-shrink-0"
+                  onError={(e: any) => { e.target.style.display = 'none'; }}
+                />
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-amber-400 truncate">
+                  {modalReserva.nombreArtistico || modalReserva.nombre}
+                </p>
+                <p className="text-xs text-white/40">Confirmar reserva</p>
+              </div>
+              <button onClick={cerrarModal} className="text-white/40 hover:text-white text-2xl leading-none ml-2">×</button>
+            </div>
+
+            <div className="p-5 space-y-5">
+              {/* Servicios */}
+              <div>
+                <p className="text-xs text-white/50 mb-3 font-medium uppercase tracking-wider">Selecciona el servicio</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {SERVICIOS_MODAL.map(s => (
+                    <div
+                      key={s.nombre}
+                      onClick={() => setModalServicio(s)}
+                      className="p-3 rounded-xl cursor-pointer transition-all"
+                      style={{
+                        border: modalServicio?.nombre === s.nombre ? '1.5px solid #FFD700' : '0.5px solid rgba(255,255,255,0.1)',
+                        background: modalServicio?.nombre === s.nombre ? 'rgba(255,215,0,0.1)' : 'rgba(255,255,255,0.03)',
+                      }}
+                    >
+                      <p className="font-semibold text-sm text-white">{s.nombre}</p>
+                      <p className="text-xs text-white/40 mt-0.5">⏱ {s.duracion}</p>
+                      <p className="text-sm font-bold mt-1.5" style={{ color: '#4CAF50' }}>
+                        ${s.precio.toLocaleString('es-CO')}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Sede */}
+              <div>
+                <p className="text-xs text-white/50 mb-3 font-medium uppercase tracking-wider">¿Dónde prefieres el servicio?</p>
+                <div className="flex gap-2">
+                  {[
+                    { key: 'sede_norte' as const, label: '🏢 Sede Norte' },
+                    { key: 'domicilio' as const, label: '🏠 A Domicilio' },
+                  ].map(({ key, label }) => (
+                    <button
+                      key={key}
+                      onClick={() => setModalSede(key)}
+                      className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-all"
+                      style={{
+                        border: modalSede === key ? '1.5px solid #FFD700' : '0.5px solid rgba(255,255,255,0.1)',
+                        background: modalSede === key ? 'rgba(255,215,0,0.1)' : 'rgba(255,255,255,0.03)',
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                {modalSede === 'domicilio' && (
+                  <input
+                    placeholder="Escribe tu dirección completa"
+                    value={modalDireccion}
+                    onChange={e => setModalDireccion(e.target.value)}
+                    className="w-full mt-2 px-3 py-2.5 rounded-xl text-sm text-white placeholder:text-white/20 focus:outline-none"
+                    style={{ background: 'rgba(255,255,255,0.05)', border: '0.5px solid rgba(255,255,255,0.1)' }}
+                  />
+                )}
+                {modalSede === 'sede_norte' && (
+                  <p className="mt-2 text-xs text-white/30 px-1">📍 Dirección exacta se comparte al confirmar la cita</p>
+                )}
+              </div>
+
+              {/* Fecha */}
+              <div>
+                <p className="text-xs text-white/50 mb-3 font-medium uppercase tracking-wider">Fecha del servicio</p>
+                <input
+                  type="date"
+                  value={modalFecha}
+                  min={mañana}
+                  onChange={e => setModalFecha(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl text-sm text-white focus:outline-none"
+                  style={{ background: 'rgba(255,255,255,0.05)', border: '0.5px solid rgba(255,255,255,0.1)' }}
+                />
+              </div>
+
+              {/* Hora */}
+              <div>
+                <p className="text-xs text-white/50 mb-3 font-medium uppercase tracking-wider">Hora preferida</p>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {['10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00'].map(h => (
+                    <button
+                      key={h}
+                      onClick={() => setModalHora(h)}
+                      className="py-2 rounded-lg text-xs transition-all"
+                      style={{
+                        border: modalHora === h ? '1.5px solid #FFD700' : '0.5px solid rgba(255,255,255,0.1)',
+                        background: modalHora === h ? 'rgba(255,215,0,0.15)' : 'rgba(255,255,255,0.03)',
+                        color: modalHora === h ? '#FFD700' : 'rgba(255,255,255,0.6)',
+                        fontWeight: modalHora === h ? 700 : 400,
+                      }}
+                    >
+                      {h}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Resumen */}
+              {modalServicio && modalFecha && modalHora && (
+                <div className="rounded-xl p-4" style={{ background: 'rgba(255,215,0,0.07)', border: '0.5px solid rgba(255,215,0,0.25)' }}>
+                  <p className="text-xs font-bold text-amber-400 mb-2.5 uppercase tracking-wider">📋 Resumen de tu reserva</p>
+                  <div className="space-y-1 text-sm text-white/75">
+                    <p>💃 <strong className="text-white">{modalReserva.nombreArtistico || modalReserva.nombre}</strong></p>
+                    <p>⏱ {modalServicio.nombre} — {modalServicio.duracion}</p>
+                    <p>📅 {formatearFechaES(modalFecha)}</p>
+                    <p>🕐 {formatearHora(modalHora)}</p>
+                    <p>📍 {modalSede === 'sede_norte' ? 'Sede Norte' : `A domicilio — ${modalDireccion}`}</p>
+                    <p className="pt-2 text-base font-bold" style={{ color: '#4CAF50' }}>
+                      💰 Total: ${modalServicio.precio.toLocaleString('es-CO')}
+                      {modalSede === 'domicilio' ? ' + desplazamiento' : ''}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Botón confirmar */}
+              <button
+                onClick={enviarReserva}
+                disabled={!modalServicio || !modalFecha || !modalHora || loadingReserva || (modalSede === 'domicilio' && !modalDireccion.trim())}
+                className="w-full py-3.5 rounded-xl text-sm font-bold text-black transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                style={{ background: 'linear-gradient(135deg, #B8860B, #FFD700)' }}
+              >
+                {loadingReserva ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Enviando reserva...</>
+                ) : (
+                  '✅ Confirmar reserva'
+                )}
+              </button>
+              {(!modalServicio || !modalFecha || !modalHora) && (
+                <p className="text-center text-xs text-white/30">
+                  Selecciona servicio, fecha y hora para continuar
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -524,117 +698,71 @@ function TabCitas({
 // ─── Tab: Solicitar Cita ─────────────────────────────────────────────────────
 
 function TabSolicitar({
-  modelosActivos, formCita, setFormCita, mañana, enviando, onEnviar
+  modelosActivos, onAbrirModal
 }: {
-  modelosActivos: any[]; formCita: any; setFormCita: any;
-  mañana: string; enviando: boolean; onEnviar: () => void;
+  modelosActivos: any[];
+  onAbrirModal: (modelo: any) => void;
 }) {
-  const inputClass = "w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors";
-
-  const modeloSeleccionada = modelosActivos.find(m => m.email === formCita.modeloEmail);
-  const servicios = modeloSeleccionada?.serviciosDisponibles || [];
+  if (modelosActivos.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mb-4">
+          <Sparkles className="w-8 h-8 text-amber-400/60" />
+        </div>
+        <p className="text-white/60 font-medium">No hay modelos disponibles</p>
+        <p className="text-sm text-white/30 mt-1">Vuelve pronto, nuevas chicas se unen cada semana</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-5 max-w-md">
+    <div className="space-y-5">
       <div>
         <h2 className="text-lg font-semibold text-white">Solicitar Cita</h2>
-        <p className="text-sm text-white/40 mt-0.5">Selecciona la modelo y el servicio para ver la tarifa.</p>
+        <p className="text-sm text-white/40 mt-0.5">Elige tu modelo y confirma la reserva.</p>
       </div>
 
-      <div className="space-y-1.5">
-        <label className="text-xs font-medium text-white/60">Modelo *</label>
-        <select
-          value={formCita.modeloEmail}
-          onChange={e => setFormCita((p: any) => ({ ...p, modeloEmail: e.target.value, servicioSeleccionado: null }))}
-          className={inputClass}
-        >
-          <option value="">Selecciona una modelo</option>
-          {modelosActivos.map((m: any) => (
-            <option key={m.id} value={m.email}>{m.nombreArtistico || m.nombre}</option>
-          ))}
-        </select>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-white/60">Fecha *</label>
-          <input
-            type="date"
-            min={mañana}
-            value={formCita.fecha}
-            onChange={e => setFormCita((p: any) => ({ ...p, fecha: e.target.value }))}
-            className={inputClass}
-          />
-        </div>
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-white/60">Hora</label>
-          <input
-            type="time"
-            value={formCita.hora}
-            onChange={e => setFormCita((p: any) => ({ ...p, hora: e.target.value }))}
-            className={inputClass}
-          />
-        </div>
-      </div>
-
-      {modeloSeleccionada && servicios.length > 0 && (
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-white/60">Servicio y Tarifa *</label>
-          <div className="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto pr-1">
-            {servicios.map((srv: any, idx: number) => {
-              const isSelected = formCita.servicioSeleccionado?.name === srv.name;
-              return (
-                <div 
-                  key={idx}
-                  onClick={() => setFormCita((p: any) => ({ ...p, servicioSeleccionado: srv }))}
-                  className={`p-3 rounded-xl border cursor-pointer transition-all flex justify-between items-center ${
-                    isSelected ? 'bg-amber-500/20 border-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.15)]' : 'bg-white/5 border-white/10 hover:bg-white/10'
-                  }`}
-                >
-                  <div>
-                    <p className={`text-sm font-semibold ${isSelected ? 'text-amber-400' : 'text-white'}`}>{srv.name}</p>
-                    <p className="text-xs text-white/50 flex items-center gap-1 mt-0.5">
-                      <Clock className="w-3 h-3" /> {srv.duration}
-                    </p>
-                  </div>
-                  <p className={`text-lg font-bold ${isSelected ? 'text-amber-400' : 'text-white'}`} style={{ fontFamily: 'Montserrat, sans-serif' }}>
-                    ${srv.price}
-                  </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {modelosActivos.map((m: any) => (
+          <div
+            key={m.id}
+            className="rounded-2xl overflow-hidden"
+            style={{ background: '#161616', border: '0.5px solid rgba(255,255,255,0.08)' }}
+          >
+            {/* Foto */}
+            <div className="relative h-48 bg-white/5 overflow-hidden">
+              {m.foto_url ? (
+                <img
+                  src={m.foto_url}
+                  alt={m.nombreArtistico || m.nombre}
+                  className="w-full h-full object-cover"
+                  onError={(e: any) => { e.target.style.display = 'none'; }}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <User className="w-12 h-12 text-white/10" />
                 </div>
-              );
-            })}
+              )}
+              <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7) 30%, transparent)' }} />
+              <div className="absolute bottom-3 left-3">
+                <p className="font-bold text-white text-base leading-tight">{m.nombreArtistico || m.nombre}</p>
+                {m.edad && <p className="text-xs text-white/60">{m.edad} años</p>}
+              </div>
+            </div>
+
+            {/* Botón */}
+            <div className="p-3">
+              <button
+                onClick={() => onAbrirModal(m)}
+                className="w-full py-3 rounded-xl text-sm font-bold text-black transition-all active:scale-95"
+                style={{ background: 'linear-gradient(135deg, #B8860B, #FFD700)' }}
+              >
+                Confirmar reserva
+              </button>
+            </div>
           </div>
-        </div>
-      )}
-
-      {modeloSeleccionada && servicios.length === 0 && (
-        <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">
-          Esta modelo aún no tiene tarifas configuradas.
-        </div>
-      )}
-
-      <div className="space-y-1.5">
-        <label className="text-xs font-medium text-white/60">Notas adicionales</label>
-        <textarea
-          value={formCita.notas}
-          onChange={e => setFormCita((p: any) => ({ ...p, notas: e.target.value }))}
-          rows={3}
-          placeholder="Preferencias, solicitudes especiales..."
-          className={`${inputClass} resize-none placeholder:text-white/20`}
-        />
+        ))}
       </div>
-
-      <button
-        onClick={onEnviar}
-        disabled={enviando || !formCita.modeloEmail || !formCita.servicioSeleccionado}
-        className="w-full py-3 bg-amber-500 text-black text-sm font-semibold rounded-xl hover:bg-amber-400 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-      >
-        {enviando ? (
-          <><Loader2 className="w-4 h-4 animate-spin" /> Enviando...</>
-        ) : (
-          <><ChevronRight className="w-4 h-4" /> Enviar Solicitud</>
-        )}
-      </button>
     </div>
   );
 }
@@ -679,11 +807,11 @@ function TabNotificaciones({ notificaciones }: { notificaciones: Array<{ id: str
 // ─── Tab: Mi Perfil ───────────────────────────────────────────────────────────
 
 function TabPerfil({
-  perfil, editandoPerfil, setEditandoPerfil, formPerfil, setFormPerfil, onGuardar, totalCitas, citasCompletadas
+  perfil, editandoPerfil, setEditandoPerfil, formPerfil, setFormPerfil, onGuardar, totalCitas, citasCompletadas, totalGastado
 }: {
   perfil: any; editandoPerfil: boolean; setEditandoPerfil: (v: boolean) => void;
   formPerfil: any; setFormPerfil: any; onGuardar: () => void;
-  totalCitas: number; citasCompletadas: number;
+  totalCitas: number; citasCompletadas: number; totalGastado: number;
 }) {
   const inputClass = "w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors";
 
@@ -702,14 +830,15 @@ function TabPerfil({
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-3 gap-3">
         {[
           { label: 'Citas totales', value: totalCitas },
           { label: 'Completadas', value: citasCompletadas },
+          { label: 'Total gastado', value: `$${totalGastado.toLocaleString('es-CO')}` },
         ].map(({ label, value }) => (
-          <div key={label} className="bg-white/[0.03] border border-white/8 rounded-xl p-3 text-center">
-            <p className="text-2xl font-bold text-amber-400">{value}</p>
-            <p className="text-xs text-white/40 mt-0.5">{label}</p>
+          <div key={label} className="bg-white/[0.03] border border-white/8 rounded-xl p-3 text-center flex flex-col justify-center items-center">
+            <p className="text-lg font-bold text-amber-400 truncate max-w-full">{value}</p>
+            <p className="text-[10px] text-white/40 mt-0.5">{label}</p>
           </div>
         ))}
       </div>

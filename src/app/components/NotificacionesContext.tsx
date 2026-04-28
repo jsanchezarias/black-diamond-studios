@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { supabase } from '../../utils/supabase/info';
+import { toast } from 'sonner';
 
 // 🔔 NOTIFICACIÓN: Alerta o mensaje para el usuario
 export interface Notificacion {
@@ -377,6 +378,55 @@ export const NotificacionesProvider = ({ children }: { children: ReactNode }) =>
       setUsuarioActual(usuarioId);
       cargarNotificaciones(usuarioId);
       obtenerPreferencias(usuarioId);
+
+      // ✅ REALTIME: Notificaciones en tiempo real
+      const channel = supabase
+        .channel(`notif-live-${usuarioId}`)
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notificaciones'
+        }, (payload) => {
+          const notif = payload.new;
+          const esParaUsuario = 
+            String(notif.usuario_id || '').toLowerCase() === String(usuarioId).toLowerCase() ||
+            String(notif.usuario_email || '').toLowerCase() === String(usuarioId).toLowerCase();
+
+          if (!esParaUsuario) return;
+
+          const mapped: Notificacion = {
+            id: notif.id,
+            usuarioId: notif.usuario_id ?? notif.usuario_email ?? usuarioId,
+            usuarioEmail: notif.usuario_email ?? usuarioId,
+            tipo: notif.tipo,
+            titulo: notif.titulo,
+            mensaje: notif.mensaje,
+            icono: notif.icono,
+            leida: notif.leida ?? false,
+            fechaLectura: notif.fecha_lectura,
+            accion: notif.accion ? (typeof notif.accion === 'string' ? JSON.parse(notif.accion) : notif.accion) : undefined,
+            urlDestino: notif.url_destino,
+            prioridad: notif.prioridad ?? 'media',
+            fechaCreacion: notif.fecha_creacion ?? notif.created_at ?? new Date().toISOString(),
+            creadoPor: notif.creado_por ?? 'sistema',
+            expiraEn: notif.expira_en,
+          };
+          setNotificaciones(prev => [mapped, ...prev]);
+          toast('🔔 ' + mapped.titulo, {
+            duration: 6000,
+            style: {
+              background: 'rgba(255,215,0,0.15)',
+              border: '1px solid rgba(255,215,0,0.4)',
+              color: 'white',
+              fontWeight: '600'
+            }
+          });
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     } else {
       setCargando(false);
     }

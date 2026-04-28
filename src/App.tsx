@@ -39,105 +39,39 @@ function AllProvidersWrapper({ children }: { children: React.ReactNode }) {
   try {
     return (
       <LanguageProvider>
-        {(() => {
-          return (
-            <PublicUsersProvider>
-              {(() => {
-                return (
-                  <VideosProvider>
-                    {(() => {
-                      return (
-                        <ModelosProvider>
-                          {(() => {
-                            return (
-                              <TestimoniosProvider>
-                                {(() => {
-                                  return (
-                                    <AgendamientosProvider>
-                                      {(() => {
-                                        return (
-                                          <ClientesProvider>
-                                            {(() => {
-                                              return (
-                                                <ServiciosProvider>
-                                                  {(() => {
-                                                    return (
-                                                      <PagosProvider>
-                                                        {(() => {
-                                                          return (
-                                                            <MultasProvider>
-                                                              {(() => {
-                                                                return (
-                                                                  <TurnosProvider>
-                                                                    {(() => {
-                                                                      return (
-                                                                        <GastosProvider>
-                                                                          {(() => {
-                                                                            return (
-                                                                              <AsistenciaProvider>
-                                                                                {(() => {
-                                                                                  return (
-                                                                                    <CarritoProvider>
-                                                                                      {(() => {
-                                                                                        return (
-                                                                                          <InventoryProvider>
-                                                                                            {(() => {
-                                                                                              return (
-                                                                                                <NotificacionesProvider>
-                                                                                                  {(() => {
-                                                                                                    return (
-                                                                                                      <AnalyticsProvider>
-                                                                                                        {(() => {
-                                                                                                          return children;
-                                                                                                        })()}
-                                                                                                      </AnalyticsProvider>
-                                                                                                    );
-                                                                                                  })()}
-                                                                                                </NotificacionesProvider>
-                                                                                              );
-                                                                                            })()}
-                                                                                          </InventoryProvider>
-                                                                                        );
-                                                                                      })()}
-                                                                                    </CarritoProvider>
-                                                                                  );
-                                                                                })()}
-                                                                              </AsistenciaProvider>
-                                                                            );
-                                                                          })()}
-                                                                        </GastosProvider>
-                                                                      );
-                                                                    })()}
-                                                                  </TurnosProvider>
-                                                                );
-                                                              })()}
-                                                            </MultasProvider>
-                                                          );
-                                                        })()}
-                                                      </PagosProvider>
-                                                    );
-                                                  })()}
-                                                </ServiciosProvider>
-                                              );
-                                            })()}
-                                          </ClientesProvider>
-                                        );
-                                      })()}
-                                    </AgendamientosProvider>
-                                  );
-                                })()}
-                              </TestimoniosProvider>
-                            );
-                          })()}
-                        </ModelosProvider>
-                      );
-                    })()}
-                  </VideosProvider>
-                );
-              })()}
-            </PublicUsersProvider>
-          );
-        })()}
+        <PublicUsersProvider>
+          <VideosProvider>
+            <ModelosProvider>
+              <TestimoniosProvider>
+                <AgendamientosProvider>
+                  <ClientesProvider>
+                    <ServiciosProvider>
+                      <PagosProvider>
+                        <MultasProvider>
+                          <TurnosProvider>
+                            <GastosProvider>
+                              <AsistenciaProvider>
+                                <CarritoProvider>
+                                  <InventoryProvider>
+                                    <NotificacionesProvider>
+                                      <AnalyticsProvider>
+                                        {children}
+                                      </AnalyticsProvider>
+                                    </NotificacionesProvider>
+                                  </InventoryProvider>
+                                </CarritoProvider>
+                              </AsistenciaProvider>
+                            </GastosProvider>
+                          </TurnosProvider>
+                        </MultasProvider>
+                      </PagosProvider>
+                    </ServiciosProvider>
+                  </ClientesProvider>
+                </AgendamientosProvider>
+              </TestimoniosProvider>
+            </ModelosProvider>
+          </VideosProvider>
+        </PublicUsersProvider>
       </LanguageProvider>
     );
   } catch (error) {
@@ -197,6 +131,14 @@ interface CurrentUser {
   nombre?: string;
 }
 
+function clearLocalSession() {
+  Object.keys(localStorage).forEach(key => {
+    if (key.startsWith('sb-') || key.includes('supabase') || key.includes('blackDiamond')) {
+      localStorage.removeItem(key);
+    }
+  });
+}
+
 export default function App() {
   const [showLogin, setShowLogin] = useState(false);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
@@ -204,57 +146,62 @@ export default function App() {
 
   // Verificar sesión contra Supabase al cargar — no confiar solo en localStorage
   useEffect(() => {
+    let mounted = true;
+
     const verifySession = async () => {
-      const savedUser = localStorage.getItem('blackDiamondUser');
-      if (!savedUser) {
-        setVerifyingSession(false);
-        return;
-      }
-
       try {
-        const localUser = JSON.parse(savedUser);
-
-        // Verificar que la sesión de Supabase sigue activa
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
-        if (sessionError || !session || session.user.id !== localUser.userId) {
-          localStorage.removeItem('blackDiamondUser');
-          setVerifyingSession(false);
+        if (sessionError || !session) {
+          clearLocalSession();
+          if (mounted) setVerifyingSession(false);
           return;
         }
 
-        // Verificar el rol desde la base de datos — no desde localStorage
         const { data: userData, error: userError } = await supabase
           .from('usuarios')
-          .select('role')
+          .select('role, nombre, estado')
           .eq('id', session.user.id)
           .single();
 
-        if (userError || !userData?.role) {
-          localStorage.removeItem('blackDiamondUser');
-          setVerifyingSession(false);
+        if (userError || !userData?.role || userData.estado === 'inactivo' || userData.estado === 'bloqueado') {
+          await supabase.auth.signOut();
+          clearLocalSession();
+          if (mounted) setVerifyingSession(false);
           return;
         }
 
-        // Actualizar con el rol verificado desde la DB (ignora el localStorage si fue manipulado)
         const verifiedUser: CurrentUser = {
           accessToken: session.access_token,
           userId: session.user.id,
-          email: session.user.email || localUser.email,
-          nombre: localUser.nombre || session.user.email,
+          email: session.user.email || '',
+          nombre: userData.nombre || session.user.email,
           role: userData.role,
         };
         localStorage.setItem('blackDiamondUser', JSON.stringify(verifiedUser));
-        setCurrentUser(verifiedUser);
+        if (mounted) setCurrentUser(verifiedUser);
       } catch (error) {
         if (process.env.NODE_ENV === 'development') console.error('❌ Error verificando sesión:', error);
-        localStorage.removeItem('blackDiamondUser');
+        clearLocalSession();
       } finally {
-        setVerifyingSession(false);
+        if (mounted) setVerifyingSession(false);
       }
     };
 
     verifySession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_OUT' || !session) {
+        clearLocalSession();
+        if (mounted) { setCurrentUser(null); setVerifyingSession(false); }
+        return;
+      }
+      if (event === 'TOKEN_REFRESHED' && session) {
+        if (mounted) setCurrentUser(prev => prev ? { ...prev, accessToken: session.access_token } : prev);
+      }
+    });
+
+    return () => { mounted = false; subscription.unsubscribe(); };
   }, []);
 
   // ✅ NUEVO: Listener global de errores para capturar throw null
@@ -326,9 +273,15 @@ export default function App() {
     setShowLogin(false);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut({ scope: 'global' });
+    } catch {
+      // continue regardless
+    }
+    clearLocalSession();
     setCurrentUser(null);
-    localStorage.removeItem('blackDiamondUser');
+    window.location.replace('/');
   };
 
   // Si hay usuario logueado, mostrar dashboard según rol
