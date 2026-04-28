@@ -50,9 +50,10 @@ export function GestionUsuariosPanel({ userRole }: GestionUsuariosPanelProps) {
       
       const { data, error } = await supabase
         .from('usuarios')
-        .select('*')
+        .select('id, email, nombre, role, created_at')
         .eq('role', rolABuscar)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(100);
 
       if (error) {
         if (process.env.NODE_ENV === 'development') console.error('Error cargando usuarios:', error);

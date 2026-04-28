@@ -1,215 +1,514 @@
-import { DoorOpen, Timer } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { useState, useEffect, useCallback } from 'react';
+import { DoorOpen, Timer, Users, CheckCircle, Clock, AlertTriangle, X, Loader2, RefreshCw } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { useServicios } from '../app/components/ServiciosContext';
+import { Button } from './ui/button';
+import { supabase } from '../utils/supabase/info';
 import { useModelos } from '../app/components/ModelosContext';
+import { toast } from 'sonner';
+
+interface Habitacion {
+  id: string;
+  numero: number;
+  nombre: string | null;
+  estado: 'disponible' | 'ocupada' | 'limpieza';
+  modelo_email: string | null;
+  modelo_nombre: string | null;
+  hora_inicio: string | null;
+  duracion_minutos: number | null;
+  hora_fin_estimada: string | null;
+  precio_hora: number | null;
+  observaciones: string | null;
+}
+
+function calcularTiempoRestante(horaFin: string | null): string {
+  if (!horaFin) return 'Sin tiempo definido';
+  const fin = new Date(horaFin);
+  const ahora = new Date();
+  const diff = fin.getTime() - ahora.getTime();
+  if (diff <= 0) return 'Tiempo cumplido';
+  const mins = Math.floor(diff / 60000);
+  const hrs = Math.floor(mins / 60);
+  const minsRest = mins % 60;
+  return hrs > 0 ? `${hrs}h ${minsRest}m restantes` : `${minsRest}m restantes`;
+}
+
+function tiempoRestanteMinutos(horaFin: string | null): number {
+  if (!horaFin) return 999;
+  const fin = new Date(horaFin);
+  const ahora = new Date();
+  return Math.floor((fin.getTime() - ahora.getTime()) / 60000);
+}
 
 export function HabitacionesPanel() {
-  const { habitaciones, loading: loadingServicios } = useServicios();
-  const { modelos, loading: loadingModelos } = useModelos();
-  const isLoading = loadingServicios || loadingModelos || !habitaciones || !modelos;
+  const [habitaciones, setHabitaciones] = useState<Habitacion[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [tick, setTick] = useState(0);
 
-  if (isLoading) {
+  // Modal asignar
+  const [modalAsignar, setModalAsignar] = useState<Habitacion | null>(null);
+  const [modeloSeleccionada, setModeloSeleccionada] = useState('');
+  const [duracion, setDuracion] = useState(60);
+  const [guardando, setGuardando] = useState(false);
+
+  // Modal liberar
+  const [modalLiberar, setModalLiberar] = useState<Habitacion | null>(null);
+
+  const { modelos } = useModelos();
+  const modelosActivos = modelos.filter(m => m.activa);
+
+  const cargarHabitaciones = useCallback(async () => {
+    const { data, error: err } = await supabase
+      .from('habitaciones')
+      .select('*')
+      .order('numero', { ascending: true })
+      .limit(50);
+
+    if (err) {
+      setError(err.message);
+    } else {
+      setHabitaciones((data as Habitacion[]) || []);
+      setError(null);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    cargarHabitaciones();
+
+    const channel = supabase
+      .channel('habitaciones-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'habitaciones' }, () => {
+        cargarHabitaciones();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [cargarHabitaciones]);
+
+  // Tick cada minuto para cuentas regresivas
+  useEffect(() => {
+    const interval = setInterval(() => setTick(t => t + 1), 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleAsignar = async () => {
+    if (!modalAsignar || !modeloSeleccionada) return;
+    const modelo = modelosActivos.find(m => m.email === modeloSeleccionada);
+    if (!modelo) return;
+
+    setGuardando(true);
+    const { error: err } = await supabase
+      .from('habitaciones')
+      .update({
+        estado: 'ocupada',
+        modelo_email: modelo.email,
+        modelo_nombre: modelo.nombreArtistico || modelo.nombre,
+        hora_inicio: new Date().toISOString(),
+        duracion_minutos: duracion,
+        hora_fin_estimada: new Date(Date.now() + duracion * 60000).toISOString(),
+      })
+      .eq('id', modalAsignar.id);
+
+    if (err) {
+      toast.error('Error al asignar: ' + err.message);
+    } else {
+      toast.success(`Habitación ${modalAsignar.numero} asignada a ${modelo.nombreArtistico || modelo.nombre}`);
+      setModalAsignar(null);
+      setModeloSeleccionada('');
+      setDuracion(60);
+    }
+    setGuardando(false);
+  };
+
+  const handleLiberar = async () => {
+    if (!modalLiberar) return;
+    setGuardando(true);
+    const { error: err } = await supabase
+      .from('habitaciones')
+      .update({
+        estado: 'limpieza',
+        modelo_email: null,
+        modelo_nombre: null,
+        hora_inicio: null,
+        hora_fin_estimada: null,
+        duracion_minutos: null,
+      })
+      .eq('id', modalLiberar.id);
+
+    if (err) {
+      toast.error('Error al liberar: ' + err.message);
+    } else {
+      toast.success(`Habitación ${modalLiberar.numero} en limpieza`);
+      setModalLiberar(null);
+    }
+    setGuardando(false);
+  };
+
+  const handleMarcarDisponible = async (hab: Habitacion) => {
+    const { error: err } = await supabase
+      .from('habitaciones')
+      .update({ estado: 'disponible' })
+      .eq('id', hab.id);
+
+    if (err) {
+      toast.error('Error: ' + err.message);
+    } else {
+      toast.success(`Habitación ${hab.numero} disponible`);
+    }
+  };
+
+  // Conteos
+  const disponibles = habitaciones.filter(h => h.estado === 'disponible').length;
+  const ocupadas = habitaciones.filter(h => h.estado === 'ocupada').length;
+  const limpieza = habitaciones.filter(h => h.estado === 'limpieza').length;
+  const pct = habitaciones.length > 0 ? Math.round((ocupadas / habitaciones.length) * 100) : 0;
+
+  if (loading) {
     return (
-      <Card className="border-primary/30">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-primary">
-            <DoorOpen className="w-5 h-5 animate-pulse" />
-            Estado de Habitaciones
-          </CardTitle>
-          <CardDescription>Cargando disponibilidad en tiempo real...</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="h-48 rounded-lg bg-secondary/50 animate-pulse border border-border/50"></div>
-            ))}
-          </div>
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[1,2,3,4].map(i => <div key={i} className="h-20 rounded-lg bg-secondary/50 animate-pulse" />)}
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          {[1,2,3,4,5,6,7,8].map(i => <div key={i} className="h-48 rounded-lg bg-secondary/50 animate-pulse" />)}
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className="border-destructive/50">
+        <CardContent className="p-8 text-center">
+          <AlertTriangle className="w-12 h-12 mx-auto text-destructive mb-4" />
+          <h3 className="text-lg font-semibold text-destructive mb-2">Error cargando habitaciones</h3>
+          <p className="text-muted-foreground text-sm mb-2">{error}</p>
+          {error.includes('schema cache') && (
+            <p className="text-xs text-muted-foreground bg-secondary/50 rounded p-3 mt-3 text-left">
+              La tabla <code>habitaciones</code> no existe en Supabase.{'\n'}
+              Ejecuta el archivo <strong>supabase_habitaciones.sql</strong> en el SQL Editor de Supabase.
+            </p>
+          )}
+          <Button onClick={cargarHabitaciones} variant="outline" className="mt-4">
+            <RefreshCw className="w-4 h-4 mr-2" /> Reintentar
+          </Button>
         </CardContent>
       </Card>
     );
   }
 
-  const formatTiempoRestante = (segundos: number) => {
-    const horas = Math.floor(segundos / 3600);
-    const minutos = Math.floor((segundos % 3600) / 60);
-    const segs = segundos % 60;
-    
-    if (horas > 0) {
-      return `${horas}:${minutos.toString().padStart(2, '0')}:${segs.toString().padStart(2, '0')}`;
-    }
-    return `${minutos}:${segs.toString().padStart(2, '0')}`;
-  };
-
-  const formatTiempoNegativo = (segundos: number) => {
-    const minutos = Math.floor(segundos / 60);
-    const segs = segundos % 60;
-    return `+${minutos}:${segs.toString().padStart(2, '0')}`;
-  };
-
-  const obtenerFotoModelo = (modeloEmail: string) => {
-    const modelo = modelos.find(m => m.email === modeloEmail);
-    return modelo?.fotoPerfil || 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200';
-  };
-
-  const obtenerNombreArtistico = (modeloEmail: string, nombrePorDefecto: string) => {
-    const modelo = modelos.find(m => m.email === modeloEmail);
-    return modelo?.nombreArtistico || nombrePorDefecto;
-  };
-
   return (
-    <Card className="border-primary/30">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-primary">
-          <DoorOpen className="w-5 h-5" />
-          Estado de Habitaciones
-        </CardTitle>
-        <CardDescription>Disponibilidad en tiempo real</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-          {habitaciones.map((hab) => (
-            <div
-              key={hab.numero}
-              className={`relative rounded-lg border-2 transition-all overflow-hidden ${
-                hab.ocupada
-                  ? 'bg-gradient-to-br from-red-950/40 to-red-950/20 border-red-500/50 shadow-lg shadow-red-500/10'
-                  : 'bg-gradient-to-br from-green-950/40 to-green-950/20 border-green-500/50 shadow-lg shadow-green-500/10'
-              }`}
-            >
-              {/* Header de la habitación */}
-              <div className={`px-4 py-3 border-b ${
-                hab.ocupada ? 'border-red-500/30 bg-red-950/30' : 'border-green-500/30 bg-green-950/30'
-              }`}>
-                <div className="flex items-center justify-between">
+    <div className="space-y-4" key={tick}>
+      {/* Header con estadísticas */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Card className="border-border/50">
+          <CardContent className="p-4 flex items-center gap-3">
+            <DoorOpen className="w-8 h-8 text-muted-foreground flex-shrink-0" />
+            <div>
+              <p className="text-2xl font-bold">{habitaciones.length}</p>
+              <p className="text-xs text-muted-foreground">Total</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-green-500/30 bg-green-950/10">
+          <CardContent className="p-4 flex items-center gap-3">
+            <CheckCircle className="w-8 h-8 text-green-400 flex-shrink-0" />
+            <div>
+              <p className="text-2xl font-bold text-green-400">{disponibles}</p>
+              <p className="text-xs text-muted-foreground">Disponibles</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-red-500/30 bg-red-950/10">
+          <CardContent className="p-4 flex items-center gap-3">
+            <Users className="w-8 h-8 text-red-400 flex-shrink-0" />
+            <div>
+              <p className="text-2xl font-bold text-red-400">{ocupadas}</p>
+              <p className="text-xs text-muted-foreground">Ocupadas</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-yellow-500/30 bg-yellow-950/10">
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center">
+              <div className="w-6 h-6 rounded-full border-2 border-yellow-400 border-t-transparent animate-spin" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-yellow-400">{limpieza}</p>
+              <p className="text-xs text-muted-foreground">Limpieza</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Barra de ocupación */}
+      <div className="flex items-center gap-3 px-1">
+        <span className="text-sm text-muted-foreground flex-shrink-0">Ocupación {pct}%</span>
+        <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
+          <div
+            className="h-full bg-gradient-to-r from-green-500 to-red-500 rounded-full transition-all duration-500"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Grid de habitaciones */}
+      {habitaciones.length === 0 ? (
+        <Card className="border-dashed border-2 border-border/50">
+          <CardContent className="p-12 text-center">
+            <DoorOpen className="w-16 h-16 mx-auto text-muted-foreground/30 mb-4" />
+            <p className="text-muted-foreground">No hay habitaciones registradas</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Ejecuta <strong>supabase_habitaciones.sql</strong> para crear las habitaciones
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          {habitaciones.map((hab) => {
+            const minsRestantes = hab.estado === 'ocupada' ? tiempoRestanteMinutos(hab.hora_fin_estimada) : 999;
+            const advertencia = hab.estado === 'ocupada' && minsRestantes <= 15 && minsRestantes > 0;
+            const tiempoCumplido = hab.estado === 'ocupada' && minsRestantes <= 0;
+
+            let borderColor = 'border-green-500/60';
+            let bgGradient = 'from-green-950/50 to-green-950/20';
+            let headerBg = 'bg-green-950/40 border-green-500/30';
+            let badgeClass = 'bg-green-500 text-white';
+            let badgeLabel = 'DISPONIBLE';
+            let iconColor = 'text-green-400';
+
+            if (hab.estado === 'ocupada') {
+              if (tiempoCumplido) {
+                borderColor = 'border-red-500 animate-pulse';
+              } else if (advertencia) {
+                borderColor = 'border-yellow-400 shadow-yellow-400/30 shadow-lg';
+              } else {
+                borderColor = 'border-red-500/60';
+              }
+              bgGradient = 'from-red-950/50 to-red-950/20';
+              headerBg = 'bg-red-950/40 border-red-500/30';
+              badgeClass = 'bg-red-500 text-white';
+              badgeLabel = 'OCUPADA';
+              iconColor = 'text-red-400';
+            } else if (hab.estado === 'limpieza') {
+              borderColor = 'border-yellow-500/60';
+              bgGradient = 'from-yellow-950/50 to-yellow-950/20';
+              headerBg = 'bg-yellow-950/40 border-yellow-500/30';
+              badgeClass = 'bg-yellow-500 text-black';
+              badgeLabel = 'LIMPIEZA';
+              iconColor = 'text-yellow-400';
+            }
+
+            return (
+              <div
+                key={hab.id}
+                className={`relative rounded-xl border-2 bg-gradient-to-br ${bgGradient} ${borderColor} overflow-hidden transition-all duration-300`}
+              >
+                {/* Header */}
+                <div className={`px-4 py-3 border-b ${headerBg} flex items-center justify-between`}>
                   <div className="flex items-center gap-2">
-                    <DoorOpen className={`w-5 h-5 ${hab.ocupada ? 'text-red-400' : 'text-green-400'}`} />
-                    <span className="text-2xl font-bold" style={{ fontFamily: 'Cormorant Garamond, serif' }}>
-                      {hab.numero}
+                    <DoorOpen className={`w-4 h-4 ${iconColor}`} />
+                    <span className="text-3xl font-bold tabular-nums" style={{ fontFamily: 'monospace' }}>
+                      {String(hab.numero).padStart(2, '0')}
                     </span>
                   </div>
-                  <Badge 
-                    variant={hab.ocupada ? 'destructive' : 'default'}
-                    className={`text-xs ${hab.ocupada ? 'bg-red-500/80 text-white' : 'bg-green-500/80 text-white'}`}
-                  >
-                    {hab.ocupada ? 'Ocupada' : 'Libre'}
+                  <Badge className={`text-xs font-bold px-2 py-0.5 ${badgeClass}`}>
+                    {badgeLabel}
                   </Badge>
                 </div>
-              </div>
 
-              {/* Contenido - Modelo o Estado Disponible */}
-              <div className="p-4">
-                {hab.ocupada && hab.servicio ? (
-                  <div className="space-y-3">
-                    {/* Foto y nombre de la modelo */}
-                    <div className="flex items-center gap-3">
-                      <div className="relative flex-shrink-0">
-                        <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-primary/40 ring-2 ring-primary/20">
-                          <img 
-                            src={obtenerFotoModelo(hab.servicio.modeloEmail)}
-                            alt={obtenerNombreArtistico(hab.servicio.modeloEmail, hab.servicio.modeloNombre)}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-red-500 rounded-full border-2 border-card animate-pulse"></div>
+                {/* Contenido */}
+                <div className="p-4 space-y-3">
+                  {hab.estado === 'disponible' && (
+                    <>
+                      <div className="text-center py-3">
+                        <CheckCircle className="w-10 h-10 mx-auto text-green-400/70 mb-2" />
+                        <p className="text-sm font-medium text-green-300">Lista para usar</p>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm text-foreground truncate">
-                          {obtenerNombreArtistico(hab.servicio.modeloEmail, hab.servicio.modeloNombre)}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {hab.servicio.tipoServicio}
-                        </p>
-                      </div>
-                    </div>
+                      <Button
+                        size="sm"
+                        className="w-full bg-green-600 hover:bg-green-700 text-white text-xs"
+                        onClick={() => { setModalAsignar(hab); setModeloSeleccionada(''); setDuracion(60); }}
+                      >
+                        Asignar modelo
+                      </Button>
+                    </>
+                  )}
 
-                    {/* Tiempo restante con diseño prominente */}
-                    <div className={`rounded-lg p-3 border ${ 
-                      (hab.servicio.tiempoNegativo && hab.servicio.tiempoNegativo > 0)
-                        ? 'bg-red-950/40 border-red-500/50'
-                        : 'bg-black/20 border-primary/20'
-                    }`}>
-                      <div className="flex items-center justify-center gap-2 mb-1">
-                        <Timer className={`w-4 h-4 animate-pulse ${
-                          (hab.servicio.tiempoNegativo && hab.servicio.tiempoNegativo > 0)
-                            ? 'text-red-500'
-                            : 'text-primary'
-                        }`} />
-                        <span className="text-xs text-muted-foreground">
-                          {(hab.servicio.tiempoNegativo && hab.servicio.tiempoNegativo > 0)
-                            ? 'Tiempo Excedido'
-                            : 'Tiempo Restante'}
-                        </span>
-                      </div>
-                      <div className="text-center">
-                        <p className={`text-2xl font-bold font-mono tabular-nums ${
-                          (hab.servicio.tiempoNegativo && hab.servicio.tiempoNegativo > 0)
-                            ? 'text-red-500 animate-pulse'
-                            : 'text-primary'
-                        }`}>
-                          {(hab.servicio.tiempoNegativo && hab.servicio.tiempoNegativo > 0)
-                            ? formatTiempoNegativo(hab.servicio.tiempoNegativo)
-                            : formatTiempoRestante(hab.servicio.tiempoRestante)}
-                        </p>
-                        {(hab.servicio.tiempoNegativo && hab.servicio.tiempoNegativo > 0) && (
-                          <p className="text-xs text-red-400 mt-1">
-                            {Math.floor(hab.servicio.tiempoNegativo / 60) >= 5 && '⚠️ Multa generada'}
+                  {hab.estado === 'ocupada' && (
+                    <>
+                      {/* Modelo */}
+                      <div>
+                        <p className="font-bold text-sm text-white truncate">{hab.modelo_nombre || 'Sin nombre'}</p>
+                        {hab.hora_inicio && (
+                          <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                            <Clock className="w-3 h-3" />
+                            Inicio: {new Date(hab.hora_inicio).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
                           </p>
                         )}
                       </div>
-                    </div>
 
-                    {/* Información adicional del servicio */}
-                    <div className="pt-2 border-t border-border/20 space-y-1">
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-muted-foreground">Duración</span>
-                        <span className="font-medium text-foreground">{hab.servicio.tiempoServicio}</span>
+                      {/* Tiempo restante */}
+                      <div className={`rounded-lg p-2.5 border text-center ${
+                        tiempoCumplido
+                          ? 'bg-red-900/50 border-red-400/50'
+                          : advertencia
+                          ? 'bg-yellow-900/50 border-yellow-400/50'
+                          : 'bg-black/30 border-white/10'
+                      }`}>
+                        <div className="flex items-center justify-center gap-1 mb-0.5">
+                          <Timer className={`w-3 h-3 ${tiempoCumplido ? 'text-red-400 animate-pulse' : advertencia ? 'text-yellow-400 animate-pulse' : 'text-primary'}`} />
+                          <span className="text-xs text-muted-foreground">
+                            {tiempoCumplido ? 'Tiempo cumplido' : advertencia ? '¡Próximo a terminar!' : 'Tiempo restante'}
+                          </span>
+                        </div>
+                        <p className={`text-xl font-bold font-mono tabular-nums ${
+                          tiempoCumplido ? 'text-red-400 animate-pulse' : advertencia ? 'text-yellow-400' : 'text-primary'
+                        }`}>
+                          {calcularTiempoRestante(hab.hora_fin_estimada)}
+                        </p>
                       </div>
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-muted-foreground">Total</span>
-                        <span className="font-bold text-primary">
-                          ${(hab.servicio.costoServicio + hab.servicio.costoAdicionales + hab.servicio.costoConsumo).toLocaleString()}
-                        </span>
+
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full border-red-500/50 text-red-400 hover:bg-red-950/50 text-xs"
+                        onClick={() => setModalLiberar(hab)}
+                      >
+                        Liberar habitación
+                      </Button>
+                    </>
+                  )}
+
+                  {hab.estado === 'limpieza' && (
+                    <>
+                      <div className="text-center py-3">
+                        <div className="w-10 h-10 mx-auto mb-2 flex items-center justify-center">
+                          <div className="w-8 h-8 rounded-full border-2 border-yellow-400 border-t-transparent animate-spin" />
+                        </div>
+                        <p className="text-sm font-medium text-yellow-300">En limpieza</p>
                       </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-6">
-                    <DoorOpen className="w-12 h-12 mx-auto text-green-400/50 mb-2" />
-                    <p className="text-sm font-medium text-green-400">Disponible</p>
-                    <p className="text-xs text-muted-foreground mt-1">Lista para usar</p>
-                  </div>
-                )}
+                      <Button
+                        size="sm"
+                        className="w-full bg-yellow-600 hover:bg-yellow-700 text-black font-semibold text-xs"
+                        onClick={() => handleMarcarDisponible(hab)}
+                      >
+                        Marcar disponible
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Modal: Asignar modelo */}
+      {modalAsignar && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card border border-primary/30 rounded-xl w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-primary">
+                Asignar — Hab. {String(modalAsignar.numero).padStart(2, '0')}
+              </h3>
+              <Button variant="ghost" size="icon" onClick={() => setModalAsignar(null)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">Modelo</label>
+                <select
+                  className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary"
+                  value={modeloSeleccionada}
+                  onChange={e => setModeloSeleccionada(e.target.value)}
+                >
+                  <option value="">— Seleccionar modelo —</option>
+                  {modelosActivos.map(m => (
+                    <option key={m.id} value={m.email}>
+                      {m.nombreArtistico || m.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">Duración (minutos)</label>
+                <input
+                  type="number"
+                  min={15}
+                  max={480}
+                  step={15}
+                  className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary"
+                  value={duracion}
+                  onChange={e => setDuracion(Number(e.target.value))}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Fin estimado: {new Date(Date.now() + duracion * 60000).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
+                </p>
               </div>
             </div>
-          ))}
-        </div>
 
-        {/* Resumen de ocupación */}
-        <div className="mt-6 flex items-center justify-center gap-8 text-sm border-t border-border/30 pt-4">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-green-500 shadow-lg shadow-green-500/50"></div>
-            <span className="text-muted-foreground">
-              <span className="font-bold text-green-400">{habitaciones.filter(h => !h.ocupada).length}</span> Disponibles
-            </span>
-          </div>
-          <div className="w-px h-4 bg-border/50"></div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-red-500 shadow-lg shadow-red-500/50 animate-pulse"></div>
-            <span className="text-muted-foreground">
-              <span className="font-bold text-red-400">{habitaciones.filter(h => h.ocupada).length}</span> Ocupadas
-            </span>
-          </div>
-          <div className="w-px h-4 bg-border/50"></div>
-          <div className="flex items-center gap-2">
-            <span className="text-muted-foreground">
-              Ocupación: <span className="font-bold text-primary">
-                {Math.round((habitaciones.filter(h => h.ocupada).length / habitaciones.length) * 100)}%
-              </span>
-            </span>
+            <div className="flex gap-2 pt-2">
+              <Button variant="outline" className="flex-1" onClick={() => setModalAsignar(null)}>
+                Cancelar
+              </Button>
+              <Button
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                disabled={!modeloSeleccionada || guardando}
+                onClick={handleAsignar}
+              >
+                {guardando ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                Confirmar
+              </Button>
+            </div>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      )}
+
+      {/* Modal: Liberar habitación */}
+      {modalLiberar && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card border border-red-500/30 rounded-xl w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-red-400">
+                Liberar — Hab. {String(modalLiberar.numero).padStart(2, '0')}
+              </h3>
+              <Button variant="ghost" size="icon" onClick={() => setModalLiberar(null)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+
+            <p className="text-sm text-muted-foreground">
+              ¿Confirmas liberar la habitación <strong className="text-white">{modalLiberar.numero}</strong>{' '}
+              actualmente ocupada por{' '}
+              <strong className="text-primary">{modalLiberar.modelo_nombre}</strong>?
+            </p>
+            <p className="text-xs text-yellow-400 flex items-center gap-1">
+              <AlertTriangle className="w-3 h-3" />
+              La habitación pasará a estado <strong>En limpieza</strong>
+            </p>
+
+            <div className="flex gap-2 pt-2">
+              <Button variant="outline" className="flex-1" onClick={() => setModalLiberar(null)}>
+                Cancelar
+              </Button>
+              <Button
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                disabled={guardando}
+                onClick={handleLiberar}
+              >
+                {guardando ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                Liberar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

@@ -10,6 +10,7 @@ export interface Multa {
   modeloNombre: string;
   modeloEmail?: string; // Agregado para compatibilidad con el sistema
   concepto: string;
+  descripcion?: string;
   monto: number;
   fecha: string;
   estado: 'pendiente' | 'pagada' | 'cancelada';

@@ -73,7 +73,8 @@ export function OwnerDashboard({ accessToken, userId, userEmail = '', onLogout }
   const [moduloActivo, setModuloActivo] = useState<ModuloType>('general');
   const [modeloDetalle, setModeloDetalle] = useState<Modelo | null>(null);
   const [modeloEditar, setModeloEditar] = useState<Modelo | null>(null);
-  
+  const [menuOpen, setMenuOpen] = useState(false);
+
   // ✅ MANEJO DEFENSIVO DE CONTEXTOS
   try {
     var pagosCtx = usePagos();
@@ -228,8 +229,6 @@ export function OwnerDashboard({ accessToken, userId, userEmail = '', onLogout }
     { periodo: 'Hoy', ingresos: ingresosHoy, egresos: gastosHoy, neto: ingresosHoy - gastosHoy },
     { periodo: 'Este mes', ingresos: ingresosMes, egresos: gastosMes, neto: ingresosMes - gastosMes },
   ];
-
-  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <div className="min-h-screen w-full bg-background" style={{ fontFamily: 'Montserrat, sans-serif' }}>
@@ -461,24 +460,37 @@ export function OwnerDashboard({ accessToken, userId, userEmail = '', onLogout }
                         className="bg-secondary rounded-lg overflow-hidden border border-border/50 hover:border-primary/30 transition-all"
                       >
                         <div className="aspect-square overflow-hidden">
-                          <img 
-                            src={modelo.fotoPerfil} 
+                          <img
+                            src={modelo.fotoPerfil}
                             alt={modelo.nombre}
                             className="w-full h-full object-cover"
+                            loading="lazy"
+                            width={300}
+                            height={300}
                           />
                         </div>
                         <div className="p-4 space-y-3">
                           <div>
                             <h3 className="font-medium text-lg">{modelo.nombreArtistico || modelo.nombre}</h3>
-                            <div className="flex items-center gap-2 mt-1">
+                            <div className="flex items-center gap-2 mt-1 flex-wrap">
                               <Badge variant="outline" className="text-xs">
                                 {modelo.edad} años
                               </Badge>
-                              <Badge 
+                              <Badge
                                 className={modelo.activa ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'bg-gray-500/20 text-gray-400 border-gray-500/30'}
                               >
                                 {modelo.activa ? 'Activa' : 'Inactiva'}
                               </Badge>
+                              {/* Document status badge */}
+                              {modelo.documentoFrente && modelo.documentoReverso ? (
+                                modelo.documento_verificado ? (
+                                  <Badge className="text-xs bg-green-500/10 text-green-400 border-green-500/30">✅ Docs verificados</Badge>
+                                ) : (
+                                  <Badge className="text-xs bg-blue-500/10 text-blue-400 border-blue-500/30">📄 Docs cargados</Badge>
+                                )
+                              ) : (
+                                <Badge className="text-xs bg-yellow-500/10 text-yellow-400 border-yellow-500/30">⚠️ Docs pendientes</Badge>
+                              )}
                             </div>
                           </div>
                           

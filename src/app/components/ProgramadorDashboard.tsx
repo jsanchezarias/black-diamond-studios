@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Calendar, BarChart3, Plus, Clock, DoorOpen, XCircle, UserX, MoreVertical, MessageSquare, Menu, X, Eye, Bell, PieChart, Settings } from 'lucide-react'; // 📊 Agregado PieChart y Settings
+import { toast } from 'sonner';
+import { Calendar, BarChart3, Plus, Clock, Timer, DollarSign, DoorOpen, XCircle, UserX, MoreVertical, MessageSquare, Menu, X, Eye, Bell, PieChart, Settings } from 'lucide-react'; // 📊 Agregado PieChart y Settings
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -108,47 +109,47 @@ export function ProgramadorDashboard({ accessToken, userId, userEmail, onLogout 
     try {
       // Validaciones
       if (!formData.modeloEmail) {
-        alert('Por favor selecciona una modelo');
+        toast.error('Por favor selecciona una modelo');
         return;
       }
-      
+
       if (!formData.clienteNombre || !formData.clienteTelefono) {
-        alert('Por favor completa los datos del cliente');
+        toast.error('Por favor completa los datos del cliente');
         return;
       }
-      
+
       if (!formData.fecha || !formData.hora) {
-        alert('Por favor selecciona fecha y hora');
+        toast.error('Por favor selecciona fecha y hora');
         return;
       }
 
       // Verificar que los contextos existan
       if (!clientesCtx?.obtenerOCrearCliente) {
-        alert('Error: El sistema de clientes no está disponible');
+        toast.error('Error: El sistema de clientes no está disponible');
         return;
       }
 
       if (!agendamientosCtx?.agregarAgendamiento) {
-        alert('Error: El sistema de agendamientos no está disponible');
+        toast.error('Error: El sistema de agendamientos no está disponible');
         return;
       }
-      
+
       // Crear o verificar cliente
       const cliente = await clientesCtx.obtenerOCrearCliente(
-        formData.clienteNombre, 
+        formData.clienteNombre,
         formData.clienteTelefono
       );
-      
+
       if (!cliente) {
-        alert('Error al crear o encontrar el cliente');
+        toast.error('Error al crear o encontrar el cliente');
         return;
       }
 
       // Buscar modelo
       const modelo = modelos.find(m => m?.email === formData.modeloEmail);
-      
+
       if (!modelo) {
-        alert('No se encontró la modelo seleccionada');
+        toast.error('No se encontró la modelo seleccionada');
         return;
       }
 
@@ -156,23 +157,25 @@ export function ProgramadorDashboard({ accessToken, userId, userEmail, onLogout 
       await agendamientosCtx.agregarAgendamiento({
         modeloEmail: formData.modeloEmail,
         modeloNombre: modelo.nombre || modelo.nombreArtistico || 'Sin nombre',
-        clienteId: cliente.id, // ✅ CORREGIDO: Pasar ID del cliente
-        clienteNombre: formData.clienteNombre, // ✅ Para display
-        clienteTelefono: formData.clienteTelefono, // ✅ Para display
+        clienteId: cliente.id,
+        clienteNombre: formData.clienteNombre,
+        clienteTelefono: formData.clienteTelefono,
         fecha: formData.fecha,
         hora: formData.hora,
         duracionMinutos: Number(formData.duracionMinutos) || 60,
         tipoServicio: formData.tipoServicio,
+        montoPago: 0,
+        estadoPago: 'pendiente',
         estado: 'pendiente',
         notas: formData.notas || '',
         creadoPor: userEmail,
       });
-      
-      alert('¡Agendamiento creado exitosamente!');
-      
+
+      toast.success('¡Agendamiento creado exitosamente!');
+
       // Limpiar formulario
       setFormData({
-        modeloEmail: undefined as string | undefined, // ✅ FIX: undefined en lugar de ''
+        modeloEmail: undefined as string | undefined,
         clienteNombre: '',
         clienteTelefono: '',
         fecha: '',
@@ -184,7 +187,7 @@ export function ProgramadorDashboard({ accessToken, userId, userEmail, onLogout 
     } catch (error) {
       if (isDev) console.error('❌ ERROR EN SUBMIT:', error);
       const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
-      alert(`Error al crear el agendamiento: ${errorMessage}`);
+      toast.error(`Error al crear el agendamiento: ${errorMessage}`);
     }
   };
 
@@ -380,11 +383,30 @@ export function ProgramadorDashboard({ accessToken, userId, userEmail, onLogout 
                                   <p className="text-sm text-muted-foreground mb-2">
                                     {apt.clienteNombre || 'Sin nombre'}
                                   </p>
-                                  <div className="flex items-center gap-3">
-                                    <div className="flex items-center gap-1.5 text-muted-foreground">
-                                      <Clock className="w-4 h-4" />
+                                  <div className="flex flex-wrap items-center gap-2 mb-3">
+                                    <div className="flex items-center gap-1.5 text-muted-foreground bg-primary/5 px-2 py-1 rounded-md">
+                                      <Clock className="w-3.5 h-3.5" />
                                       <span className="text-sm font-medium">{apt.hora || '--:--'}</span>
                                     </div>
+                                    {apt.duracionMinutos > 0 && (
+                                      <div className="flex items-center gap-1.5 text-muted-foreground bg-primary/5 px-2 py-1 rounded-md">
+                                        <Timer className="w-3.5 h-3.5" />
+                                        <span className="text-sm font-medium">{apt.duracionMinutos} min</span>
+                                      </div>
+                                    )}
+                                    {apt.tipoServicio && (
+                                      <Badge variant="outline" className="bg-primary/5 border-primary/20 text-primary font-normal">
+                                        {apt.tipoServicio}
+                                      </Badge>
+                                    )}
+                                    {apt.montoPago > 0 && (
+                                      <div className="flex items-center gap-1 text-amber-600 font-semibold ml-auto bg-amber-500/10 px-2 py-1 rounded-md">
+                                        <DollarSign className="w-3.5 h-3.5" />
+                                        <span className="text-sm">{Number(apt.montoPago).toLocaleString('es-CO')}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-3">
                                     <Badge variant={
                                       apt.estado === 'confirmado' ? 'default' : 
                                       apt.estado === 'cancelado' ? 'destructive' : 

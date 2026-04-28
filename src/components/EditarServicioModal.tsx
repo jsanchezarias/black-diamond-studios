@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { useState } from 'react';
 import { X, Edit, AlertTriangle, Save } from 'lucide-react';
 import { Button } from './ui/button';
@@ -15,11 +16,11 @@ interface EditarServicioModalProps {
 export function EditarServicioModal({ isOpen, onClose, servicio }: EditarServicioModalProps) {
   const { editarServicioFinalizado } = useServicios();
   
-  const [tipoServicio, setTipoServicio] = useState<'Sede' | 'Domicilio'>(servicio.tipoServicio);
-  const [tiempoServicio, setTiempoServicio] = useState<'30 minutos' | '1 hora' | 'rato' | 'varias horas' | 'amanecida'>(servicio.tiempoServicio);
-  const [costoServicio, setCostoServicio] = useState(servicio.costoServicio.toString());
-  const [costoAdicionales, setCostoAdicionales] = useState(servicio.costoAdicionales.toString());
-  const [costoConsumo, setCostoConsumo] = useState(servicio.costoConsumo.toString());
+  const [tipoServicio, setTipoServicio] = useState<'sede' | 'domicilio'>(servicio.tipoServicio);
+  const [tiempoServicio, setTiempoServicio] = useState<string>(servicio.tiempoServicio ?? '');
+  const [costoServicio, setCostoServicio] = useState((servicio.costoServicio ?? 0).toString());
+  const [costoAdicionales, setCostoAdicionales] = useState((servicio.costoAdicionales ?? 0).toString());
+  const [costoConsumo, setCostoConsumo] = useState((servicio.costoConsumo ?? 0).toString());
   const [motivoEdicion, setMotivoEdicion] = useState('');
   const [confirmacion, setConfirmacion] = useState('');
 
@@ -27,12 +28,12 @@ export function EditarServicioModal({ isOpen, onClose, servicio }: EditarServici
     e.preventDefault();
     
     if (!motivoEdicion.trim()) {
-      alert('⚠️ Debes ingresar el motivo de la modificación');
+      toast.error('⚠️ Debes ingresar el motivo de la modificación');
       return;
     }
 
     if (confirmacion.toUpperCase() !== 'MODIFICAR') {
-      alert('⚠️ Debes escribir "MODIFICAR" para confirmar los cambios');
+      toast.error('⚠️ Debes escribir "MODIFICAR" para confirmar los cambios');
       return;
     }
 
@@ -47,7 +48,7 @@ export function EditarServicioModal({ isOpen, onClose, servicio }: EditarServici
 
     editarServicioFinalizado(servicio.id, datosEditados);
 
-    alert(`✅ Servicio modificado exitosamente\n\nMotivo: ${motivoEdicion}\n\nLos cambios se reflejarán en el cálculo de liquidación.`);
+    toast.success(`✅ Servicio modificado exitosamente\n\nMotivo: ${motivoEdicion}\n\nLos cambios se reflejarán en el cálculo de liquidación.`);
 
     // Reset
     setMotivoEdicion('');
@@ -58,7 +59,7 @@ export function EditarServicioModal({ isOpen, onClose, servicio }: EditarServici
   if (!isOpen) return null;
 
   // Calcular totales
-  const costoOriginal = servicio.costoServicio + servicio.costoAdicionales + servicio.costoConsumo;
+  const costoOriginal = (servicio.costoServicio ?? 0) + (servicio.costoAdicionales ?? 0) + (servicio.costoConsumo ?? 0);
   const costoNuevo = parseFloat(costoServicio || '0') + parseFloat(costoAdicionales || '0') + parseFloat(costoConsumo || '0');
   const diferencia = costoNuevo - costoOriginal;
 
@@ -122,7 +123,7 @@ export function EditarServicioModal({ isOpen, onClose, servicio }: EditarServici
           <div className="space-y-2">
             <Label>Tipo de Servicio</Label>
             <div className="grid grid-cols-2 gap-3">
-              {(['Sede', 'Domicilio'] as const).map((tipo) => (
+              {(['sede', 'domicilio'] as const).map((tipo) => (
                 <button
                   key={tipo}
                   type="button"
@@ -133,7 +134,7 @@ export function EditarServicioModal({ isOpen, onClose, servicio }: EditarServici
                       : 'border-border hover:border-primary/50'
                   }`}
                 >
-                  {tipo}
+                  {tipo.charAt(0).toUpperCase() + tipo.slice(1)}
                 </button>
               ))}
             </div>

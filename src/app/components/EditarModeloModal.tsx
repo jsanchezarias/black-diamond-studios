@@ -10,6 +10,8 @@ import { Button } from '../../components/ui/button';
 import { Switch } from '../../components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { Upload, Edit, Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
+import { Badge } from '../../components/ui/badge';
+import { GaleriaFotosModelo } from '../../components/GaleriaFotosModelo';
 
 interface EditarModeloModalProps {
   open: boolean;
@@ -20,7 +22,7 @@ interface EditarModeloModalProps {
 export function EditarModeloModal({ open, onClose, modelo }: EditarModeloModalProps) {
   const { modelos, actualizarModelo } = useModelos();
   const [loading, setLoading] = useState(false);
-  
+
   const [formData, setFormData] = useState({
     nombre: '',
     nombreArtistico: '',
@@ -39,12 +41,18 @@ export function EditarModeloModal({ open, onClose, modelo }: EditarModeloModalPr
     disponible: true,
     domicilio: true,
     politicaTarifa: 1,
+    documento_tipo: 'cedula',
+    documento_numero: '',
+    documentoFrente: '',
+    documentoReverso: '',
+    documento_verificado: false,
   });
-  
+
   const [fotoPerfil, setFotoPerfil] = useState<string>('');
   const [showPassword, setShowPassword] = useState(false);
   const [changePassword, setChangePassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [subiendoDoc, setSubiendoDoc] = useState<'frente' | 'reverso' | null>(null);
 
   // Cargar datos del modelo cuando cambia
   useEffect(() => {
@@ -67,6 +75,11 @@ export function EditarModeloModal({ open, onClose, modelo }: EditarModeloModalPr
         disponible: modelo.disponible ?? true,
         domicilio: modelo.domicilio ?? true,
         politicaTarifa: modelo.politicaTarifa || 1,
+        documento_tipo: modelo.documento_tipo || 'cedula',
+        documento_numero: modelo.documento_numero || '',
+        documentoFrente: modelo.documentoFrente || '',
+        documentoReverso: modelo.documentoReverso || '',
+        documento_verificado: modelo.documento_verificado || false,
       });
       setFotoPerfil(modelo.fotoPerfil);
     }
@@ -82,6 +95,36 @@ export function EditarModeloModal({ open, onClose, modelo }: EditarModeloModalPr
         setFormData(prev => ({ ...prev, fotoPerfil: result }));
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const subirDocumento = async (e: React.ChangeEvent<HTMLInputElement>, cara: 'frente' | 'reverso') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('El archivo no puede superar 5MB');
+      return;
+    }
+
+    setSubiendoDoc(cara);
+    try {
+      const ext = file.name.split('.').pop();
+      const fileName = `modelo-${modelo!.id}-${cara}-${Date.now()}.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('documentos')
+        .upload(fileName, file, { cacheControl: '3600', upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const campo = cara === 'frente' ? 'documentoFrente' : 'documentoReverso';
+      setFormData(prev => ({ ...prev, [campo]: fileName }));
+      toast.success(`Documento ${cara === 'frente' ? 'frontal' : 'posterior'} cargado`);
+    } catch (err) {
+      toast.error('Error al subir documento');
+    } finally {
+      setSubiendoDoc(null);
     }
   };
 
@@ -147,6 +190,14 @@ export function EditarModeloModal({ open, onClose, modelo }: EditarModeloModalPr
         disponible: formData.disponible,
         domicilio: formData.domicilio,
         politicaTarifa: formData.politicaTarifa,
+        documento_tipo: formData.documento_tipo,
+        documento_numero: formData.documento_numero,
+        documentoFrente: formData.documentoFrente || undefined,
+        documentoReverso: formData.documentoReverso || undefined,
+        documento_verificado: formData.documento_verificado,
+        documento_fecha_subida: (formData.documentoFrente || formData.documentoReverso)
+          ? new Date().toISOString()
+          : undefined,
       };
 
       // Only update password if changing
@@ -195,6 +246,11 @@ export function EditarModeloModal({ open, onClose, modelo }: EditarModeloModalPr
       disponible: true,
       domicilio: true,
       politicaTarifa: 1,
+      documento_tipo: 'cedula',
+      documento_numero: '',
+      documentoFrente: '',
+      documentoReverso: '',
+      documento_verificado: false,
     });
     setFotoPerfil('');
     setErrors({});
@@ -217,10 +273,12 @@ export function EditarModeloModal({ open, onClose, modelo }: EditarModeloModalPr
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <Tabs defaultValue="basica" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="basica">Información Básica</TabsTrigger>
               <TabsTrigger value="perfil">Perfil Público</TabsTrigger>
               <TabsTrigger value="tarifas">Tarifas</TabsTrigger>
+              <TabsTrigger value="documentos">Documentos</TabsTrigger>
+              <TabsTrigger value="galeria">Galería</TabsTrigger>
             </TabsList>
 
             {/* TAB: INFORMACIÓN BÁSICA */}
@@ -651,6 +709,168 @@ export function EditarModeloModal({ open, onClose, modelo }: EditarModeloModalPr
                 <div className="mt-4 p-3 bg-blue-950/20 border border-blue-500/30 rounded text-xs text-blue-300">
                   <strong>💡 Nota:</strong> Al seleccionar una política, las tarifas se aplicarán automáticamente a la modelo en la landing page cuando guardes los cambios. La política solo afecta los precios en sede, las tarifas a domicilio son fijas.
                 </div>
+              </div>
+            </TabsContent>
+            {/* TAB: DOCUMENTOS */}
+            <TabsContent value="documentos" className="space-y-4">
+              {/* Sección: Documento de Identidad */}
+              <div className="border border-white/10 rounded-xl p-4 space-y-4">
+                <h3 className="text-sm font-semibold text-amber-400 uppercase tracking-wider flex items-center gap-2">
+                  <span>🪪</span> Documento de Identidad
+                </h3>
+
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Tipo de documento */}
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Tipo de documento</label>
+                    <select
+                      value={formData.documento_tipo}
+                      onChange={e => setFormData(prev => ({ ...prev, documento_tipo: e.target.value }))}
+                      className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    >
+                      <option value="cedula">Cédula de Ciudadanía</option>
+                      <option value="pasaporte">Pasaporte</option>
+                      <option value="extranjeria">Cédula de Extranjería</option>
+                    </select>
+                  </div>
+
+                  {/* Número de documento */}
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Número de documento</label>
+                    <Input
+                      type="text"
+                      placeholder="Ej: 1234567890"
+                      value={formData.documento_numero}
+                      onChange={e => setFormData(prev => ({ ...prev, documento_numero: e.target.value }))}
+                    />
+                  </div>
+                </div>
+
+                {/* Zona de carga */}
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Cara frontal */}
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Cara frontal</label>
+                    <label className="block cursor-pointer">
+                      <input
+                        type="file"
+                        accept="image/*,.pdf"
+                        className="hidden"
+                        onChange={e => subirDocumento(e, 'frente')}
+                        disabled={subiendoDoc !== null}
+                      />
+                      <div className={`border-2 border-dashed rounded-xl p-4 text-center transition-colors ${
+                        formData.documentoFrente
+                          ? 'border-green-500/40 bg-green-500/5'
+                          : 'border-border hover:border-primary/50'
+                      }`}>
+                        {subiendoDoc === 'frente' ? (
+                          <div className="flex flex-col items-center gap-2 py-2">
+                            <Loader2 className="w-5 h-5 text-amber-400 animate-spin" />
+                            <span className="text-xs text-muted-foreground">Subiendo...</span>
+                          </div>
+                        ) : formData.documentoFrente ? (
+                          <div className="flex flex-col items-center gap-1">
+                            <span className="text-2xl">✅</span>
+                            <Badge className="bg-green-600/20 text-green-400 border-green-500/30">Cargado</Badge>
+                            <span className="text-xs text-muted-foreground">Clic para cambiar</span>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center gap-1 py-2">
+                            <Upload className="w-8 h-8 text-muted-foreground mb-1" />
+                            <span className="text-xs font-medium">Cara frontal</span>
+                            <span className="text-xs text-muted-foreground">JPG, PNG o PDF · máx 5MB</span>
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* Cara posterior */}
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Cara posterior</label>
+                    <label className="block cursor-pointer">
+                      <input
+                        type="file"
+                        accept="image/*,.pdf"
+                        className="hidden"
+                        onChange={e => subirDocumento(e, 'reverso')}
+                        disabled={subiendoDoc !== null}
+                      />
+                      <div className={`border-2 border-dashed rounded-xl p-4 text-center transition-colors ${
+                        formData.documentoReverso
+                          ? 'border-green-500/40 bg-green-500/5'
+                          : 'border-border hover:border-primary/50'
+                      }`}>
+                        {subiendoDoc === 'reverso' ? (
+                          <div className="flex flex-col items-center gap-2 py-2">
+                            <Loader2 className="w-5 h-5 text-amber-400 animate-spin" />
+                            <span className="text-xs text-muted-foreground">Subiendo...</span>
+                          </div>
+                        ) : formData.documentoReverso ? (
+                          <div className="flex flex-col items-center gap-1">
+                            <span className="text-2xl">✅</span>
+                            <Badge className="bg-green-600/20 text-green-400 border-green-500/30">Cargado</Badge>
+                            <span className="text-xs text-muted-foreground">Clic para cambiar</span>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center gap-1 py-2">
+                            <Upload className="w-8 h-8 text-muted-foreground mb-1" />
+                            <span className="text-xs font-medium">Cara posterior</span>
+                            <span className="text-xs text-muted-foreground">JPG, PNG o PDF · máx 5MB</span>
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Estado de verificación */}
+                {(formData.documentoFrente && formData.documentoReverso) && (
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-secondary border border-border">
+                    <div className="flex items-center gap-2">
+                      <span>{formData.documento_verificado ? '✅' : '📋'}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {formData.documento_verificado
+                          ? 'Documentos verificados'
+                          : 'Documentos cargados, pendiente verificación'}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, documento_verificado: !prev.documento_verificado }))}
+                      className={`text-xs px-3 py-1 rounded-full border transition-colors ${
+                        formData.documento_verificado
+                          ? 'border-green-500/50 text-green-400 bg-green-500/10'
+                          : 'border-amber-500/50 text-amber-400 bg-amber-500/10 hover:bg-amber-500/20'
+                      }`}
+                    >
+                      {formData.documento_verificado ? 'Verificado ✓' : 'Marcar verificado'}
+                    </button>
+                  </div>
+                )}
+
+                <div className="bg-yellow-950/20 border border-yellow-500/30 rounded-lg p-3">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-yellow-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-xs text-yellow-300 font-medium">Documentos Confidenciales</p>
+                      <p className="text-xs text-yellow-300/80 mt-0.5">
+                        Los documentos son solo para verificación interna. No se mostrarán en la página web.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* TAB: GALERÍA */}
+            <TabsContent value="galeria" className="space-y-4">
+              <div className="border border-white/10 rounded-xl p-4">
+                <GaleriaFotosModelo
+                  modeloEmail={modelo.email}
+                  soloLectura={false}
+                />
               </div>
             </TabsContent>
           </Tabs>

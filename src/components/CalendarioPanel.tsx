@@ -31,7 +31,8 @@ interface CalendarioPanelProps {
 }
 
 export function CalendarioPanel({ modeloEmail, userRole = 'modelo' }: CalendarioPanelProps) {
-  const { serviciosActivos, serviciosFinalizados } = useServicios();
+  // Usar servicios (array unificado) con guard defensivo
+  const { servicios } = useServicios();
   const { modelos } = useModelos();
   const { buscarPorTelefono } = useClientes();
   const [vista, setVista] = useState<VistaCalendario>('mes');
@@ -56,14 +57,14 @@ export function CalendarioPanel({ modeloEmail, userRole = 'modelo' }: Calendario
   // Determinar si el usuario tiene acceso a la info del cliente (owner, admin, programador)
   const puedeVerInfoCliente = userRole === 'owner' || userRole === 'admin' || userRole === 'programador';
 
-  // Combinar todos los servicios
+  // Combinar todos los servicios con guard defensivo
   const todosLosServicios = useMemo(() => {
-    const servicios = [...serviciosActivos, ...serviciosFinalizados];
+    const lista = Array.isArray(servicios) ? servicios : [];
     // Filtrar por modelo si se especifica
-    return modeloEmail 
-      ? servicios.filter(s => s.modeloEmail === modeloEmail)
-      : servicios;
-  }, [serviciosActivos, serviciosFinalizados, modeloEmail]);
+    return modeloEmail
+      ? lista.filter(s => s.modeloEmail === modeloEmail)
+      : lista;
+  }, [servicios, modeloEmail]);
 
   // Navegación
   const navegarAnterior = () => {
@@ -128,8 +129,9 @@ export function CalendarioPanel({ modeloEmail, userRole = 'modelo' }: Calendario
   };
 
   const obtenerServiciosPorDia = (fecha: Date) => {
-    return todosLosServicios.filter(servicio => 
-      esMismoDia(servicio.horaInicio, fecha)
+    const fechaStr = `${fecha.getFullYear()}-${String(fecha.getMonth()+1).padStart(2,'0')}-${String(fecha.getDate()).padStart(2,'0')}`;
+    return todosLosServicios.filter(servicio =>
+      (servicio.fecha || '') === fechaStr
     );
   };
 
@@ -146,8 +148,8 @@ export function CalendarioPanel({ modeloEmail, userRole = 'modelo' }: Calendario
           </div>
         ) : (
           <div className="space-y-3">
-            {servicios
-              .sort((a, b) => a.horaInicio.getTime() - b.horaInicio.getTime())
+            {(Array.isArray(servicios) ? servicios.filter(s => (s.fecha||'') === (fechaActual.toISOString().split('T')[0])) : [])
+              .sort((a, b) => (a.hora||'').localeCompare(b.hora||''))
               .map(servicio => (
                 <Card 
                   key={servicio.id}
@@ -162,11 +164,10 @@ export function CalendarioPanel({ modeloEmail, userRole = 'modelo' }: Calendario
                         <div className="flex items-center gap-2">
                           <Clock className="w-4 h-4 text-primary" />
                           <span className="font-semibold">
-                            {servicio.horaInicio.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
-                            {servicio.horaFin && ` - ${servicio.horaFin.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}`}
+                            {servicio.hora || '—'}
                           </span>
-                          <Badge variant={servicio.estado === 'activo' ? 'default' : 'secondary'}>
-                            {servicio.estado === 'activo' ? 'En curso' : 'Finalizado'}
+                          <Badge variant={servicio.estado === 'completado' ? 'default' : 'secondary'}>
+                            {servicio.estado === 'completado' ? 'Finalizado' : servicio.estado}
                           </Badge>
                         </div>
                         <div className="flex items-center gap-2 text-sm">
@@ -246,7 +247,7 @@ export function CalendarioPanel({ modeloEmail, userRole = 'modelo' }: Calendario
                   </p>
                 ) : (
                   servicios
-                    .sort((a, b) => a.horaInicio.getTime() - b.horaInicio.getTime())
+                    .sort((a, b) => (a.hora||'').localeCompare(b.hora||''))
                     .map(servicio => (
                       <div
                         key={servicio.id}
@@ -259,17 +260,10 @@ export function CalendarioPanel({ modeloEmail, userRole = 'modelo' }: Calendario
                       >
                         <div className="font-medium truncate">{obtenerNombreArtistico(servicio.modeloEmail, servicio.modeloNombre)}</div>
                         <div className="text-muted-foreground">
-                          {servicio.horaInicio.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
+                          {servicio.hora || '—'}
                         </div>
                         <div className="text-primary font-semibold">
-                          ${(() => {
-                            const costoTiemposAdicionales = (servicio.tiemposAdicionales || []).reduce((sum, t) => sum + t.costo, 0);
-                            const costoAdicionalesExtra = (servicio.adicionalesExtra || []).reduce((sum, a) => sum + a.costo, 0);
-                            const costoConsumosDetallados = (servicio.consumosDetallados || []).reduce((sum, c) => sum + (c.costo * c.cantidad), 0);
-                            const total = servicio.costoServicio + servicio.costoAdicionales + servicio.costoConsumo + 
-                                         costoTiemposAdicionales + costoAdicionalesExtra + costoConsumosDetallados;
-                            return total.toLocaleString('es-CO');
-                          })()}
+                          ${(servicio.montoPagado ?? servicio.montoPactado ?? 0).toLocaleString('es-CO')}
                         </div>
                       </div>
                     ))
@@ -324,11 +318,7 @@ export function CalendarioPanel({ modeloEmail, userRole = 'modelo' }: Calendario
             const servicios = obtenerServiciosPorDia(dia);
             const esHoy = esMismoDia(dia, new Date());
             const totalIngresos = servicios.reduce((sum, s) => {
-              const costoTiemposAdicionales = (s.tiemposAdicionales || []).reduce((sumT, t) => sumT + t.costo, 0);
-              const costoAdicionalesExtra = (s.adicionalesExtra || []).reduce((sumA, a) => sumA + a.costo, 0);
-              const costoConsumosDetallados = (s.consumosDetallados || []).reduce((sumC, c) => sumC + (c.costo * c.cantidad), 0);
-              return sum + s.costoServicio + s.costoAdicionales + s.costoConsumo + 
-                     costoTiemposAdicionales + costoAdicionalesExtra + costoConsumosDetallados;
+              return sum + (s.montoPagado ?? s.montoPactado ?? 0);
             }, 0);
 
             return (
@@ -381,10 +371,11 @@ export function CalendarioPanel({ modeloEmail, userRole = 'modelo' }: Calendario
 
   // Renderizar vista de lista
   const renderVistaLista = () => {
-    const serviciosFiltrados = todosLosServicios.filter(servicio => {
+    const serviciosFiltrados = (Array.isArray(servicios) ? servicios : []).filter(servicio => {
       if (filtroTiempo === 'todos') return true;
-      if (filtroTiempo === 'proximos') return servicio.horaInicio > new Date();
-      if (filtroTiempo === 'pasados') return servicio.horaInicio < new Date();
+      const fechaServicio = new Date(servicio.fecha || '');
+      if (filtroTiempo === 'proximos') return fechaServicio >= new Date();
+      if (filtroTiempo === 'pasados') return fechaServicio < new Date();
       return true;
     });
 
@@ -398,7 +389,7 @@ export function CalendarioPanel({ modeloEmail, userRole = 'modelo' }: Calendario
         ) : (
           <div className="space-y-3">
             {serviciosFiltrados
-              .sort((a, b) => a.horaInicio.getTime() - b.horaInicio.getTime())
+              .sort((a, b) => (a.fecha||'').localeCompare(b.fecha||''))
               .map(servicio => (
                 <Card 
                   key={servicio.id}
@@ -413,11 +404,10 @@ export function CalendarioPanel({ modeloEmail, userRole = 'modelo' }: Calendario
                         <div className="flex items-center gap-2">
                           <Clock className="w-4 h-4 text-primary" />
                           <span className="font-semibold">
-                            {servicio.horaInicio.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
-                            {servicio.horaFin && ` - ${servicio.horaFin.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}`}
+                            {servicio.hora || '—'}
                           </span>
-                          <Badge variant={servicio.estado === 'activo' ? 'default' : 'secondary'}>
-                            {servicio.estado === 'activo' ? 'En curso' : 'Finalizado'}
+                          <Badge variant={servicio.estado === 'completado' ? 'default' : 'secondary'}>
+                            {servicio.estado === 'completado' ? 'Finalizado' : servicio.estado}
                           </Badge>
                         </div>
                         <div className="flex items-center gap-2 text-sm">
@@ -585,7 +575,7 @@ export function CalendarioPanel({ modeloEmail, userRole = 'modelo' }: Calendario
               Detalles del Servicio
             </DialogTitle>
             <DialogDescription>
-              {servicioSeleccionado?.estado === 'activo' ? '🟢 Servicio en curso' : '✅ Servicio finalizado'} • {servicioSeleccionado?.horaInicio.toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' })}
+              {servicioSeleccionado?.estado === 'completado' ? '✅ Servicio finalizado' : '🔄 Servicio ' + (servicioSeleccionado?.estado || '')} • {servicioSeleccionado?.fecha || ''}
             </DialogDescription>
           </DialogHeader>
           {servicioSeleccionado && (

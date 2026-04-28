@@ -218,10 +218,14 @@ export function AnalyticsProvider({ children }: AnalyticsProviderProps) {
   useEffect(() => {
     const cargarVentas = async () => {
       try {
+        const fechaLimite = new Date();
+        fechaLimite.setDate(fechaLimite.getDate() - 365); // último año
         const { data, error } = await supabase
           .from('ventas_boutique')
           .select('*')
-          .order('fecha', { ascending: false });
+          .gte('fecha', fechaLimite.toISOString().split('T')[0])
+          .order('fecha', { ascending: false })
+          .limit(500);
 
         if (!error && data) {
           setVentasBoutique(data);
@@ -566,7 +570,13 @@ export function AnalyticsProvider({ children }: AnalyticsProviderProps) {
   const obtenerReporteFinanciero = useCallback((filtros?: FiltrosAnalytics): ReporteFinanciero => {
     const fechaInicio = filtros?.fechaInicio || obtenerFechaInicioMes();
     const fechaFin = filtros?.fechaFin || obtenerFechaHoy();
-    const periodo = filtros?.periodo || 'mensual';
+    const periodoRaw = filtros?.periodo || 'mensual';
+    // Normalize period to ReporteFinanciero type
+    const periodoMap: Record<string, ReporteFinanciero['periodo']> = {
+      dia: 'diario', semana: 'semanal', mes: 'mensual', trimestre: 'mensual',
+      anio: 'anual', diario: 'diario', semanal: 'semanal', mensual: 'mensual', anual: 'anual', personalizado: 'personalizado',
+    };
+    const periodo: ReporteFinanciero['periodo'] = periodoMap[periodoRaw] ?? 'mensual';
 
     const serviciosPeriodo = aplicarFiltrosServicios({
       ...filtros,
@@ -600,7 +610,7 @@ export function AnalyticsProvider({ children }: AnalyticsProviderProps) {
       return estaEnRango(fechaGasto, fechaInicio, fechaFin);
     });
     
-    const gastosOperativos = (gastosPeriodo || []).filter(g => g.categoria === 'operativo').reduce((sum, g) => sum + (g.monto || 0), 0);
+    const gastosOperativos = (gastosPeriodo || []).filter(g => ['arriendo', 'mantenimiento', 'insumos', 'transporte', 'servicios'].includes(g.categoria || '')).reduce((sum, g) => sum + (g.monto || 0), 0);
     const gastosNomina = (gastosPeriodo || []).filter(g => g.categoria === 'nomina').reduce((sum, g) => sum + (g.monto || 0), 0);
     const gastosMarketing = (gastosPeriodo || []).filter(g => g.categoria === 'marketing').reduce((sum, g) => sum + (g.monto || 0), 0);
     const gastosOtros = (gastosPeriodo || []).filter(g => !['operativo', 'nomina', 'marketing'].includes(g.categoria || '')).reduce((sum, g) => sum + (g.monto || 0), 0);

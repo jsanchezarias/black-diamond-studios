@@ -66,7 +66,7 @@ export function EditarProductoModal({ open, onClose, onSave, producto }: EditarP
     e.preventDefault();
     
     if (!formData.nombre || !formData.precioRegular || !formData.imagen) {
-      alert('Por favor completa todos los campos obligatorios (nombre, precio e imagen)');
+      toast.error('Por favor completa todos los campos obligatorios (nombre, precio e imagen)');
       return;
     }
 

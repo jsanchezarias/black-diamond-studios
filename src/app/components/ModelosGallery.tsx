@@ -33,11 +33,26 @@ function ModeloCardItem({
   proximasCitas: any[];
   onSelectModelo: (email: string) => void;
 }) {
+  const [seleccionada, setSeleccionada] = useState(false);
+
   return (
     <Card
-      className="relative bg-gradient-to-br from-neutral-900 via-black to-neutral-950 border border-amber-500/20 overflow-hidden cursor-default"
-      onClick={() => onSelectModelo(modelo.email)}
+      className={`card-modelo relative bg-gradient-to-br from-neutral-900 via-black to-neutral-950 border border-amber-500/20 overflow-hidden cursor-pointer ${seleccionada ? 'card-modelo-seleccionada' : ''}`}
+      onClick={() => {
+        setSeleccionada(s => !s);
+        onSelectModelo(modelo.email);
+      }}
     >
+      {seleccionada && (
+        <div style={{
+          position: 'absolute', top: 8, right: 8, zIndex: 20,
+          background: '#FF0000', color: 'white',
+          fontSize: '10px', fontWeight: 700,
+          padding: '3px 8px', borderRadius: 20,
+          boxShadow: '0 0 8px #FF0000, 0 0 16px #FF0000',
+          letterSpacing: '0.1em'
+        }}>SELECCIONADA</div>
+      )}
 
       <CardContent className="p-0">
         {/* Imagen principal */}
@@ -76,7 +91,7 @@ function ModeloCardItem({
 
           {/* Info en overlay */}
           <div className="absolute bottom-0 left-0 right-0 p-5 text-white z-10">
-            <h3 className="text-2xl font-bold mb-1 bd-gold-shimmer"
+            <h3 className="nombre-modelo text-2xl font-bold mb-1 bd-gold-shimmer"
               style={{ fontFamily: 'Playfair Display, serif' }}>
               {modelo.nombreArtistico}
             </h3>

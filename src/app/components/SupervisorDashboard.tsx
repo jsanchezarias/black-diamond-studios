@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   Eye, UserCheck, Bell, LogOut, Activity, Clock,
   DollarSign, Users, ClipboardList, PieChart, TrendingUp,
-  CheckCircle,
+  CheckCircle, Calendar,
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
@@ -20,6 +20,7 @@ import { useModelos } from './ModelosContext';
 import { supabase } from '../../utils/supabase/info';
 import { AgendamientosPanel } from './AgendamientosPanel';
 import { AgendamientosMetrics } from './AgendamientosMetrics';
+import { useServiceAlarms } from './useServiceAlarms';
 
 interface SupervisorDashboardProps {
   userEmail: string;
@@ -146,7 +147,7 @@ function ServiciosActivosPanel() {
   const hoy     = new Date().toISOString().split('T')[0];
   const activos = agendamientos
     .filter(a => a.fecha === hoy && (a.estado === 'confirmado' || a.estado === 'pendiente'))
-    .sort((a, b) => a.hora.localeCompare(b.hora));
+    .sort((a, b) => (a.hora ?? '').localeCompare(b.hora ?? ''));
 
   return (
     <Card className="border-white/10 bg-black/20">
@@ -295,6 +296,9 @@ export function SupervisorDashboard({ userEmail, onLogout }: SupervisorDashboard
   const [tab, setTab]                       = useState('general');
   const [modelosActivas, setModelosActivas]   = useState<number | null>(null);
   const [estadoOps, setEstadoOps]             = useState<'ok' | 'alerta' | 'cargando'>('cargando');
+
+  // 🔔 Integrar alarmas de 15 min para el supervisor
+  useServiceAlarms(userEmail, 'supervisor');
 
   // ── Estado operacional ────────────────────────────────────────────────
   useEffect(() => {

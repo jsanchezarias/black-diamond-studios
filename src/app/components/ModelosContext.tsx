@@ -15,9 +15,12 @@ export interface Modelo {
   password: string;
   fotoPerfil: string;
   fotosAdicionales?: string[];
-  // ❌ Removidos: campos que no existen en la tabla
-  // documentoFrente: string;
-  // documentoReverso: string;
+  documentoFrente?: string;
+  documentoReverso?: string;
+  documento_tipo?: string;
+  documento_numero?: string;
+  documento_verificado?: boolean;
+  documento_fecha_subida?: string;
   edad: number;
   altura?: string;
   medidas?: string;
@@ -48,9 +51,18 @@ export interface ModeloData {
   password: string;
   fotoPerfil: string;
   fotosAdicionales?: string[];
-  // ❌ Removidos: campos que no existen en la tabla
-  // documentoFrente: string;
-  // documentoReverso: string;
+  documentoFrente?: string;
+  documentoReverso?: string;
+  documento_tipo?: string;
+  documento_numero?: string;
+  documento_verificado?: boolean;
+  documento_fecha_subida?: string;
+  edad?: number;
+  altura?: string;
+  medidas?: string;
+  descripcion?: string;
+  sede?: string;
+  videos?: string[];
 }
 
 interface ModelosContextType {
@@ -95,9 +107,39 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
     };
     
     inicializar();
+
+    // ✅ NUEVO: Configurar Realtime para la tabla usuarios y modelo_fotos
+    const channel = supabase
+      .channel('usuarios_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Escuchar INSERT, UPDATE, DELETE
+          schema: 'public',
+          table: 'usuarios',
+          filter: "role=eq.modelo"
+        },
+        () => {
+          // Si hay algún cambio, recargamos la lista
+          cargarModelos();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'modelo_fotos'
+        },
+        () => {
+          cargarModelos();
+        }
+      )
+      .subscribe();
     
     return () => {
       isMounted = false;
+      supabase.removeChannel(channel);
     };
   }, []);
 
@@ -106,7 +148,8 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
       const { data: usuarios, error } = await supabase
         .from('usuarios')
         .select('*')
-        .eq('role', 'modelo');
+        .eq('role', 'modelo')
+        .limit(200);
 
       if (error) {
         if (process.env.NODE_ENV === 'development') console.error('❌ Error cargando modelos:', error);
@@ -142,7 +185,33 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
 
       
       if (usuarios && usuarios.length > 0) {
-        
+
+        // Cargar fotos principales y adicionales de modelo_fotos
+        let fotosPrincipalesMap: Map<string, string> = new Map();
+        let fotosAdicionalesMap: Map<string, string[]> = new Map();
+        try {
+          const { data: todasLasFotos } = await supabase
+            .from('modelo_fotos')
+            .select('modelo_id, url, es_principal, orden')
+            .order('es_principal', { ascending: false })
+            .order('orden', { ascending: true });
+            
+          if (todasLasFotos) {
+            todasLasFotos.forEach(f => {
+              if (f.es_principal) {
+                fotosPrincipalesMap.set(f.modelo_id, f.url);
+              } else {
+                if (!fotosAdicionalesMap.has(f.modelo_id)) {
+                  fotosAdicionalesMap.set(f.modelo_id, []);
+                }
+                fotosAdicionalesMap.get(f.modelo_id)!.push(f.url);
+              }
+            });
+          }
+        } catch {
+          // silently ignore — tabla puede no existir aún
+        }
+
         // ✅ OPTIMIZADO: Cargar TODAS las políticas tarifarias y sus servicios EN UNA SOLA QUERY
         let politicasConServicios: Map<number, any[]> = new Map();
         try {
@@ -191,14 +260,14 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
           const modelo: Modelo = {
             id: index + 1, // ID secuencial local
             nombre: usuario.nombre || 'Sin nombre',
-            nombreArtistico: usuario.nombreArtistico || usuario.nombre_artistico || usuario.nombre || 'Sin nombre',
+            nombreArtistico: usuario.nombreArtistico || usuario.nombre_artistico || usuario.nombreartistico || usuario.nombre || 'Sin nombre',
             cedula: usuario.cedula || '',
             telefono: usuario.telefono || '',
             direccion: usuario.direccion || '',
             email: usuario.email,
             password: '', // No guardamos contraseñas en el contexto
-            fotoPerfil: usuario.fotoPerfil || usuario.foto_perfil || '',
-            fotosAdicionales: usuario.fotosAdicionales || usuario.fotos_adicionales || [],
+            fotoPerfil: usuario.fotoPerfil || usuario.foto_perfil || usuario.fotoperfil || fotosPrincipalesMap.get(usuario.id) || '',
+            fotosAdicionales: fotosAdicionalesMap.get(usuario.id) || usuario.fotosAdicionales || usuario.fotosadicionales || usuario.fotos_adicionales || [],
             edad: usuario.edad || 21,
             altura: usuario.altura || '',
             medidas: usuario.medidas || '',
@@ -215,6 +284,13 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
             // ✅ Campos de archivado
             fechaArchivado: usuario.fecha_archivado || undefined,
             motivoArchivo: usuario.motivo_archivo || undefined,
+            // ✅ Campos de documentos de identidad
+            documentoFrente: usuario.documento_frente || undefined,
+            documentoReverso: usuario.documento_reverso || undefined,
+            documento_tipo: usuario.documento_tipo || 'cedula',
+            documento_numero: usuario.documento_numero || undefined,
+            documento_verificado: usuario.documento_verificado || false,
+            documento_fecha_subida: usuario.documento_fecha_subida || undefined,
           };
           
           return modelo;
@@ -415,9 +491,13 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
       if (datos.email !== undefined) datosSupabase.email = datos.email; // ✅ Actualizar email en BD también
       if (datos.fotoPerfil !== undefined) datosSupabase.fotoPerfil = datos.fotoPerfil;
       if (datos.fotosAdicionales !== undefined) datosSupabase.fotosAdicionales = datos.fotosAdicionales;
-      // ❌ Removido: documentoFrente y documentoReverso no existen en la tabla
-      // if (datos.documentoFrente !== undefined) datosSupabase.documentoFrente = datos.documentoFrente;
-      // if (datos.documentoReverso !== undefined) datosSupabase.documentoReverso = datos.documentoReverso;
+      // ✅ Campos de documentos de identidad
+      if (datos.documentoFrente !== undefined) datosSupabase.documento_frente = datos.documentoFrente;
+      if (datos.documentoReverso !== undefined) datosSupabase.documento_reverso = datos.documentoReverso;
+      if (datos.documento_tipo !== undefined) datosSupabase.documento_tipo = datos.documento_tipo;
+      if (datos.documento_numero !== undefined) datosSupabase.documento_numero = datos.documento_numero;
+      if (datos.documento_verificado !== undefined) datosSupabase.documento_verificado = datos.documento_verificado;
+      if (datos.documento_fecha_subida !== undefined) datosSupabase.documento_fecha_subida = datos.documento_fecha_subida;
       if (datos.edad !== undefined) datosSupabase.edad = datos.edad;
       if (datos.altura !== undefined) datosSupabase.altura = datos.altura;
       if (datos.medidas !== undefined) datosSupabase.medidas = datos.medidas;

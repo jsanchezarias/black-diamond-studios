@@ -31,19 +31,17 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
   const [inventario, setInventario] = useState<Producto[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // ✅ Cargar productos desde Supabase al inicializar + Realtime
+  // ✅ Cargar productos desde Supabase al inicializar + polling cada 5 minutos
+  // (inventario de boutique no requiere actualizaciones en tiempo real)
   useEffect(() => {
     cargarProductos();
 
-    // ✅ REALTIME: recargar inventario ante cualquier cambio en productos
-    const channel = supabase
-      .channel('inventario-productos-rt')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'productos' }, () => {
-        cargarProductos();
-      })
-      .subscribe();
+    // Polling cada 5 minutos en lugar de Realtime para reducir conexiones WebSocket
+    const pollingInterval = setInterval(() => {
+      cargarProductos();
+    }, 5 * 60 * 1000);
 
-    return () => { supabase.removeChannel(channel); };
+    return () => { clearInterval(pollingInterval); };
   }, []);
 
   const cargarProductos = async () => {

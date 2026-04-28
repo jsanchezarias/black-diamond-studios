@@ -34,7 +34,7 @@ export function TestimoniosProvider({ children }: { children: ReactNode }) {
         const { data, error } = await (supabase as any)
           .from('testimonios')
           .select('*')
-          .order('fecha', { ascending: false })
+          .order('created_at', { ascending: false })
           .limit(100);
 
         if (error) {
@@ -45,12 +45,12 @@ export function TestimoniosProvider({ children }: { children: ReactNode }) {
         if (data && data.length > 0) {
           setTestimonios(data.map((row: any) => ({
             id: String(row.id),
-            nombre: row.nombre ?? '',
+            nombre: row.cliente_nombre ?? row.nombre ?? '',
             email: row.email ?? '',
-            comentario: row.comentario ?? '',
-            calificacion: row.calificacion ?? 5,
-            fecha: row.fecha ?? row.created_at?.split('T')[0] ?? new Date().toISOString().split('T')[0],
-            estado: row.estado ?? 'pendiente',
+            comentario: row.contenido ?? row.comentario ?? '',
+            calificacion: row.rating ?? row.calificacion ?? 5,
+            fecha: row.created_at?.split('T')[0] ?? new Date().toISOString().split('T')[0],
+            estado: (row.aprobado === true ? 'aprobado' : row.estado) ?? 'pendiente',
             respuestaAdmin: row.respuesta_admin ?? undefined,
           })));
         }
@@ -74,12 +74,10 @@ export function TestimoniosProvider({ children }: { children: ReactNode }) {
       const { data, error } = await (supabase as any)
         .from('testimonios')
         .insert({
-          nombre: nuevoTestimonio.nombre,
-          email: nuevoTestimonio.email,
-          comentario: nuevoTestimonio.comentario,
-          calificacion: nuevoTestimonio.calificacion,
-          fecha,
-          estado: 'pendiente',
+          cliente_nombre: nuevoTestimonio.nombre,
+          contenido: nuevoTestimonio.comentario,
+          rating: nuevoTestimonio.calificacion,
+          aprobado: false,
         })
         .select()
         .single();

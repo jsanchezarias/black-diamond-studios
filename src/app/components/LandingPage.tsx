@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
@@ -11,6 +12,7 @@ import { AgregarTestimonioModal } from './AgregarTestimonioModal';
 import { ClienteLoginModal } from './ClienteLoginModal';
 import { BoutiqueStreamPlayer } from './BoutiqueStreamPlayer';
 import { TipNotification } from './TipNotification'; // ✅ Agregar TipNotification
+import { SolicitudServicioModal } from './SolicitudServicioModal';
 import { ParticlesBackground } from './ParticlesBackground'; // ✅ Fondo de partículas premium
 import { GoldenCursor } from './GoldenCursor'; // ✅ Cursor personalizado dorado
 import { ScrollUI } from './ScrollUI'; // ✅ Barra de progreso y back-to-top
@@ -23,6 +25,7 @@ import { LiveChat } from './LiveChat';
 import { TipModal } from './TipModal';
 import { usePublicUsers } from './PublicUsersContext';
 import { useModelos } from './ModelosContext';
+import { supabase } from '../../utils/supabase/info';
 
 
 // ✅ Agregar tipos necesarios
@@ -72,8 +75,16 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
   // Estado para login de clientes
   const [showClienteLogin, setShowClienteLogin] = useState(false);
   const [clienteActual, setClienteActual] = useState<any>(null);
+
+  // Estado para registro de clientes
+  const [mostrarRegistro, setMostrarRegistro] = useState(false);
+  const [registrando, setRegistrando] = useState(false);
+  const [regForm, setRegForm] = useState({ nombre: '', telefono: '', email: '', password: '' });
   
-  const { currentUser, logout, logoutRef } = usePublicUsers(); // ✅ Agregar logoutRef del contexto
+  // Estado para Solicitud de Servicio
+  const [solicitudData, setSolicitudData] = useState<{model: any, service?: any, location?: 'sede' | 'domicilio', price?: string} | null>(null);
+
+  const { currentUser, logout, logoutRef, sendMessage } = usePublicUsers(); // ✅ Agregar logoutRef del contexto
 
   // ============================================
   // 🆕 SINCRONIZAR clienteActual con currentUser del chat
@@ -239,6 +250,80 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
     // scrollToSection('inicio');
   };
 
+  const normalizarTelefono = (tel: string): string => {
+    const soloDigitos = tel.replace(/[^0-9]/g, '');
+    return soloDigitos.slice(-10);
+  };
+
+  const registrarCliente = async () => {
+    if (!regForm.nombre || !regForm.email || !regForm.password || !regForm.telefono) {
+      toast.error('Completa todos los campos');
+      return;
+    }
+    if (regForm.password.length < 6) {
+      toast.error('La contraseña debe tener al menos 6 caracteres');
+      return;
+    }
+    setRegistrando(true);
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: regForm.email,
+        password: regForm.password,
+        options: {
+          data: { nombre: regForm.nombre, telefono: regForm.telefono, role: 'cliente' }
+        }
+      });
+
+      if (error) {
+        if (error.message.includes('already registered') || error.message.includes('already been registered')) {
+          toast.error('Este email ya está registrado. Inicia sesión con el botón de arriba.');
+        } else if (error.message.includes('password')) {
+          toast.error('La contraseña debe tener mínimo 6 caracteres.');
+        } else if (error.message.includes('valid email') || error.message.includes('invalid email')) {
+          toast.error('El formato del email no es válido.');
+        } else if (error.message.includes('Database error')) {
+          toast.error('Error del servidor. Intenta de nuevo en un momento.');
+        } else {
+          toast.error(error.message);
+        }
+        return;
+      }
+
+      if (data.user) {
+        // Insertar en usuarios y clientes directamente como respaldo al trigger
+        await supabase.from('usuarios').upsert({
+          id: data.user.id,
+          email: regForm.email,
+          nombre: regForm.nombre,
+          role: 'cliente',
+          estado: 'activo',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'id' });
+
+        await supabase.from('clientes').upsert({
+          user_id: data.user.id,
+          nombre: regForm.nombre,
+          email: regForm.email,
+          telefono: regForm.telefono ? normalizarTelefono(regForm.telefono) : null,
+          total_servicios: 0,
+          total_gastado: 0,
+          created_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' });
+      }
+
+      toast.success('¡Cuenta creada! Ingresa con tu email y contraseña.');
+      setMostrarRegistro(false);
+      setRegForm({ nombre: '', telefono: '', email: '', password: '' });
+      // Abrir el sistema de login directamente después del registro
+      setTimeout(() => onAccessSystem(), 800);
+    } catch (err: any) {
+      toast.error('Error inesperado. Intenta de nuevo.');
+    } finally {
+      setRegistrando(false);
+    }
+  };
+
   // Obtener modelos según la sede actual (filtrar por activa y convertir formato)
   const modelosDisponibles = modelosSupabase
     .filter((m: any) => m.activa && m.disponible)
@@ -256,14 +341,35 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
   const todosLosModelos = modelosSupabase.map(convertirModeloParaCard); // Para el modal
 
 
-  const handleContactModel = () => {
-    scrollToSection('contacto');
+  const handleContactModel = (model: any, service?: any, location?: 'sede' | 'domicilio', price?: string) => {
+    if (!currentUser) {
+      toast.error('Por favor, inicia sesión para solicitar un servicio.');
+      setShowClienteLogin(true);
+      return;
+    }
+    setSolicitudData({ model, service, location, price });
+  };
+
+  const handleConfirmarSolicitud = async (mensajeChat: string) => {
+    try {
+      if (!sendMessage) {
+        throw new Error('Chat no disponible');
+      }
+      
+      await sendMessage(mensajeChat);
+      toast.success('¡Solicitud enviada! Revisa el chat para comunicarte con nuestro programador.');
+      setSolicitudData(null);
+      // Abrir el chat automáticamente (si es necesario/posible)
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') console.error('Error al enviar solicitud:', error);
+      toast.error('Hubo un error al enviar tu solicitud. Intenta nuevamente.');
+    }
   };
 
   // Handler para abrir modal de propinas
   const handleTipClick = () => {
     if (!currentUser) {
-      alert('Por favor inicia sesión para enviar propinas');
+      toast.error('Por favor inicia sesión para enviar propinas');
       return;
     }
     setShowTipModal(true);
@@ -295,7 +401,7 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
       // Por ahora simulamos el pago exitoso
 
       // Mostrar notificación temporal (hasta que se implemente el pago real)
-      alert(`🎉 Propina de $${amount.toLocaleString('es-CO')} procesada con ${paymentMethod.toUpperCase()}!\n\n⚠️ NOTA: La integración con PayU/PSE requiere configuración en el servidor.\n\nEsta es una versión de prueba. En producción, el sistema redirigirá a la pasarela de pago.`);
+      toast.success(`Propina de $${amount.toLocaleString('es-CO')} recibida. Integración PayU/PSE en configuración.`);
 
       const newTip: TipData = {
         id: Date.now().toString(),
@@ -320,7 +426,7 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
 
     } catch (error) {
       if (process.env.NODE_ENV === 'development') console.error('❌ Error procesando propina:', error);
-      alert('Error al procesar la propina. Por favor intenta de nuevo.');
+      toast.error('Error al procesar la propina. Por favor intenta de nuevo.');
     }
   };
 
@@ -410,6 +516,9 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
                     <UserIcon className="w-3.5 h-3.5 xl:w-4 xl:h-4 mr-1.5" />
                     <span className="hidden xl:inline">{t.nav.login}</span>
                     <span className="xl:hidden">Login</span>
+                  </Button>
+                  <Button onClick={() => setMostrarRegistro(true)} variant="outline" size="sm" className="border-amber-500/60 text-amber-400 hover:bg-amber-500/10 text-xs xl:text-sm px-2 xl:px-3 h-8 xl:h-9 whitespace-nowrap">
+                    Crear cuenta
                   </Button>
                   <Button onClick={onAccessSystem} variant="outline" size="sm" className="border-primary text-primary hover:bg-primary hover:text-background text-xs xl:text-sm px-2 xl:px-3 h-8 xl:h-9 whitespace-nowrap">
                     Sistema
@@ -516,8 +625,15 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
                       <UserIcon className="w-4 h-4 mr-2" />
                       {t.nav.login}
                     </Button>
-                    <Button 
-                      onClick={() => { onAccessSystem(); setMenuOpen(false); }} 
+                    <Button
+                      onClick={() => { setMostrarRegistro(true); setMenuOpen(false); }}
+                      variant="outline"
+                      className="w-full border-amber-500/60 text-amber-400 hover:bg-amber-500/10 h-10 sm:h-11 text-sm sm:text-base"
+                    >
+                      Crear cuenta
+                    </Button>
+                    <Button
+                      onClick={() => { onAccessSystem(); setMenuOpen(false); }}
                       className="w-full bg-primary text-primary-foreground hover:bg-primary/90 h-10 sm:h-11 text-sm sm:text-base"
                     >
                       {t.nav.systemAccess}
@@ -1113,11 +1229,80 @@ export function LandingPage({ onAccessSystem }: LandingPageProps) {
 
       {/* Modal de Login de Clientes */}
       {showClienteLogin && (
-        <ClienteLoginModal 
+        <ClienteLoginModal
           isOpen={showClienteLogin}
           onClose={() => setShowClienteLogin(false)}
-          onLoginSuccess={setClienteActual}
+          onLoginSuccess={(cliente) => {
+            setClienteActual(cliente);
+            setShowClienteLogin(false);
+            toast.success(`¡Bienvenido de nuevo, ${cliente.nombre}!`);
+          }}
         />
+      )}
+
+      {/* Modal de Solicitud de Servicio */}
+      <SolicitudServicioModal 
+        isOpen={!!solicitudData}
+        onClose={() => setSolicitudData(null)}
+        onConfirm={handleConfirmarSolicitud}
+        data={solicitudData}
+      />
+
+      {/* Modal de Registro de Clientes */}
+      {mostrarRegistro && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-[#0f1014] border border-white/10 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-semibold text-amber-400">Crear cuenta</h2>
+              <button onClick={() => setMostrarRegistro(false)} className="text-white/40 hover:text-white/70 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-3">
+              {[
+                { key: 'nombre', label: 'Nombre completo', type: 'text', placeholder: 'Tu nombre' },
+                { key: 'telefono', label: 'Teléfono', type: 'tel', placeholder: '+57 300 000 0000' },
+                { key: 'email', label: 'Email', type: 'email', placeholder: 'tu@email.com' },
+                { key: 'password', label: 'Contraseña', type: 'password', placeholder: 'Mínimo 6 caracteres' },
+              ].map(({ key, label, type, placeholder }) => (
+                <div key={key} className="space-y-1">
+                  <label className="text-xs text-white/60">{label}</label>
+                  <input
+                    type={type}
+                    placeholder={placeholder}
+                    value={(regForm as any)[key]}
+                    onChange={e => setRegForm(p => ({ ...p, [key]: e.target.value }))}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-amber-500/50"
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2 mt-5">
+              <button
+                onClick={registrarCliente}
+                disabled={registrando}
+                className="flex-1 py-2.5 bg-amber-500 text-black text-sm font-medium rounded-lg hover:bg-amber-400 transition-colors disabled:opacity-60"
+              >
+                {registrando ? 'Creando cuenta...' : 'Crear cuenta'}
+              </button>
+              <button
+                onClick={() => setMostrarRegistro(false)}
+                className="px-4 py-2.5 bg-white/10 text-sm rounded-lg hover:bg-white/20 transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+            <p className="text-xs text-white/30 text-center mt-3">
+              ¿Ya tienes cuenta?{' '}
+              <button
+                onClick={() => { setMostrarRegistro(false); setShowClienteLogin(true); }}
+                className="text-amber-400 hover:text-amber-300 transition-colors"
+              >
+                Inicia sesión
+              </button>
+            </p>
+          </div>
+        </div>
       )}
 
       {/* ✨ Cursor personalizado dorado — solo desktop */}

@@ -70,15 +70,18 @@ export function CarritoProvider({ children }: { children: ReactNode }) {
       }
 
       if (data) {
-        const carritoFormateado: ItemCarrito[] = data.map(item => ({
-          id: item.id,
-          productoId: item.producto_id,
-          nombre: item.inventario?.nombre || 'Producto',
-          precio: parseFloat(item.precio_unitario),
-          cantidad: item.cantidad,
-          imagen: item.inventario?.imagen || '',
-          categoria: item.inventario?.categoria || '',
-        }));
+        const carritoFormateado: ItemCarrito[] = data.map(item => {
+          const inv = Array.isArray(item.inventario) ? item.inventario[0] : item.inventario;
+          return {
+            id: item.id,
+            productoId: item.producto_id,
+            nombre: inv?.nombre || 'Producto',
+            precio: parseFloat(item.precio_unitario),
+            cantidad: item.cantidad,
+            imagen: inv?.imagen || '',
+            categoria: inv?.categoria || '',
+          };
+        });
 
         setCarrito(carritoFormateado);
       }

@@ -71,7 +71,7 @@ export function ScrollUI() {
           pointerEvents: showBtn ? 'auto' : 'none',
           transform: showBtn ? 'translateY(0) scale(1)' : 'translateY(12px) scale(0.9)',
           transition: 'opacity 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease',
-          cursor: 'none',
+          cursor: 'pointer',
         }}
       >
         <ArrowUp

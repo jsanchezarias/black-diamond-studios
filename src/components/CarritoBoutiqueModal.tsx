@@ -194,7 +194,7 @@ export function CarritoBoutiqueModal({ isOpen, onClose, onProcederCheckout }: Ca
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction className="bg-red-500 hover:bg-red-600 text-white" onClick={vaciarCarrito}>
+            <AlertDialogAction className="bg-red-500 hover:bg-red-600 text-white" onClick={() => vaciarCarrito('')}>
               Sí, vaciar
             </AlertDialogAction>
           </AlertDialogFooter>

@@ -14,33 +14,55 @@ interface LoginFormProps {
 
 // Formulario de login con Supabase Auth
 export function LoginForm({ onLogin, onBackToLanding }: LoginFormProps) {
-  const [email, setEmail] = useState('');
+  const [identificador, setIdentificador] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const esEmail = (valor: string) => valor.includes('@');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
+    let emailParaLogin = identificador.trim();
+
     try {
+      if (!esEmail(emailParaLogin)) {
+        const soloDigitos = emailParaLogin.replace(/[^0-9]/g, '');
+        const tel10 = soloDigitos.slice(-10);
+
+        const { data: clienteData } = await supabase
+          .from('clientes')
+          .select('email')
+          .or(`telefono.eq.${tel10},telefono.eq.57${tel10},telefono.eq.+57${tel10}`)
+          .maybeSingle();
+
+        if (!clienteData?.email) {
+          setError('No encontramos una cuenta con ese número.');
+          setLoading(false);
+          return;
+        }
+        emailParaLogin = clienteData.email;
+      }
+
       // Login con Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email,
+        email: emailParaLogin,
         password,
       });
 
       if (authError) {
         // Mensajes de error amigables sin consolas técnicas
         if (authError.message.includes('Invalid login credentials')) {
-          setError('Email o contraseña incorrectos. Por favor verifica tus credenciales.');
+          setError('Email o contraseña incorrectos.');
         } else if (authError.message.includes('Email not confirmed')) {
-          setError('Debes confirmar tu email antes de iniciar sesión.');
-        } else if (authError.message.includes('Invalid email')) {
-          setError('Formato de email inválido.');
+          setError('Email o contraseña incorrectos.');
+        } else if (authError.message.includes('too many requests')) {
+          setError('Demasiados intentos. Espera unos minutos.');
         } else {
-          setError('Error al iniciar sesión. Intenta nuevamente.');
+          setError('Email o contraseña incorrectos.');
         }
         setLoading(false);
         return;
@@ -55,19 +77,60 @@ export function LoginForm({ onLogin, onBackToLanding }: LoginFormProps) {
       // Obtener el rol del usuario desde la tabla usuarios
       const { data: userData, error: userError } = await supabase
         .from('usuarios')
-        .select('role')
+        .select('role, nombre, estado')
         .eq('id', authData.user.id)
         .single();
 
+      let role: string | null = null;
+
       if (userError || !userData) {
+        // Logging específico por código de error para diagnóstico
+        if (userError?.code === 'PGRST116') {
+          console.error('USUARIO NO EXISTE EN TABLA usuarios:', authData.user.id, authData.user.email);
+        } else if (userError?.code === '42501') {
+          console.error('RLS BLOQUEANDO LECTURA:', authData.user.id);
+        } else {
+          console.error('ROL NO ENCONTRADO:', { userId: authData.user.id, email: authData.user.email, error: userError });
+        }
+
+        // Fallback: intentar con metadata de auth
+        const roleMeta = authData.user.user_metadata?.role || authData.user.app_metadata?.role;
+        if (roleMeta) {
+          onLogin(
+            authData.session.access_token,
+            authData.user.id,
+            authData.user.email || '',
+            roleMeta
+          );
+          return;
+        }
+
         setError('No se pudo verificar el rol del usuario. Contacta al administrador.');
         setLoading(false);
         return;
       }
 
-      const role = userData?.role;
-      
+      // Verificar que la cuenta no esté inactiva o archivada
+      if (userData.estado === 'inactivo' || userData.estado === 'archivado') {
+        setError('Tu cuenta está inactiva. Contacta al administrador.');
+        setLoading(false);
+        return;
+      }
+
+      role = userData.role;
+
       if (!role) {
+        // Fallback: intentar con metadata de auth
+        const roleMeta = authData.user.user_metadata?.role || authData.user.app_metadata?.role;
+        if (roleMeta) {
+          onLogin(
+            authData.session.access_token,
+            authData.user.id,
+            authData.user.email || '',
+            roleMeta
+          );
+          return;
+        }
         setError('Usuario sin rol asignado. Contacta al administrador.');
         setLoading(false);
         return;
@@ -112,7 +175,7 @@ export function LoginForm({ onLogin, onBackToLanding }: LoginFormProps) {
           <Card className="relative backdrop-blur-premium bg-gradient-card border-primary/15 shadow-premium hover:shadow-premium hover:border-primary/25 transition-all duration-500">
             <CardHeader className="space-y-4 pb-4">
               <div className="flex justify-center mb-2 animate-luxury-fade-in">
-                <Logo size="md" showText={false} />
+                <Logo size="md" />
               </div>
               <div className="text-center space-y-2">
                 <CardTitle className="text-3xl font-['Cormorant_Garamond'] text-foreground">
@@ -126,21 +189,23 @@ export function LoginForm({ onLogin, onBackToLanding }: LoginFormProps) {
 
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Email */}
+                {/* Email o teléfono */}
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-sm font-medium">
-                    Email
+                  <Label htmlFor="identificador" className="text-sm font-medium">
+                    Email o número de teléfono
                   </Label>
                   <Input
-                    id="email"
-                    type="email"
-                    placeholder="tu@email.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    id="identificador"
+                    type="text"
+                    placeholder="tu@email.com o 3001234567"
+                    value={identificador}
+                    onChange={(e) => setIdentificador(e.target.value)}
                     disabled={loading}
                     required
+                    autoComplete="username"
                     className="h-12 text-base"
                   />
+                  <p className="text-xs text-muted-foreground">Puedes usar tu email o número de celular</p>
                 </div>
 
                 {/* Password */}
@@ -162,43 +227,8 @@ export function LoginForm({ onLogin, onBackToLanding }: LoginFormProps) {
 
                 {/* Error message */}
                 {error && (
-                  <div className="space-y-3">
-                    <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
-                      <p className="text-sm text-destructive font-semibold">{error}</p>
-                    </div>
-                    
-                    {/* Ayuda adicional si es error de credenciales */}
-                    {error.includes('incorrectos') && (
-                      <div className="p-4 rounded-lg bg-primary/5 border border-primary/20 space-y-2">
-                        <p className="text-sm font-semibold text-primary">💡 ¿No tienes usuario todavía?</p>
-                        <p className="text-xs text-muted-foreground">
-                          Necesitas crear un usuario en Supabase Auth primero. 
-                        </p>
-                        <details className="text-xs">
-                          <summary className="cursor-pointer text-primary hover:text-primary/80 font-medium">
-                            Ver cómo crear usuario →
-                          </summary>
-                          <div className="mt-2 p-3 bg-black/40 rounded space-y-2">
-                            <p className="font-semibold">Opción 1: Desde la consola (F12):</p>
-                            <code className="block text-[10px] overflow-x-auto">
-{`const supabase = await import('https://esm.sh/@supabase/supabase-js@2').then(m => 
-  m.createClient(
-    'https://kzdjravwcjummegxxrkd.supabase.co',
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
-  )
-);
-const { data } = await supabase.auth.signUp({
-  email: 'test@test.com',
-  password: '123456'
-});`}
-                            </code>
-                            <p className="text-[10px] text-muted-foreground mt-2">
-                              📄 Lee más en: <strong>/CREAR_USUARIO_PRUEBA.md</strong>
-                            </p>
-                          </div>
-                        </details>
-                      </div>
-                    )}
+                  <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+                    <p className="text-sm text-destructive font-semibold">{error}</p>
                   </div>
                 )}
 

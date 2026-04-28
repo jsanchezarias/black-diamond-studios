@@ -9,12 +9,16 @@ export interface Adelanto {
   id: string;
   modeloEmail: string;
   modeloNombre: string;
+  modeloId?: string | number;
   monto: number;
+  concepto?: string;
+  fecha?: string | Date;
   fechaSolicitud: Date;
   estado: 'pendiente' | 'aprobado' | 'rechazado';
   fechaRespuesta?: Date;
   aprobadoPor?: string;
   motivo?: string;
+  observaciones?: string;
 }
 
 export interface Pago {

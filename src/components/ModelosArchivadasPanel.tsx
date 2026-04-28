@@ -86,10 +86,13 @@ export function ModelosArchivadasPanel() {
                 <div className="p-4">
                   <div className="flex items-start gap-4">
                     <div className="w-20 h-20 rounded-lg overflow-hidden border-2 border-yellow-500/30 flex-shrink-0">
-                      <img 
-                        src={modelo.fotoPerfil} 
+                      <img
+                        src={modelo.fotoPerfil}
                         alt={modelo.nombre}
                         className="w-full h-full object-cover opacity-60"
+                        loading="lazy"
+                        width={80}
+                        height={80}
                       />
                     </div>
 

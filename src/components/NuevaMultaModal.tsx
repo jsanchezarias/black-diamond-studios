@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { useState } from 'react';
 import { X, AlertTriangle } from 'lucide-react';
 import { Button } from './ui/button';
@@ -34,7 +35,7 @@ export function NuevaMultaModal({ open, onClose, onSave }: NuevaMultaModalProps)
     e.preventDefault();
     
     if (!formData.modeloId || !formData.concepto || formData.monto <= 0) {
-      alert('Por favor completa todos los campos correctamente');
+      toast.error('Por favor completa todos los campos correctamente');
       return;
     }
 

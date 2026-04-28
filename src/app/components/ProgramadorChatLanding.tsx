@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -7,6 +8,8 @@ import { Badge } from '../../components/ui/badge';
 import { Clock, Eye, Gem, LogOut, MessageCircle, Send, Settings, Users, Video } from 'lucide-react';
 import { Logo } from './Logo';
 import { supabase } from '../../utils/supabase/info'; // ✅ Corregido: ruta correcta
+import { AgendamientosPanel } from './AgendamientosPanel';
+import { useServiceAlarms } from './useServiceAlarms';
 
 interface ConversacionUsuario {
   userId: string;
@@ -42,12 +45,16 @@ export function ProgramadorChatLanding() {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [messageInput, setMessageInput] = useState('');
+  const [activeTab, setActiveTab] = useState<'chat' | 'fichas'>('chat');
   
   // Estados de transmisión
   const [streamUrl, setStreamUrl] = useState('');
   const [streamActive, setStreamActive] = useState(false);
   const [editingStream, setEditingStream] = useState(false);
   const [newStreamUrl, setNewStreamUrl] = useState('');
+
+  // 🔔 Integrar alarmas de 15 min para el programador (supervisor)
+  useServiceAlarms('programador@app.com', 'supervisor');
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -110,7 +117,7 @@ export function ProgramadorChatLanding() {
           .single();
 
         if (emailError || !userByEmail) {
-          alert('❌ Credenciales incorrectas. Usa el teléfono: 3000000000 o email: programador@app.com');
+          toast.error('Credenciales incorrectas');
           return;
         }
 
@@ -123,7 +130,7 @@ export function ProgramadorChatLanding() {
 
       // Verificar que sea el programador (por email)
       if (user.email !== 'programador@app.com') {
-        alert('❌ Solo el programador puede acceder a este panel');
+        toast.error('Solo el programador puede acceder a este panel');
         return;
       }
 
@@ -133,7 +140,7 @@ export function ProgramadorChatLanding() {
       setIsAuthenticated(true);
     } catch (error) {
       if (isDev) console.error('Error en login:', error);
-      alert('❌ Error al iniciar sesión');
+      toast.error('Error al iniciar sesión');
     }
   };
 
@@ -269,7 +276,7 @@ export function ProgramadorChatLanding() {
 
       if (error) {
         if (isDev) console.error('Error enviando mensaje:', error);
-        alert('❌ Error al enviar mensaje');
+        toast.error('Error al enviar mensaje');
         return;
       }
 
@@ -403,19 +410,39 @@ export function ProgramadorChatLanding() {
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              <Badge className="bg-green-500/20 text-green-400 border-green-500/30 gap-1">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                En línea
-              </Badge>
-              <Button
-                onClick={handleLogout}
-                variant="outline"
-                className="gap-2"
-              >
-                <LogOut className="w-4 h-4" />
-                Cerrar Sesión
-              </Button>
+            <div className="flex items-center gap-6">
+              <div className="flex bg-card border border-primary/20 rounded-lg p-1">
+                <button
+                  onClick={() => setActiveTab('chat')}
+                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    activeTab === 'chat' ? 'bg-primary text-black' : 'text-muted-foreground hover:text-white'
+                  }`}
+                >
+                  Mensajes
+                </button>
+                <button
+                  onClick={() => setActiveTab('fichas')}
+                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    activeTab === 'fichas' ? 'bg-primary text-black' : 'text-muted-foreground hover:text-white'
+                  }`}
+                >
+                  Fichas Pendientes
+                </button>
+              </div>
+              <div className="flex items-center gap-3">
+                <Badge className="bg-green-500/20 text-green-400 border-green-500/30 gap-1">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  En línea
+                </Badge>
+                <Button
+                  onClick={handleLogout}
+                  variant="outline"
+                  className="gap-2"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Cerrar Sesión
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -423,258 +450,264 @@ export function ProgramadorChatLanding() {
 
       {/* Contenido Principal */}
       <div className="container mx-auto p-4 h-[calc(100vh-88px)]">
-        <div className="grid grid-cols-12 gap-4 h-full">
-          {/* Sidebar - Lista de Conversaciones */}
-          <div className="col-span-3 bg-card/60 backdrop-blur-xl border border-primary/20 rounded-lg overflow-hidden flex flex-col">
-            <div className="bg-primary/10 border-b border-primary/20 p-4">
-              <h2 className="font-bold flex items-center gap-2">
-                <MessageCircle className="w-5 h-5" />
-                Conversaciones ({conversaciones.length})
-              </h2>
-            </div>
-
-            <div className="flex-1 overflow-y-auto">
-              {conversaciones.length === 0 ? (
-                <div className="p-8 text-center text-muted-foreground">
-                  <MessageCircle className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                  <p className="text-sm">No hay conversaciones activas</p>
-                </div>
-              ) : (
-                conversaciones.map((conv) => (
-                  <button
-                    key={conv.userId}
-                    onClick={() => setSelectedUserId(conv.userId)}
-                    className={`w-full p-4 border-b border-border/50 hover:bg-primary/10 transition-colors text-left ${
-                      selectedUserId === conv.userId ? 'bg-primary/20' : ''
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center text-sm font-bold flex-shrink-0">
-                        {conv.username.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className="font-medium text-sm truncate">
-                            {conv.username}
-                          </p>
-                          {conv.isVIP && <Gem className="w-3 h-3 text-primary" />}
-                        </div>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {conv.lastMessage}
-                        </p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Clock className="w-3 h-3 text-muted-foreground" />
-                          <p className="text-xs text-muted-foreground">
-                            {formatDate(conv.lastMessageTime)}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </button>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Área de Chat */}
-          <div className="col-span-6 bg-card/60 backdrop-blur-xl border border-primary/20 rounded-lg overflow-hidden flex flex-col">
-            {selectedUser ? (
-              <>
-                {/* Header del chat */}
-                <div className="bg-primary/10 border-b border-primary/20 p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center text-sm font-bold">
-                      {selectedUser.username.charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                      <h3 className="font-bold flex items-center gap-2">
-                        {selectedUser.username}
-                        {selectedUser.isVIP && <Gem className="w-4 h-4 text-primary" />}
-                      </h3>
-                      <p className="text-xs text-muted-foreground">
-                        Tel: {selectedUser.telefono}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Mensajes */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-3" ref={chatContainerRef}>
-                  {messages.map((msg) => {
-                    const isProgramador = msg.userId === programadorId;
-                    return (
-                      <div
-                        key={msg.id}
-                        className={`flex flex-col ${isProgramador ? 'items-end' : 'items-start'}`}
-                      >
-                        <div className={`max-w-[70%] ${isProgramador ? 'bg-primary/20' : 'bg-card'} rounded-lg px-4 py-2 border ${isProgramador ? 'border-primary/30' : 'border-border/50'}`}>
-                          <p className="text-xs font-bold mb-1" style={{ color: isProgramador ? '#d4af37' : '#999' }}>
-                            {msg.username}
-                          </p>
-                          <p className="text-sm break-words">{msg.message}</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {formatTime(msg.timestamp)}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  <div ref={messagesEndRef} />
-                </div>
-
-                {/* Input de mensaje */}
-                <div className="border-t border-primary/20 p-4">
-                  <form onSubmit={handleSendMessage} className="flex gap-2">
-                    <Input
-                      value={messageInput}
-                      onChange={(e) => setMessageInput(e.target.value)}
-                      placeholder="Escribe tu respuesta..."
-                      className="flex-1"
-                      maxLength={500}
-                    />
-                    <Button
-                      type="submit"
-                      disabled={!messageInput.trim()}
-                      className="bg-primary text-background hover:bg-primary/90"
-                    >
-                      <Send className="w-4 h-4" />
-                    </Button>
-                  </form>
-                </div>
-              </>
-            ) : (
-              <div className="flex-1 flex items-center justify-center text-center p-8">
-                <div>
-                  <MessageCircle className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-                  <h3 className="text-lg font-bold mb-2">Selecciona una conversación</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Elige un usuario de la lista para ver y responder mensajes
-                  </p>
-                </div>
+        {activeTab === 'chat' ? (
+          <div className="grid grid-cols-12 gap-4 h-full">
+            {/* Sidebar - Lista de Conversaciones */}
+            <div className="col-span-3 bg-card/60 backdrop-blur-xl border border-primary/20 rounded-lg overflow-hidden flex flex-col">
+              <div className="bg-primary/10 border-b border-primary/20 p-4">
+                <h2 className="font-bold flex items-center gap-2">
+                  <MessageCircle className="w-5 h-5" />
+                  Conversaciones ({conversaciones.length})
+                </h2>
               </div>
-            )}
-          </div>
-
-          {/* Panel de Configuración */}
-          <div className="col-span-3 space-y-4">
-            {/* Estadísticas */}
-            <Card className="border-primary/20 bg-card/60 backdrop-blur-xl">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Users className="w-4 h-4" />
-                  Estadísticas
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs text-muted-foreground">Conversaciones activas</span>
-                  <Badge className="bg-primary/20 text-primary">
-                    {conversaciones.length}
-                  </Badge>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-xs text-muted-foreground">Usuarios VIP</span>
-                  <Badge className="bg-amber-500/20 text-amber-400">
-                    {conversaciones.filter(c => c.isVIP).length}
-                  </Badge>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-xs text-muted-foreground">Mensajes hoy</span>
-                  <Badge className="bg-green-500/20 text-green-400">
-                    {messages.length}
-                  </Badge>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Configuración de Transmisión */}
-            <Card className="border-primary/20 bg-card/60 backdrop-blur-xl">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Video className="w-4 h-4" />
-                  Transmisión
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">Estado</span>
-                  <Badge className={streamActive ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'}>
-                    {streamActive ? 'Activa' : 'Inactiva'}
-                  </Badge>
-                </div>
-
-                {editingStream ? (
-                  <div className="space-y-2">
-                    <Label className="text-xs">URL de YouTube</Label>
-                    <Input
-                      value={newStreamUrl}
-                      onChange={(e) => setNewStreamUrl(e.target.value)}
-                      placeholder="https://youtube.com/watch?v=..."
-                      className="text-xs"
-                    />
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          setStreamUrl(newStreamUrl);
-                          setStreamActive(true);
-                          setEditingStream(false);
-                        }}
-                        className="flex-1 bg-primary text-background"
-                      >
-                        Guardar
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setEditingStream(false)}
-                      >
-                        Cancelar
-                      </Button>
-                    </div>
+  
+              <div className="flex-1 overflow-y-auto">
+                {conversaciones.length === 0 ? (
+                  <div className="p-8 text-center text-muted-foreground">
+                    <MessageCircle className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                    <p className="text-sm">No hay conversaciones activas</p>
                   </div>
                 ) : (
+                  conversaciones.map((conv) => (
+                    <button
+                      key={conv.userId}
+                      onClick={() => setSelectedUserId(conv.userId)}
+                      className={`w-full p-4 border-b border-border/50 hover:bg-primary/10 transition-colors text-left ${
+                        selectedUserId === conv.userId ? 'bg-primary/20' : ''
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center text-sm font-bold flex-shrink-0">
+                          {conv.username.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="font-medium text-sm truncate">
+                              {conv.username}
+                            </p>
+                            {conv.isVIP && <Gem className="w-3 h-3 text-primary" />}
+                          </div>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {conv.lastMessage}
+                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Clock className="w-3 h-3 text-muted-foreground" />
+                            <p className="text-xs text-muted-foreground">
+                              {formatDate(conv.lastMessageTime)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+  
+            {/* Área de Chat */}
+            <div className="col-span-6 bg-card/60 backdrop-blur-xl border border-primary/20 rounded-lg overflow-hidden flex flex-col">
+              {selectedUser ? (
+                <>
+                  {/* Header del chat */}
+                  <div className="bg-primary/10 border-b border-primary/20 p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center text-sm font-bold">
+                        {selectedUser.username.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <h3 className="font-bold flex items-center gap-2">
+                          {selectedUser.username}
+                          {selectedUser.isVIP && <Gem className="w-4 h-4 text-primary" />}
+                        </h3>
+                        <p className="text-xs text-muted-foreground">
+                          Tel: {selectedUser.telefono}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+  
+                  {/* Mensajes */}
+                  <div className="flex-1 overflow-y-auto p-4 space-y-3" ref={chatContainerRef}>
+                    {messages.map((msg) => {
+                      const isProgramador = msg.userId === programadorId;
+                      return (
+                        <div
+                          key={msg.id}
+                          className={`flex flex-col ${isProgramador ? 'items-end' : 'items-start'}`}
+                        >
+                          <div className={`max-w-[70%] ${isProgramador ? 'bg-primary/20' : 'bg-card'} rounded-lg px-4 py-2 border ${isProgramador ? 'border-primary/30' : 'border-border/50'}`}>
+                            <p className="text-xs font-bold mb-1" style={{ color: isProgramador ? '#d4af37' : '#999' }}>
+                              {msg.username}
+                            </p>
+                            <p className="text-sm break-words">{msg.message}</p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {formatTime(msg.timestamp)}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div ref={messagesEndRef} />
+                  </div>
+  
+                  {/* Input de mensaje */}
+                  <div className="border-t border-primary/20 p-4">
+                    <form onSubmit={handleSendMessage} className="flex gap-2">
+                      <Input
+                        value={messageInput}
+                        onChange={(e) => setMessageInput(e.target.value)}
+                        placeholder="Escribe tu respuesta..."
+                        className="flex-1"
+                        maxLength={500}
+                      />
+                      <Button
+                        type="submit"
+                        disabled={!messageInput.trim()}
+                        className="bg-primary text-background hover:bg-primary/90"
+                      >
+                        <Send className="w-4 h-4" />
+                      </Button>
+                    </form>
+                  </div>
+                </>
+              ) : (
+                <div className="flex-1 flex items-center justify-center text-center p-8">
+                  <div>
+                    <MessageCircle className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
+                    <h3 className="text-lg font-bold mb-2">Selecciona una conversación</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Elige un usuario de la lista para ver y responder mensajes
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+  
+            {/* Panel de Configuración */}
+            <div className="col-span-3 space-y-4">
+              {/* Estadísticas */}
+              <Card className="border-primary/20 bg-card/60 backdrop-blur-xl">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Users className="w-4 h-4" />
+                    Estadísticas
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-muted-foreground">Conversaciones activas</span>
+                    <Badge className="bg-primary/20 text-primary">
+                      {conversaciones.length}
+                    </Badge>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-muted-foreground">Usuarios VIP</span>
+                    <Badge className="bg-amber-500/20 text-amber-400">
+                      {conversaciones.filter(c => c.isVIP).length}
+                    </Badge>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-muted-foreground">Mensajes hoy</span>
+                    <Badge className="bg-green-500/20 text-green-400">
+                      {messages.length}
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+  
+              {/* Configuración de Transmisión */}
+              <Card className="border-primary/20 bg-card/60 backdrop-blur-xl">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Video className="w-4 h-4" />
+                    Transmisión
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Estado</span>
+                    <Badge className={streamActive ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'}>
+                      {streamActive ? 'Activa' : 'Inactiva'}
+                    </Badge>
+                  </div>
+  
+                  {editingStream ? (
+                    <div className="space-y-2">
+                      <Label className="text-xs">URL de YouTube</Label>
+                      <Input
+                        value={newStreamUrl}
+                        onChange={(e) => setNewStreamUrl(e.target.value)}
+                        placeholder="https://youtube.com/watch?v=..."
+                        className="text-xs"
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            setStreamUrl(newStreamUrl);
+                            setStreamActive(true);
+                            setEditingStream(false);
+                          }}
+                          className="flex-1 bg-primary text-background"
+                        >
+                          Guardar
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setEditingStream(false)}
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <Button
+                      size="sm"
+                      onClick={() => setEditingStream(true)}
+                      className="w-full"
+                      variant="outline"
+                    >
+                      <Settings className="w-3 h-3 mr-2" />
+                      Configurar Stream
+                    </Button>
+                  )}
+  
+                  {streamUrl && (
+                    <div className="pt-2 border-t border-border/50">
+                      <p className="text-xs text-muted-foreground mb-2">URL actual:</p>
+                      <p className="text-xs text-primary truncate">{streamUrl}</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+  
+              {/* Acciones rápidas */}
+              <Card className="border-primary/20 bg-card/60 backdrop-blur-xl">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Eye className="w-4 h-4" />
+                    Vista Rápida
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
                   <Button
                     size="sm"
-                    onClick={() => setEditingStream(true)}
+                    onClick={() => window.open('/', '_blank')}
                     className="w-full"
                     variant="outline"
                   >
-                    <Settings className="w-3 h-3 mr-2" />
-                    Configurar Stream
+                    Ver Landing Pública
                   </Button>
-                )}
-
-                {streamUrl && (
-                  <div className="pt-2 border-t border-border/50">
-                    <p className="text-xs text-muted-foreground mb-2">URL actual:</p>
-                    <p className="text-xs text-primary truncate">{streamUrl}</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Acciones rápidas */}
-            <Card className="border-primary/20 bg-card/60 backdrop-blur-xl">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Eye className="w-4 h-4" />
-                  Vista Rápida
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Button
-                  size="sm"
-                  onClick={() => window.open('/', '_blank')}
-                  className="w-full"
-                  variant="outline"
-                >
-                  Ver Landing Pública
-                </Button>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="h-full bg-card/60 backdrop-blur-xl border border-primary/20 rounded-lg overflow-hidden relative">
+             <AgendamientosPanel rol="supervisor" userEmail="programador@app.com" />
+          </div>
+        )}
       </div>
     </div>
   );

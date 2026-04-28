@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Send, Users, MessageSquare, LogIn, LogOut, Gem, Trash2 } from 'lucide-react';
+import { Send, Users, MessageSquare, LogOut, Gem, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -17,16 +17,43 @@ import {
   AlertDialogTitle,
 } from "./ui/alert-dialog";
 
-export function ChatModeratorPanel() {
-  const { currentUser, login, logout, sendMessage, messages, onlineUsers } = usePublicUsers();
+interface ChatModeratorPanelProps {
+  userEmail: string;
+  userId?: string;
+}
+
+export function ChatModeratorPanel({ userEmail, userId }: ChatModeratorPanelProps) {
+  const { currentUser, loginUser, logout, sendMessage, messages, onlineUsers } = usePublicUsers();
   const [messageInput, setMessageInput] = useState('');
-  const [showLoginForm, setShowLoginForm] = useState(false);
-  const [loginEmail, setLoginEmail] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
-  const [selectedUserId, setSelectedUserId] = useState<string>(''); // Usuario seleccionado para responder
+  const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [users, setUsers] = useState<any[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [mostrarLimpiarDialog, setMostrarLimpiarDialog] = useState(false);
+  const [autoLoginAttempted, setAutoLoginAttempted] = useState(false);
+
+  // Auto-login del moderador usando el email/userId que llega como prop
+  useEffect(() => {
+    if (!currentUser && !autoLoginAttempted) {
+      setAutoLoginAttempted(true);
+      autoLoginModerador();
+    }
+  }, [currentUser, autoLoginAttempted]);
+
+  const autoLoginModerador = async () => {
+    try {
+      // Buscar en clientes por email o por userId
+      let query = supabase.from('clientes').select('*');
+      if (userId) {
+        query = query.eq('id', userId);
+      } else {
+        query = query.eq('email', userEmail);
+      }
+      const { data, error } = await query.maybeSingle();
+      if (!error && data) {
+        loginUser(data);
+      }
+    } catch (_) {}
+  };
 
   // Auto-scroll al final cuando hay nuevos mensajes
   useEffect(() => {
@@ -41,7 +68,9 @@ export function ChatModeratorPanel() {
   const loadUsers = async () => {
     const { data, error } = await supabase
       .from('clientes')
-      .select('*');
+      .select('id, nombre, email, telefono, bloqueado')
+      .order('created_at', { ascending: false })
+      .limit(200);
 
     if (!error && data) {
       setUsers(data);
@@ -62,17 +91,11 @@ export function ChatModeratorPanel() {
   // Obtener mensajes filtrados por usuario seleccionado
   const getFilteredMessages = () => {
     if (!selectedUserId) return messages;
-    
+
     return messages.filter(msg => {
-      // Mensajes del sistema siempre visibles
       if (msg.role === 'system') return true;
-      
-      // Mensajes del usuario seleccionado
       if (msg.userId === selectedUserId) return true;
-      
-      // Mensajes del programador dirigidos al usuario seleccionado
       if (msg.role === 'programador' && msg.receiverId === selectedUserId) return true;
-      
       return false;
     });
   };
@@ -85,31 +108,16 @@ export function ChatModeratorPanel() {
 
   // Contar mensajes no leídos por usuario (simulado)
   const getUnreadCount = (userId: string) => {
-    return messages.filter(msg => 
-      msg.userId === userId && 
+    return messages.filter(msg =>
+      msg.userId === userId &&
       msg.role === 'user' &&
-      !msg.receiverId // Mensajes del usuario que no han sido respondidos
+      !msg.receiverId
     ).length;
-  };
-
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    const success = login(loginEmail, loginPassword);
-    if (success && currentUser?.role === 'programador') {
-      setShowLoginForm(false);
-      setLoginEmail('');
-      setLoginPassword('');
-    } else if (success && currentUser?.role !== 'programador') {
-      logout();
-      alert('Esta sección es solo para programadores');
-    }
   };
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (!messageInput.trim()) return;
-
-    // Enviar mensaje al usuario seleccionado o a todos si no hay selección
     sendMessage(messageInput, selectedUserId || undefined);
     setMessageInput('');
   };
@@ -132,8 +140,8 @@ export function ChatModeratorPanel() {
   };
 
   const formatTime = (date: Date) => {
-    return new Date(date).toLocaleTimeString('es-CO', { 
-      hour: '2-digit', 
+    return new Date(date).toLocaleTimeString('es-CO', {
+      hour: '2-digit',
       minute: '2-digit',
       second: '2-digit'
     });
@@ -155,68 +163,10 @@ export function ChatModeratorPanel() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Login del Moderador */}
           {!currentUser ? (
-            <div className="space-y-4">
-              {!showLoginForm ? (
-                <div className="text-center p-8 bg-muted/50 rounded-lg border border-primary/20">
-                  <MessageSquare className="w-16 h-16 text-primary mx-auto mb-4" />
-                  <h3 className="text-xl font-bold mb-2">Iniciar Sesión como Moderador</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Inicia sesión para moderar el chat como <strong>Black Diamond</strong>
-                  </p>
-                  <Button 
-                    onClick={() => setShowLoginForm(true)}
-                    className="bg-primary text-background hover:bg-primary/90 gap-2"
-                  >
-                    <LogIn className="w-4 h-4" />
-                    Iniciar Sesión
-                  </Button>
-                </div>
-              ) : (
-                <form onSubmit={handleLogin} className="space-y-4 p-6 bg-muted/50 rounded-lg border border-primary/20">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Email</label>
-                    <Input
-                      type="email"
-                      value={loginEmail}
-                      onChange={(e) => setLoginEmail(e.target.value)}
-                      placeholder="programador@blackdiamond.com"
-                      required
-                      className="bg-background"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Contraseña</label>
-                    <Input
-                      type="password"
-                      value={loginPassword}
-                      onChange={(e) => setLoginPassword(e.target.value)}
-                      placeholder="Tu contraseña"
-                      required
-                      minLength={6}
-                      className="bg-background"
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <Button type="submit" className="flex-1 bg-primary text-background hover:bg-primary/90">
-                      <LogIn className="w-4 h-4 mr-2" />
-                      Iniciar Sesión
-                    </Button>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      onClick={() => setShowLoginForm(false)}
-                    >
-                      Cancelar
-                    </Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground text-center">
-                    💡 Usa el email: <strong>programador@blackdiamond.com</strong><br/>
-                    Si es tu primera vez, crea una contraseña nueva.
-                  </p>
-                </form>
-              )}
+            <div className="text-center p-8 bg-muted/50 rounded-lg border border-primary/20">
+              <MessageSquare className="w-16 h-16 text-primary mx-auto mb-4 opacity-50" />
+              <p className="text-sm text-muted-foreground">Iniciando sesión de moderación...</p>
             </div>
           ) : (
             <>
@@ -232,7 +182,7 @@ export function ChatModeratorPanel() {
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <Button 
+                  <Button
                     onClick={clearAllMessages}
                     variant="outline"
                     size="sm"
@@ -241,7 +191,7 @@ export function ChatModeratorPanel() {
                     <Trash2 className="w-4 h-4 mr-2" />
                     Limpiar Chat
                   </Button>
-                  <Button 
+                  <Button
                     onClick={logout}
                     variant="outline"
                     size="sm"
@@ -265,11 +215,11 @@ export function ChatModeratorPanel() {
                 </div>
                 <div className="h-[400px] overflow-y-auto bg-muted/30 rounded-lg p-4 space-y-3 border border-primary/20">
                   {messages.map((msg) => (
-                    <div 
+                    <div
                       key={msg.id}
                       className={`p-3 rounded-lg ${
-                        msg.username === 'Sistema' 
-                          ? 'bg-background/40 text-center' 
+                        msg.username === 'Sistema'
+                          ? 'bg-background/40 text-center'
                           : msg.role === 'programador'
                           ? 'bg-gradient-to-r from-primary/20 to-amber-400/20 border-l-4 border-primary'
                           : 'bg-background/60 border-l-4 border-muted'
@@ -277,7 +227,7 @@ export function ChatModeratorPanel() {
                     >
                       <div className="flex items-center justify-between mb-1">
                         <div className="flex items-center gap-2">
-                          <span 
+                          <span
                             className="text-sm font-bold"
                             style={{ color: msg.color || '#d4af37' }}
                           >
@@ -319,7 +269,7 @@ export function ChatModeratorPanel() {
                     className="flex-1 bg-background"
                     maxLength={200}
                   />
-                  <Button 
+                  <Button
                     type="submit"
                     disabled={!messageInput.trim()}
                     className="bg-primary text-background hover:bg-primary/90"

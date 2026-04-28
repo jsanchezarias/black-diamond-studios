@@ -50,7 +50,7 @@ export function AgregarServicioPublicoModal({ isOpen, onClose }: AgregarServicio
       tipo,
       proveedor: proveedor.trim(),
       numeroCuenta: numeroCuenta.trim() || undefined,
-      fechaLimitePago: new Date(2026, 0, dia), // Guardar el día de referencia
+      fechaLimitePago: dia, // Guardar el día del mes (1-31)
       montoPromedio: parseFloat(montoPromedio),
       proximoPago,
       activo: true,

@@ -28,6 +28,7 @@ const COLOR_PRIMARY = '#c9a961';
 
 const ESTADO_CONFIG: Record<Agendamiento['estado'], { label: string; color: string; icon: React.ReactNode }> = {
   pendiente:  { label: 'Pendiente',  color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30', icon: <Clock className="w-3 h-3" /> },
+  aprobado:   { label: 'Aprobado',   color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30', icon: <CheckCircle className="w-3 h-3" /> },
   confirmado: { label: 'Confirmado', color: 'bg-blue-500/20 text-blue-400 border-blue-500/30',       icon: <CheckCircle className="w-3 h-3" /> },
   completado: { label: 'Completado', color: 'bg-green-500/20 text-green-400 border-green-500/30',    icon: <CheckCircle className="w-3 h-3" /> },
   cancelado:  { label: 'Cancelado',  color: 'bg-red-500/20 text-red-400 border-red-500/30',          icon: <XCircle className="w-3 h-3" /> },
@@ -42,7 +43,7 @@ function AgendaDiaPanel() {
   const hoy = new Date().toISOString().split('T')[0];
   const agendamientosHoy = agendamientos
     .filter(a => a.fecha === hoy)
-    .sort((a, b) => a.hora.localeCompare(b.hora));
+    .sort((a, b) => (a.hora ?? '').localeCompare(b.hora ?? ''));
 
   const pendientes  = agendamientosHoy.filter(a => a.estado === 'pendiente' || a.estado === 'confirmado').length;
   const completados = agendamientosHoy.filter(a => a.estado === 'completado').length;

@@ -924,7 +924,7 @@ export function FinanzasPanel({
               <Card key={index} className="border-primary/30">
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">{modelo.nombreArtistico || modelo.nombre}</CardTitle>
+                    <CardTitle className="text-lg">{modelo.nombre}</CardTitle>
                     <Badge className="bg-primary text-primary-foreground">
                       #{index + 1}
                     </Badge>

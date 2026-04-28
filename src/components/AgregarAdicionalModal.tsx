@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { useState } from 'react';
 import { X, Plus, DollarSign, Upload, Image as ImageIcon } from 'lucide-react';
 import { Button } from './ui/button';
@@ -36,18 +37,18 @@ export function AgregarAdicionalModal({ isOpen, onClose, servicioId }: AgregarAd
     e.preventDefault();
     
     if (!descripcionAdicional || !costoAdicional) {
-      alert('Por favor completa todos los campos requeridos');
+      toast.error('Por favor completa todos los campos requeridos');
       return;
     }
 
-    agregarAdicionalAServicio(servicioId, {
+    agregarAdicionalAServicio(String(servicioId), {
       descripcion: descripcionAdicional,
       costo: parseFloat(costoAdicional),
       comprobante: comprobante || undefined,
     });
 
     // Mostrar confirmación
-    alert(`✅ Adicional agregado\n\n${descripcionAdicional}\nCosto: $${parseFloat(costoAdicional).toLocaleString()}\n\nEl costo se agregará al total del servicio.`);
+    toast.success(`✅ Adicional agregado\n\n${descripcionAdicional}\nCosto: $${parseFloat(costoAdicional).toLocaleString()}\n\nEl costo se agregará al total del servicio.`);
 
     // Reset
     setDescripcionAdicional('');

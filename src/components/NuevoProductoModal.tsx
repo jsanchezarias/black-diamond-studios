@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { useState } from 'react';
 import { X, Upload, Image as ImageIcon } from 'lucide-react';
 import { Button } from './ui/button';
@@ -54,7 +55,7 @@ export function NuevoProductoModal({ open, onClose, onSave }: NuevoProductoModal
     e.preventDefault();
     
     if (!formData.nombre || !formData.precioRegular || !formData.imagen) {
-      alert('Por favor completa todos los campos obligatorios (nombre, precio e imagen)');
+      toast.error('Por favor completa todos los campos obligatorios (nombre, precio e imagen)');
       return;
     }
 

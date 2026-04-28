@@ -1,8 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useClientes, Cliente } from './ClientesContext';
-import { useServicios, Servicio } from './ServiciosContext';
-import { AlertTriangle, Ban, CheckCircle, DollarSign, X, User, Calendar, Clock, AlertCircle, TrendingUp, XCircle } from 'lucide-react';
+import { useServicios } from './ServiciosContext';
+import { AlertTriangle, Ban, CheckCircle, DollarSign, X, User, Calendar, Clock, AlertCircle, TrendingUp, XCircle, Star } from 'lucide-react';
 import { toast } from 'sonner';
+
+// ── VIP helper ───────────────────────────────────────────────────────────────
+const esVip = (c: Cliente) =>
+  !!(c.es_vip || (c.total_visitas ?? 0) >= 5 || (c.total_gastado_col ?? c.totalGastado ?? 0) >= 1000000);
+
+// ── COP formatter ─────────────────────────────────────────────────────────────
+const formatCOP = (n: number) =>
+  n > 0 ? `$${n.toLocaleString('es-CO', { maximumFractionDigits: 0 })}` : '$0';
 
 export function GestionClientesAdmin() {
   const { clientes, actualizarCliente } = useClientes();
@@ -150,7 +158,7 @@ export function GestionClientesAdmin() {
         </div>
 
         {/* Estadísticas rápidas */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6">
           <div className="bg-black p-4 rounded-lg border border-[#2A2A2A]">
             <p className="text-gray-400 text-sm">Total Clientes</p>
             <p className="text-2xl font-bold text-white">{clientes.length}</p>
@@ -167,6 +175,10 @@ export function GestionClientesAdmin() {
             <p className="text-gray-400 text-sm">Con No-Shows</p>
             <p className="text-2xl font-bold text-yellow-500">{clientesEnriquecidos.filter(c => (c.totalNoShows || 0) > 0).length}</p>
           </div>
+          <div className="bg-black p-4 rounded-lg border border-[#D4AF37]/30">
+            <p className="text-gray-400 text-sm">Clientes VIP</p>
+            <p className="text-2xl font-bold text-[#D4AF37]">{clientesEnriquecidos.filter(c => esVip(c)).length}</p>
+          </div>
         </div>
       </div>
 
@@ -178,7 +190,9 @@ export function GestionClientesAdmin() {
               <tr>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Cliente</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Contacto</th>
-                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-400 uppercase tracking-wider">Servicios</th>
+                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-400 uppercase tracking-wider">Visitas</th>
+                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-400 uppercase tracking-wider">Total Gastado</th>
+                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-400 uppercase tracking-wider">Último Ag.</th>
                 <th className="px-6 py-4 text-center text-xs font-semibold text-gray-400 uppercase tracking-wider">No-Shows</th>
                 <th className="px-6 py-4 text-center text-xs font-semibold text-gray-400 uppercase tracking-wider">Multas</th>
                 <th className="px-6 py-4 text-center text-xs font-semibold text-gray-400 uppercase tracking-wider">Estado</th>
@@ -190,11 +204,18 @@ export function GestionClientesAdmin() {
                 <tr key={cliente.id} className="hover:bg-[#0F0F0F] transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#D4AF37] to-[#C9A961] flex items-center justify-center mr-3">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#D4AF37] to-[#C9A961] flex items-center justify-center mr-3 flex-shrink-0">
                         <User className="w-5 h-5 text-black" />
                       </div>
                       <div>
-                        <p className="font-semibold text-white">{cliente.nombre}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-white">{cliente.nombre}</p>
+                          {esVip(cliente) && (
+                            <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/40">
+                              <Star className="w-2.5 h-2.5" />VIP
+                            </span>
+                          )}
+                        </div>
                         <p className="text-sm text-gray-400">ID: {cliente.id.slice(0, 8)}</p>
                       </div>
                     </div>
@@ -204,7 +225,17 @@ export function GestionClientesAdmin() {
                     {cliente.email && <p className="text-sm text-gray-400">{cliente.email}</p>}
                   </td>
                   <td className="px-6 py-4 text-center">
-                    <span className="text-white font-semibold">{cliente.serviciosCount || 0}</span>
+                    <span className="text-white font-semibold">{cliente.total_visitas ?? cliente.serviciosCount ?? 0}</span>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <span className="text-[#D4AF37] font-semibold text-sm">{formatCOP(cliente.total_gastado_col ?? cliente.totalGastado ?? 0)}</span>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    {cliente.ultimo_agendamiento ? (
+                      <span className="text-gray-300 text-sm">{new Date(cliente.ultimo_agendamiento).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })}</span>
+                    ) : (
+                      <span className="text-gray-600 text-sm">—</span>
+                    )}
                   </td>
                   <td className="px-6 py-4 text-center">
                     {(cliente.totalNoShows || 0) > 0 ? (

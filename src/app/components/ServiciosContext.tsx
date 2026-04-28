@@ -1,6 +1,30 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '../../utils/supabase/info';
 
+export interface TiempoAdicional {
+  tiempo: string;
+  costo: number;
+  metodoPago?: string;
+  comprobante?: string;
+}
+
+export interface AdicionalExtra {
+  descripcion: string;
+  costo: number;
+  metodoPago?: string;
+  comprobante?: string;
+}
+
+export interface ConsumoDetallado {
+  productoId: string;
+  nombre: string;
+  descripcion?: string;
+  cantidad: number;
+  costo: number;
+  metodoPago?: string;
+  comprobante?: string;
+}
+
 export interface Servicio {
   id: string;
   fecha: string;
@@ -25,9 +49,10 @@ export interface Servicio {
   comprobantePago?: string;
   montoPagado?: number;
   propina?: number;
-  estado: 'completado' | 'cancelado' | 'no_show';
+  estado: 'activo' | 'completado' | 'cancelado' | 'no_show' | 'finalizado';
   notasPreServicio?: string;
   notasPostServicio?: string;
+  notasCierre?: string;
   calificacionCliente?: number;
   reviewCliente?: string;
   calificacionModelo?: number;
@@ -43,9 +68,25 @@ export interface Servicio {
   creadoPor: string;
   agendamientoId: string;
   // Métricas financieras
-  costoServicio: number;
-  costoAdicionales: number;
-  costoConsumo: number;
+  costoServicio?: number;
+  costoAdicionales?: number;
+  costoConsumo?: number;
+  // Campos de servicio activo (live timer)
+  horaInicio?: Date;
+  horaFin?: Date;
+  duracionMinutos?: number;
+  tiempoServicio?: string;
+  tiempoRestante?: number;
+  tiempoNegativo?: number;
+  habitacion?: string;
+  // Extras durante el servicio
+  tiemposAdicionales?: TiempoAdicional[];
+  adicionalesExtra?: AdicionalExtra[];
+  consumosDetallados?: ConsumoDetallado[];
+  // Campos legacy/alias
+  adicionales?: number;
+  adicional?: number;
+  consumo?: number;
 }
 
 export interface PoliticaPenalizacion {
@@ -56,8 +97,9 @@ export interface PoliticaPenalizacion {
   diasParaPagarMulta: number;
 }
 
-interface ServiciosContextType {
+export interface ServiciosContextType {
   servicios: Servicio[];
+  serviciosActivos: Servicio[];
   serviciosFinalizados: Servicio[];
   politicaPenalizacion: PoliticaPenalizacion;
   crearServicio: (servicio: Omit<Servicio, 'id' | 'fechaCreacion' | 'creadoPor'>) => Promise<{ success: boolean, error?: any, data?: any }>;
@@ -74,6 +116,11 @@ interface ServiciosContextType {
   aplicarMultaPorNoShow: (servicioId: string) => Promise<void>;
   marcarMultaComoPagada: (servicioId: string) => Promise<void>;
   recargarServicios: () => Promise<void>;
+  iniciarServicio: (agendamientoId: string, datos?: Partial<Servicio>) => Promise<{ success: boolean, error?: any, data?: any }>;
+  finalizarServicio: (id: string, notas?: string) => Promise<void>;
+  agregarTiempoAdicional: (id: string, datos: { tiempoAdicional: string; costoAdicional: number; comprobante?: string }) => void;
+  agregarAdicionalAServicio: (id: string, datos: { descripcion: string; costo: number; comprobante?: string }) => void;
+  editarServicioFinalizado: (id: string, datos: Partial<Servicio> & { motivoEdicion?: string }) => void;
   loading: boolean;
 }
 
@@ -196,13 +243,16 @@ export function ServiciosProvider({ children }: { children: ReactNode }) {
 
   const cargarServicios = async () => {
     try {
-      // Pull from agendamientos instead of servicios_modelo (which is a catalog)
+      // Pull from agendamientos (últimos 90 días)
+      const fechaLimite = new Date();
+      fechaLimite.setDate(fechaLimite.getDate() - 90);
       const { data, error } = await supabase
         .from('agendamientos')
         .select('*')
-        .neq('estado', 'pendiente') // Pull records that are not just pending appointments
+        .neq('estado', 'pendiente')
+        .gte('fecha', fechaLimite.toISOString().split('T')[0])
         .order('fecha', { ascending: false })
-        .limit(100);
+        .limit(200);
 
       if (error) {
         if (process.env.NODE_ENV === 'development') console.error('❌ Error cargando servicios:', error.message);
@@ -362,15 +412,55 @@ export function ServiciosProvider({ children }: { children: ReactNode }) {
 
   const recargarServicios = async () => { await cargarServicios(); };
 
-  const serviciosFinalizados = servicios.filter(s => s.estado === 'completado');
+  const iniciarServicio = async (agendamientoId: string, datos?: Partial<Servicio>) => {
+    return await crearServicioDesdeAgendamiento(agendamientoId, 'completado', {
+      estado: 'activo',
+      horaInicio: new Date(),
+      ...datos,
+    });
+  };
+
+  const finalizarServicio = async (id: string, notas?: string) => {
+    await actualizarServicio(id, {
+      estado: 'finalizado',
+      horaFin: new Date(),
+      notasCierre: notas,
+    });
+  };
+
+  const agregarTiempoAdicional = (id: string, datos: { tiempoAdicional: string; costoAdicional: number; comprobante?: string }) => {
+    setServicios(prev => prev.map(s => {
+      if (s.id !== id) return s;
+      const tiempoEntry: TiempoAdicional = { tiempo: datos.tiempoAdicional, costo: datos.costoAdicional, comprobante: datos.comprobante };
+      return { ...s, tiemposAdicionales: [...(s.tiemposAdicionales ?? []), tiempoEntry] };
+    }));
+  };
+
+  const agregarAdicionalAServicio = (id: string, datos: { descripcion: string; costo: number; comprobante?: string }) => {
+    setServicios(prev => prev.map(s => {
+      if (s.id !== id) return s;
+      const adicionalEntry: AdicionalExtra = { descripcion: datos.descripcion, costo: datos.costo, comprobante: datos.comprobante };
+      return { ...s, adicionalesExtra: [...(s.adicionalesExtra ?? []), adicionalEntry] };
+    }));
+  };
+
+  const editarServicioFinalizado = (id: string, datos: Partial<Servicio> & { motivoEdicion?: string }) => {
+    const { motivoEdicion: _motivo, ...rest } = datos;
+    setServicios(prev => prev.map(s => s.id === id ? { ...s, ...rest } : s));
+  };
+
+  const serviciosActivos = servicios.filter(s => s.estado === 'activo');
+  const serviciosFinalizados = servicios.filter(s => s.estado === 'completado' || s.estado === 'finalizado');
 
   return (
     <ServiciosContext.Provider value={{
-      servicios, serviciosFinalizados, politicaPenalizacion, crearServicio, actualizarServicio,
+      servicios, serviciosActivos, serviciosFinalizados, politicaPenalizacion, crearServicio, actualizarServicio,
       obtenerServicioPorId, obtenerServiciosPorCliente, obtenerNoShowsPorCliente,
       contarNoShowsCliente, obtenerMultasPendientesCliente, calcularTotalMultasCliente,
       obtenerServiciosPorModelo, obtenerIngresosModelo, crearServicioDesdeAgendamiento,
-      aplicarMultaPorNoShow, marcarMultaComoPagada, recargarServicios, loading
+      aplicarMultaPorNoShow, marcarMultaComoPagada, recargarServicios,
+      iniciarServicio, finalizarServicio, agregarTiempoAdicional, agregarAdicionalAServicio,
+      editarServicioFinalizado, loading
     }}>
       {children}
     </ServiciosContext.Provider>
@@ -381,7 +471,7 @@ export function useServicios() {
   const context = useContext(ServiciosContext);
   if (context === undefined) {
     return {
-      servicios: [], serviciosFinalizados: [], politicaPenalizacion: POLITICA_DEFAULT,
+      servicios: [], serviciosActivos: [], serviciosFinalizados: [], politicaPenalizacion: POLITICA_DEFAULT,
       crearServicio: async () => ({ success: false }),
       actualizarServicio: async () => {},
       obtenerServicioPorId: () => undefined,
@@ -396,6 +486,11 @@ export function useServicios() {
       aplicarMultaPorNoShow: async () => {},
       marcarMultaComoPagada: async () => {},
       recargarServicios: async () => {},
+      iniciarServicio: async () => ({ success: false }),
+      finalizarServicio: async () => {},
+      agregarTiempoAdicional: () => {},
+      agregarAdicionalAServicio: () => {},
+      editarServicioFinalizado: () => {},
       loading: true,
     } as ServiciosContextType;
   }

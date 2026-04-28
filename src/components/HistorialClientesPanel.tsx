@@ -115,7 +115,7 @@ export function HistorialClientesPanel() {
               </div>
               <div>
                 <p className="text-2xl font-bold">
-                  {clientes.reduce((sum, c) => sum + c.totalServicios, 0)}
+                  {clientes.map(c => c.totalServicios).reduce((a, b) => a + b, 0)}
                 </p>
                 <p className="text-sm text-muted-foreground">Total Servicios</p>
               </div>
@@ -129,7 +129,7 @@ export function HistorialClientesPanel() {
               </div>
               <div>
                 <p className="text-2xl font-bold">
-                  ${clientes.reduce((sum, c) => sum + c.totalGastado, 0).toLocaleString()}
+                  ${clientes.map(c => c.totalGastado).reduce((a, b) => a + b, 0).toLocaleString()}
                 </p>
                 <p className="text-sm text-muted-foreground">Ingresos Totales</p>
               </div>
@@ -144,8 +144,8 @@ export function HistorialClientesPanel() {
               <div>
                 <p className="text-2xl font-bold">
                   ${Math.round(
-                    clientes.reduce((sum, c) => sum + c.totalGastado, 0) / 
-                    Math.max(clientes.reduce((sum, c) => sum + c.totalServicios, 0), 1)
+                    clientes.map(c => c.totalGastado).reduce((a, b) => a + b, 0) /
+                    Math.max(clientes.map(c => c.totalServicios).reduce((a, b) => a + b, 0), 1)
                   ).toLocaleString()}
                 </p>
                 <p className="text-sm text-muted-foreground">Ticket Promedio</p>

@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import {
   Calendar, Clock, CheckCircle, XCircle, AlertCircle,
-  User, Phone, ThumbsUp, ThumbsDown, Edit3, Filter,
-  ChevronDown, RefreshCw,
+  User, Phone, ThumbsUp, ThumbsDown, Filter,
+  RefreshCw, Plus, Star, X, Loader2, Users, MapPin,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { useAgendamientos, Agendamiento, formatearFecha, formatearHora } from './AgendamientosContext';
+import { useModelos } from './ModelosContext';
+import { supabase } from '../../utils/supabase/info';
 import { toast } from 'sonner';
 
 // ── Constantes de estilo ──────────────────────────────────────────────────────
@@ -130,6 +132,598 @@ function AgendamientoRow({
   );
 }
 
+// ── Modal: Nuevo Agendamiento ─────────────────────────────────────────────────
+
+const DURACIONES = [
+  { label: '30 min', value: 30 },
+  { label: '1 hora', value: 60 },
+  { label: '1.5 horas', value: 90 },
+  { label: '2 horas', value: 120 },
+  { label: '3 horas', value: 180 },
+  { label: '4 horas', value: 240 },
+];
+
+const TIPOS_SERVICIO = ['VIP', 'Estándar', 'Premium', 'Básico', 'Personalizado'];
+const TIPOS_UBICACION = ['Sede', 'Domicilio', 'Virtual'];
+
+interface NuevoAgendamientoModalProps {
+  onClose: () => void;
+  userEmail: string;
+  onCreado: () => void;
+}
+
+function NuevoAgendamientoModal({ onClose, userEmail, onCreado }: NuevoAgendamientoModalProps) {
+  const { modelos } = useModelos();
+  const modelosActivos = modelos.filter(m => m.activa);
+  const { agregarAgendamiento, actualizarAgendamiento } = useAgendamientos();
+
+  const hoyISO = new Date().toISOString().split('T')[0];
+  const [guardando, setGuardando] = useState(false);
+  const [form, setForm] = useState({
+    clienteNombre: '',
+    clienteTelefono: '',
+    clienteEmail: '',
+    modeloEmail: '',
+    tipoServicio: 'Estándar',
+    ubicacion: 'Sede',
+    habitacion: '',
+    direccion: '',
+    fecha: hoyISO,
+    hora: '10:00',
+    duracion: 60,
+    precio: 0,
+    notas: '',
+  });
+  const [sugerenciasClientes, setSugerenciasClientes] = useState<any[]>([]);
+  const [mostrarSugerencias, setMostrarSugerencias] = useState(false);
+
+  const modeloSeleccionada = modelosActivos.find(m => m.email === form.modeloEmail);
+
+  const set = (k: string, v: any) => setForm(prev => ({ ...prev, [k]: v }));
+
+  // ── Buscar clientes por teléfono (autocomplete) ──────────────────────────────
+  const buscarClientePorTelefono = async (tel: string) => {
+    if (tel.length < 6) { setSugerenciasClientes([]); setMostrarSugerencias(false); return; }
+    const { data } = await supabase
+      .from('clientes')
+      .select('id, nombre, telefono, email, total_visitas, total_gastado')
+      .ilike('telefono', `%${tel}%`)
+      .limit(5);
+    setSugerenciasClientes(data || []);
+    setMostrarSugerencias((data?.length || 0) > 0);
+  };
+
+  // ── Auto-guardar/actualizar cliente en la tabla clientes ─────────────────────
+  const guardarCliente = async (nombre: string, telefono: string, email?: string): Promise<string | null> => {
+    try {
+      let clienteId: string | null = null;
+
+      if (telefono) {
+        const { data: byPhone } = await supabase
+          .from('clientes')
+          .select('id, total_visitas')
+          .eq('telefono', telefono)
+          .maybeSingle();
+
+        if (byPhone) {
+          await supabase.from('clientes').update({
+            nombre,
+            ultimo_agendamiento: new Date().toISOString().split('T')[0],
+            total_visitas: (byPhone.total_visitas || 0) + 1,
+            updated_at: new Date().toISOString(),
+          }).eq('id', byPhone.id);
+          clienteId = byPhone.id;
+        }
+      }
+
+      if (!clienteId && email) {
+        const { data: byEmail } = await supabase
+          .from('clientes')
+          .select('id, total_visitas')
+          .eq('email', email)
+          .maybeSingle();
+
+        if (byEmail) {
+          await supabase.from('clientes').update({
+            nombre,
+            ultimo_agendamiento: new Date().toISOString().split('T')[0],
+            total_visitas: (byEmail.total_visitas || 0) + 1,
+            updated_at: new Date().toISOString(),
+          }).eq('id', byEmail.id);
+          clienteId = byEmail.id;
+        }
+      }
+
+      if (!clienteId) {
+        const { data: newCliente } = await supabase
+          .from('clientes')
+          .insert({
+            nombre,
+            telefono: telefono || null,
+            email: email || null,
+            total_visitas: 1,
+            ultimo_agendamiento: new Date().toISOString().split('T')[0],
+          })
+          .select('id')
+          .single();
+        clienteId = newCliente?.id || null;
+      }
+
+      return clienteId;
+    } catch {
+      return null;
+    }
+  };
+
+  const guardar = async (aprobar: boolean) => {
+    if (!form.clienteNombre.trim()) { toast.error('Ingresa el nombre del cliente'); return; }
+    if (!form.modeloEmail) { toast.error('Selecciona una modelo'); return; }
+    if (!form.fecha) { toast.error('Selecciona una fecha'); return; }
+
+    setGuardando(true);
+    try {
+      const result = await agregarAgendamiento({
+        clienteId: `manual-${Date.now()}`,
+        clienteNombre: form.clienteNombre.trim(),
+        clienteTelefono: form.clienteTelefono.trim(),
+        modeloEmail: form.modeloEmail,
+        modeloNombre: modeloSeleccionada?.nombreArtistico || modeloSeleccionada?.nombre || '',
+        tipoServicio: form.tipoServicio,
+        fecha: form.fecha,
+        hora: form.hora,
+        duracionMinutos: form.duracion,
+        montoPago: form.precio,
+        estadoPago: 'pendiente',
+        notas: form.notas.trim() || undefined,
+        estado: aprobar ? 'aprobado' : 'pendiente',
+      });
+      if (result.success) {
+        // Auto-save client and link to booking
+        const clienteId = await guardarCliente(
+          form.clienteNombre.trim(),
+          form.clienteTelefono.trim(),
+          form.clienteEmail.trim() || undefined,
+        );
+        if (clienteId && result.data?.id) {
+          await actualizarAgendamiento(result.data.id, { clienteRefId: clienteId });
+        }
+        toast.success(aprobar ? 'Agendamiento creado y aprobado' : 'Agendamiento guardado como pendiente');
+        onCreado();
+        onClose();
+      } else {
+        toast.error('Error al guardar: ' + (result.error?.message || 'Error desconocido'));
+      }
+    } catch (e: any) {
+      toast.error('Error: ' + e.message);
+    }
+    setGuardando(false);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-3 overflow-y-auto">
+      <div className="bg-[#111] border border-white/10 rounded-xl w-full max-w-lg my-4">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-white/10">
+          <h3 className="font-bold text-base flex items-center gap-2" style={{ color: COLOR_PRIMARY }}>
+            <Plus className="w-4 h-4" /> Nuevo Agendamiento
+          </h3>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose}><X className="w-4 h-4" /></Button>
+        </div>
+
+        <div className="p-4 space-y-4 max-h-[75vh] overflow-y-auto">
+          {/* Cliente */}
+          <div>
+            <p className="text-[10px] uppercase text-gray-500 font-semibold mb-2 tracking-wider">Cliente</p>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Nombre *</label>
+                <input className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary" value={form.clienteNombre} onChange={e => set('clienteNombre', e.target.value)} placeholder="Nombre del cliente" />
+              </div>
+              <div className="relative">
+                <label className="text-xs text-gray-400 block mb-1">Teléfono</label>
+                <input
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary"
+                  value={form.clienteTelefono}
+                  onChange={e => { set('clienteTelefono', e.target.value); buscarClientePorTelefono(e.target.value); }}
+                  onBlur={() => setTimeout(() => setMostrarSugerencias(false), 200)}
+                  placeholder="3XX XXX XXXX"
+                  autoComplete="off"
+                />
+                {mostrarSugerencias && sugerenciasClientes.length > 0 && (
+                  <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-[#1a1a1a] border border-white/10 rounded-lg shadow-xl overflow-hidden">
+                    {sugerenciasClientes.map(c => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        className="w-full text-left px-3 py-2 hover:bg-white/10 transition-colors border-b border-white/5 last:border-b-0"
+                        onMouseDown={() => {
+                          set('clienteNombre', c.nombre);
+                          set('clienteTelefono', c.telefono || '');
+                          set('clienteEmail', c.email || '');
+                          setMostrarSugerencias(false);
+                        }}
+                      >
+                        <p className="text-xs font-medium text-white">{c.nombre}</p>
+                        <p className="text-[10px] text-gray-400">{c.telefono}{c.total_visitas ? ` · ${c.total_visitas} visita${c.total_visitas !== 1 ? 's' : ''}` : ''}</p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="mt-2">
+              <label className="text-xs text-gray-400 block mb-1">Email (opcional)</label>
+              <input className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary" value={form.clienteEmail} onChange={e => set('clienteEmail', e.target.value)} placeholder="cliente@email.com" />
+            </div>
+          </div>
+
+          {/* Modelo */}
+          <div>
+            <p className="text-[10px] uppercase text-gray-500 font-semibold mb-2 tracking-wider">Modelo</p>
+            <select className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary" value={form.modeloEmail} onChange={e => set('modeloEmail', e.target.value)}>
+              <option value="">— Seleccionar modelo —</option>
+              {modelosActivos.map(m => (
+                <option key={m.id} value={m.email}>{m.nombreArtistico || m.nombre}</option>
+              ))}
+            </select>
+            {modeloSeleccionada && (
+              <div className="mt-2 flex items-center gap-2 p-2 bg-white/5 rounded-lg">
+                <img src={modeloSeleccionada.fotoPerfil} alt="" className="w-8 h-8 rounded-full object-cover border border-primary/30" loading="lazy" width={32} height={32} />
+                <div>
+                  <p className="text-xs font-medium text-white">{modeloSeleccionada.nombreArtistico || modeloSeleccionada.nombre}</p>
+                  <p className="text-[10px] text-gray-500">{modeloSeleccionada.email}</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Servicio */}
+          <div>
+            <p className="text-[10px] uppercase text-gray-500 font-semibold mb-2 tracking-wider">Servicio</p>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Tipo</label>
+                <select className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary" value={form.tipoServicio} onChange={e => set('tipoServicio', e.target.value)}>
+                  {TIPOS_SERVICIO.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Ubicación</label>
+                <select className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary" value={form.ubicacion} onChange={e => set('ubicacion', e.target.value)}>
+                  {TIPOS_UBICACION.map(u => <option key={u} value={u}>{u}</option>)}
+                </select>
+              </div>
+            </div>
+            {form.ubicacion === 'Sede' && (
+              <input className="mt-2 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary" value={form.habitacion} onChange={e => set('habitacion', e.target.value)} placeholder="Habitación (ej: Hab. 3)" />
+            )}
+            {form.ubicacion === 'Domicilio' && (
+              <input className="mt-2 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary" value={form.direccion} onChange={e => set('direccion', e.target.value)} placeholder="Dirección completa" />
+            )}
+          </div>
+
+          {/* Fecha y Hora */}
+          <div>
+            <p className="text-[10px] uppercase text-gray-500 font-semibold mb-2 tracking-wider">Fecha y Hora</p>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="col-span-1">
+                <label className="text-xs text-gray-400 block mb-1">Fecha *</label>
+                <input type="date" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary" value={form.fecha} onChange={e => set('fecha', e.target.value)} />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Hora</label>
+                <input type="time" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary" value={form.hora} onChange={e => set('hora', e.target.value)} />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Duración</label>
+                <select className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary" value={form.duracion} onChange={e => set('duracion', Number(e.target.value))}>
+                  {DURACIONES.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Precio */}
+          <div>
+            <p className="text-[10px] uppercase text-gray-500 font-semibold mb-2 tracking-wider">Precio</p>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+              <input type="number" min={0} className="w-full bg-white/5 border border-white/10 rounded-lg pl-7 pr-3 py-1.5 text-sm focus:outline-none focus:border-primary" value={form.precio || ''} onChange={e => set('precio', Number(e.target.value))} placeholder="0" />
+            </div>
+          </div>
+
+          {/* Notas */}
+          <div>
+            <label className="text-xs text-gray-400 block mb-1">Notas adicionales</label>
+            <textarea rows={2} className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary resize-none" value={form.notas} onChange={e => set('notas', e.target.value)} placeholder="Preferencias, requerimientos especiales..." />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 border-t border-white/10 flex flex-col sm:flex-row gap-2">
+          <Button variant="outline" className="flex-1 border-white/10 text-gray-400 hover:bg-white/5" onClick={onClose}>Cancelar</Button>
+          <Button variant="outline" className="flex-1 border-white/20 text-white hover:bg-white/10" disabled={guardando} onClick={() => guardar(false)}>
+            {guardando ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : null}
+            Guardar pendiente
+          </Button>
+          <Button className="flex-1 text-black font-semibold" style={{ background: COLOR_PRIMARY }} disabled={guardando} onClick={() => guardar(true)}>
+            {guardando ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : null}
+            Aprobar directo
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Modal: Crear Evento ───────────────────────────────────────────────────────
+
+const TIPOS_EVENTO = ['Privado', 'Corporativo', 'Especial', 'VIP', 'Otro'];
+const TARIFA_BASE = 150000; // Tarifa base por hora por modelo
+
+interface CrearEventoModalProps {
+  onClose: () => void;
+  userEmail: string;
+  onCreado: () => void;
+}
+
+function CrearEventoModal({ onClose, userEmail, onCreado }: CrearEventoModalProps) {
+  const { modelos } = useModelos();
+  const { agregarAgendamiento } = useAgendamientos();
+  const modelosActivos = modelos.filter(m => m.activa);
+
+  const hoyISO = new Date().toISOString().split('T')[0];
+  const [guardando, setGuardando] = useState(false);
+  const [form, setForm] = useState({
+    nombre: '',
+    tipo: 'Privado',
+    descripcion: '',
+    ubicacionTipo: 'Sede',
+    direccion: '',
+    ciudad: '',
+    fecha: hoyISO,
+    horaInicio: '18:00',
+    horaFin: '22:00',
+  });
+  const [modelosSeleccionadas, setModelosSeleccionadas] = useState<string[]>([]);
+
+  const set = (k: string, v: any) => setForm(prev => ({ ...prev, [k]: v }));
+
+  const toggleModelo = (email: string) => {
+    setModelosSeleccionadas(prev =>
+      prev.includes(email) ? prev.filter(e => e !== email) : [...prev, email]
+    );
+  };
+
+  // Cálculo de costos
+  const calcular = () => {
+    const [hIni, mIni] = form.horaInicio.split(':').map(Number);
+    const [hFin, mFin] = form.horaFin.split(':').map(Number);
+    const durMinutos = (hFin * 60 + mFin) - (hIni * 60 + mIni);
+    const durHoras = Math.max(0, durMinutos / 60);
+    const costoModelos = modelosSeleccionadas.length * TARIFA_BASE * durHoras;
+    const subtotal = costoModelos;
+    const iva = subtotal * 0.19;
+    const total = subtotal + iva;
+    return { durMinutos: Math.max(0, durMinutos), durHoras, costoModelos, subtotal, iva, total };
+  };
+
+  const costos = calcular();
+
+  const guardar = async () => {
+    if (!form.nombre.trim()) { toast.error('Ingresa el nombre del evento'); return; }
+    if (modelosSeleccionadas.length === 0) { toast.error('Selecciona al menos una modelo'); return; }
+    if (!form.fecha) { toast.error('Selecciona la fecha'); return; }
+
+    setGuardando(true);
+    try {
+      // Intentar guardar en tabla eventos (puede no existir)
+      const eventoPayload = {
+        nombre: form.nombre,
+        tipo: form.tipo,
+        descripcion: form.descripcion,
+        modelos_ids: modelosSeleccionadas,
+        modelos_nombres: modelosSeleccionadas.map(email => {
+          const m = modelos.find(x => x.email === email);
+          return m?.nombreArtistico || m?.nombre || email;
+        }),
+        ubicacion_tipo: form.ubicacionTipo,
+        direccion: form.ubicacionTipo !== 'Sede' ? form.direccion : null,
+        fecha_evento: form.fecha,
+        hora_inicio: form.horaInicio,
+        hora_fin: form.horaFin,
+        duracion_minutos: costos.durMinutos,
+        costo_modelos: costos.costoModelos,
+        subtotal: costos.subtotal,
+        iva: costos.iva,
+        total: costos.total,
+        estado: 'pendiente',
+        creado_por: userEmail,
+      };
+
+      const { error: errorEvento } = await supabase.from('eventos').insert(eventoPayload);
+      if (errorEvento && process.env.NODE_ENV === 'development') {
+        console.warn('Tabla eventos no existe, solo se crearán agendamientos:', errorEvento.message);
+      }
+
+      // Crear agendamiento individual por cada modelo
+      let errores = 0;
+      for (const email of modelosSeleccionadas) {
+        const modelo = modelos.find(m => m.email === email);
+        const result = await agregarAgendamiento({
+          clienteId: `evento-${Date.now()}`,
+          clienteNombre: form.nombre,
+          clienteTelefono: '',
+          modeloEmail: email,
+          modeloNombre: modelo?.nombreArtistico || modelo?.nombre || '',
+          tipoServicio: `Evento ${form.tipo}`,
+          fecha: form.fecha,
+          hora: form.horaInicio,
+          duracionMinutos: costos.durMinutos,
+          montoPago: Math.round(TARIFA_BASE * costos.durHoras),
+          estadoPago: 'pendiente',
+          notas: form.descripcion || undefined,
+          estado: 'aprobado',
+        });
+        if (!result.success) errores++;
+      }
+
+      if (errores === 0) {
+        toast.success(`Evento creado con ${modelosSeleccionadas.length} modelo${modelosSeleccionadas.length > 1 ? 's' : ''}. Total: $${costos.total.toLocaleString('es-CO', { maximumFractionDigits: 0 })}`);
+        onCreado();
+        onClose();
+      } else {
+        toast.error(`Se crearon ${modelosSeleccionadas.length - errores} de ${modelosSeleccionadas.length} agendamientos`);
+      }
+    } catch (e: any) {
+      toast.error('Error: ' + e.message);
+    }
+    setGuardando(false);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-3 overflow-y-auto">
+      <div className="bg-[#111] border border-white/10 rounded-xl w-full max-w-2xl my-4">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-white/10">
+          <h3 className="font-bold text-base flex items-center gap-2" style={{ color: COLOR_PRIMARY }}>
+            <Star className="w-4 h-4" /> Crear Evento
+          </h3>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose}><X className="w-4 h-4" /></Button>
+        </div>
+
+        <div className="p-4 space-y-4 max-h-[75vh] overflow-y-auto">
+          {/* Info del evento */}
+          <div>
+            <p className="text-[10px] uppercase text-gray-500 font-semibold mb-2 tracking-wider">Evento</p>
+            <div className="grid grid-cols-3 gap-2 mb-2">
+              <div className="col-span-2">
+                <label className="text-xs text-gray-400 block mb-1">Nombre del evento *</label>
+                <input className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary" value={form.nombre} onChange={e => set('nombre', e.target.value)} placeholder="Ej: Fiesta Privada VIP" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Tipo</label>
+                <select className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary" value={form.tipo} onChange={e => set('tipo', e.target.value)}>
+                  {TIPOS_EVENTO.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+            </div>
+            <textarea rows={2} className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary resize-none" value={form.descripcion} onChange={e => set('descripcion', e.target.value)} placeholder="Descripción del evento..." />
+          </div>
+
+          {/* Modelos */}
+          <div>
+            <p className="text-[10px] uppercase text-gray-500 font-semibold mb-2 tracking-wider flex items-center gap-2">
+              <Users className="w-3 h-3" /> Modelos
+              {modelosSeleccionadas.length > 0 && (
+                <Badge className="text-[10px] border-none" style={{ background: COLOR_PRIMARY, color: 'black' }}>
+                  {modelosSeleccionadas.length} seleccionada{modelosSeleccionadas.length > 1 ? 's' : ''}
+                </Badge>
+              )}
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-44 overflow-y-auto pr-1">
+              {modelosActivos.map(m => {
+                const sel = modelosSeleccionadas.includes(m.email);
+                return (
+                  <button
+                    key={m.id}
+                    onClick={() => toggleModelo(m.email)}
+                    className={`flex items-center gap-2 p-2 rounded-lg border text-left transition-all ${sel ? 'border-primary/70 bg-primary/10' : 'border-white/10 bg-white/[0.02] hover:bg-white/5'}`}
+                  >
+                    <img src={m.fotoPerfil} alt="" className={`w-8 h-8 rounded-full object-cover flex-shrink-0 ${sel ? 'ring-2 ring-primary' : ''}`} loading="lazy" width={32} height={32} />
+                    <span className="text-xs font-medium truncate text-white">{m.nombreArtistico || m.nombre}</span>
+                    {sel && <CheckCircle className="w-3 h-3 text-primary flex-shrink-0 ml-auto" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Ubicación */}
+          <div>
+            <p className="text-[10px] uppercase text-gray-500 font-semibold mb-2 tracking-wider flex items-center gap-2">
+              <MapPin className="w-3 h-3" /> Ubicación
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Tipo</label>
+                <select className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary" value={form.ubicacionTipo} onChange={e => set('ubicacionTipo', e.target.value)}>
+                  {['Sede', 'Domicilio', 'Venue externo'].map(u => <option key={u} value={u}>{u}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Ciudad</label>
+                <input className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary" value={form.ciudad} onChange={e => set('ciudad', e.target.value)} placeholder="Ciudad" />
+              </div>
+            </div>
+            {form.ubicacionTipo !== 'Sede' && (
+              <input className="mt-2 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary" value={form.direccion} onChange={e => set('direccion', e.target.value)} placeholder="Dirección completa" />
+            )}
+          </div>
+
+          {/* Fecha y Hora */}
+          <div>
+            <p className="text-[10px] uppercase text-gray-500 font-semibold mb-2 tracking-wider">Fecha y Hora</p>
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Fecha *</label>
+                <input type="date" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary" value={form.fecha} onChange={e => set('fecha', e.target.value)} />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Hora inicio</label>
+                <input type="time" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary" value={form.horaInicio} onChange={e => set('horaInicio', e.target.value)} />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Hora fin</label>
+                <input type="time" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary" value={form.horaFin} onChange={e => set('horaFin', e.target.value)} />
+              </div>
+            </div>
+            {costos.durMinutos > 0 && (
+              <p className="text-xs text-gray-500 mt-1">
+                Duración: {Math.floor(costos.durMinutos / 60)}h {costos.durMinutos % 60 > 0 ? `${costos.durMinutos % 60}m` : ''}
+              </p>
+            )}
+          </div>
+
+          {/* Resumen de costos */}
+          {modelosSeleccionadas.length > 0 && costos.durMinutos > 0 && (
+            <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
+              <p className="text-[10px] uppercase font-semibold mb-3 tracking-wider" style={{ color: COLOR_PRIMARY }}>Resumen del Costo</p>
+              <div className="space-y-1.5 text-sm">
+                <div className="flex justify-between text-gray-400">
+                  <span>Modelos ({modelosSeleccionadas.length}) × {costos.durHoras.toFixed(1)}h</span>
+                  <span>${costos.costoModelos.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
+                </div>
+                <div className="flex justify-between text-gray-500 border-t border-white/5 pt-1.5 mt-1.5">
+                  <span>Subtotal</span>
+                  <span>${costos.subtotal.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
+                </div>
+                <div className="flex justify-between text-gray-500">
+                  <span>IVA (19%)</span>
+                  <span>${costos.iva.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
+                </div>
+                <div className="flex justify-between font-bold text-base border-t border-white/10 pt-2 mt-1" style={{ color: COLOR_PRIMARY }}>
+                  <span>TOTAL</span>
+                  <span>${costos.total.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 border-t border-white/10 flex gap-2">
+          <Button variant="outline" className="flex-1 border-white/10 text-gray-400 hover:bg-white/5" onClick={onClose}>Cancelar</Button>
+          <Button className="flex-1 text-black font-semibold" style={{ background: COLOR_PRIMARY }} disabled={guardando} onClick={guardar}>
+            {guardando ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" /> : <Star className="w-3.5 h-3.5 mr-2" />}
+            Guardar Evento
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Componente principal ──────────────────────────────────────────────────────
 
 export function AgendamientosPanel({ rol, userEmail = '', modeloEmail }: AgendamientosPanelProps) {
@@ -149,6 +743,10 @@ export function AgendamientosPanel({ rol, userEmail = '', modeloEmail }: Agendam
   const [filtroVista, setFiltroVista]   = useState<'todos' | 'pendientes'>('todos');
   const [cargando, setCargando]         = useState(false);
   const [paginaHistorial, setPaginaHistorial] = useState(1);
+  const [mostrarNuevoAgendamiento, setMostrarNuevoAgendamiento] = useState(false);
+  const [mostrarCrearEvento, setMostrarCrearEvento] = useState(false);
+
+  const esAdmin = rol === 'admin' || rol === 'owner';
 
   // ── Selección y Ordenamiento ─────────────────────────────────────
   let rawList = [...agendamientos];
@@ -263,6 +861,27 @@ export function AgendamientosPanel({ rol, userEmail = '', modeloEmail }: Agendam
             </div>
 
             <div className="flex items-center gap-2 flex-wrap">
+              {/* Botones crear — solo admin/owner */}
+              {esAdmin && (
+                <>
+                  <Button
+                    size="sm"
+                    className="h-8 px-3 text-xs bg-blue-600 hover:bg-blue-700 text-white border-none"
+                    onClick={() => setMostrarNuevoAgendamiento(true)}
+                  >
+                    <Plus className="w-3 h-3 mr-1" />Nuevo Agendamiento
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="h-8 px-3 text-xs text-black font-semibold border-none"
+                    style={{ background: COLOR_PRIMARY }}
+                    onClick={() => setMostrarCrearEvento(true)}
+                  >
+                    <Star className="w-3 h-3 mr-1" />Crear Evento
+                  </Button>
+                </>
+              )}
+
               {/* Vista (no para modelo) */}
               {rol !== 'modelo' && (
                 <Select value={filtroVista} onValueChange={(v) => setFiltroVista(v as any)}>
@@ -415,6 +1034,22 @@ export function AgendamientosPanel({ rol, userEmail = '', modeloEmail }: Agendam
           )}
 
         </div>
+      )}
+
+      {/* Modales */}
+      {mostrarNuevoAgendamiento && (
+        <NuevoAgendamientoModal
+          userEmail={userEmail}
+          onClose={() => setMostrarNuevoAgendamiento(false)}
+          onCreado={handleRecargar}
+        />
+      )}
+      {mostrarCrearEvento && (
+        <CrearEventoModal
+          userEmail={userEmail}
+          onClose={() => setMostrarCrearEvento(false)}
+          onCreado={handleRecargar}
+        />
       )}
     </div>
   );

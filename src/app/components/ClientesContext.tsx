@@ -69,6 +69,12 @@ export interface Cliente {
   bloqueadoPor?: string;
   multasPendientes?: number;
   totalNoShows?: number;
+  // ── Nuevas columnas de estadísticas ─────────────────────────────────────────
+  total_visitas?: number;
+  total_gastado_col?: number;
+  ultimo_agendamiento?: string;
+  es_vip?: boolean;
+  como_nos_conocio?: string;
 }
 
 interface ClientesContextType {
@@ -122,6 +128,11 @@ function dbRowToCliente(row: any): Cliente {
     bloqueadoPor: row.bloqueado_por ?? row.bloqueadoPor,
     multasPendientes: row.multas_pendientes ?? row.multasPendientes ?? 0,
     totalNoShows: row.total_no_shows ?? row.totalNoShows ?? 0,
+    total_visitas: row.total_visitas ?? 0,
+    total_gastado_col: row.total_gastado ?? 0,
+    ultimo_agendamiento: row.ultimo_agendamiento ?? undefined,
+    es_vip: row.es_vip ?? false,
+    como_nos_conocio: row.como_nos_conocio ?? undefined,
   };
 }
 
@@ -148,6 +159,11 @@ function clienteToDbRow(cliente: Partial<Cliente> & { password?: string }): Reco
   if (cliente.bloqueadoPor !== undefined) row.bloqueado_por = cliente.bloqueadoPor;
   if (cliente.multasPendientes !== undefined) row.multas_pendientes = cliente.multasPendientes;
   if (cliente.totalNoShows !== undefined) row.total_no_shows = cliente.totalNoShows;
+  if (cliente.total_visitas !== undefined) row.total_visitas = cliente.total_visitas;
+  if (cliente.total_gastado_col !== undefined) row.total_gastado = cliente.total_gastado_col;
+  if (cliente.ultimo_agendamiento !== undefined) row.ultimo_agendamiento = cliente.ultimo_agendamiento;
+  if (cliente.es_vip !== undefined) row.es_vip = cliente.es_vip;
+  if (cliente.como_nos_conocio !== undefined) row.como_nos_conocio = cliente.como_nos_conocio;
   return row;
 }
 
@@ -198,7 +214,8 @@ export function ClientesProvider({ children }: { children: ReactNode }) {
       bloqueado: false,
     };
     // No guardar password en la tabla directamente
-    delete dbRow.password;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    delete (dbRow as any).password;
 
     const { data, error } = await supabase
       .from('clientes')

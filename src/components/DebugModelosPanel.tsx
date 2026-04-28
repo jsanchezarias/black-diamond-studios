@@ -21,7 +21,7 @@ interface Modelo {
 interface DebugResponse {
   success: boolean;
   total: number;
-  porEstado: {
+  porEstado?: {
     activo: number;
     inactivo: number;
     archivado: number;

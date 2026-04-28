@@ -1,5 +1,16 @@
 import { MetricasGenerales, ReporteFinanciero, ModeloMetrica, ClienteMetrica } from './AnalyticsContext';
 
+// ==================== SEGURIDAD: HTML ESCAPING ====================
+function escHtml(str: unknown): string {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+}
+
 // ==================== EXPORTACIÓN A CSV/EXCEL ====================
 
 export function exportarCSV(datos: any[], nombreArchivo: string) {
@@ -371,7 +382,7 @@ export function generarReporteHTML(
     <!-- Header -->
     <div class="header">
       <h1>💎 Black Diamond App</h1>
-      <p>Reporte de Analytics | ${reporte.fechaInicio} - ${reporte.fechaFin}</p>
+      <p>Reporte de Analytics | ${escHtml(reporte.fechaInicio)} - ${escHtml(reporte.fechaFin)}</p>
       <p style="margin-top: 10px; font-size: 14px;">Generado: ${fechaGeneracion}</p>
     </div>
 
@@ -448,7 +459,7 @@ export function generarReporteHTML(
           ${topModelos.slice(0, 10).map((modelo, idx) => `
             <tr>
               <td><strong>${idx + 1}</strong></td>
-              <td>${modelo.modeloNombre}</td>
+              <td>${escHtml(modelo.modeloNombre)}</td>
               <td>${modelo.serviciosCompletados}</td>
               <td style="color: #D4AF37;">$${(modelo.ingresosTotales / 1000000).toFixed(2)}M</td>
               <td>$${(modelo.ingresosPromedioPorServicio / 1000).toFixed(0)}k</td>
@@ -476,25 +487,24 @@ export function generarReporteHTML(
           </tr>
         </thead>
         <tbody>
-          ${topClientes.slice(0, 10).map((cliente, idx) => `
+          ${topClientes.slice(0, 10).map((cliente, idx) => {
+            const cat = ['vip','frecuente','nuevo','inactivo'].includes(cliente.categoriaCliente) ? cliente.categoriaCliente : 'nuevo';
+            const badgeClass = cat === 'vip' ? 'badge-success' : cat === 'frecuente' ? 'badge-warning' : 'badge-danger';
+            return `
             <tr>
               <td><strong>${idx + 1}</strong></td>
-              <td>${cliente.clienteNombre}</td>
+              <td>${escHtml(cliente.clienteNombre)}</td>
               <td>
-                <span class="badge ${
-                  cliente.categoriaCliente === 'vip' ? 'badge-success' :
-                  cliente.categoriaCliente === 'frecuente' ? 'badge-warning' :
-                  'badge-danger'
-                }">
-                  ${cliente.categoriaCliente.toUpperCase()}
+                <span class="badge ${badgeClass}">
+                  ${escHtml(cat.toUpperCase())}
                 </span>
               </td>
               <td>${cliente.totalServicios}</td>
               <td style="color: #D4AF37;">$${(cliente.totalGastado / 1000000).toFixed(2)}M</td>
               <td>$${(cliente.gastoPromedioPorServicio / 1000).toFixed(0)}k</td>
-              <td>${cliente.ultimaVisita}</td>
+              <td>${escHtml(cliente.ultimaVisita)}</td>
             </tr>
-          `).join('')}
+          `;}).join('')}
         </tbody>
       </table>
     </div>

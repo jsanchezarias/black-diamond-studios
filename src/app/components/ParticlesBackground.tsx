@@ -111,7 +111,6 @@ export function ParticlesBackground({
     ctx.fillStyle = radial;
     ctx.fillRect(0, 0, w, h);
 
-    // Segundo blob de color en esquina
     const radial2 = ctx.createRadialGradient(w * 0.85, h * 0.15, 0, w * 0.85, h * 0.15, w * 0.3);
     radial2.addColorStop(0, 'rgba(184,148,31,0.03)');
     radial2.addColorStop(1, 'rgba(0,0,0,0)');
@@ -158,14 +157,12 @@ export function ParticlesBackground({
       timeRef.current = ts;
       ctx.clearRect(0, 0, w, h);
 
-      // Nebula layer
       if (showNebula) drawNebula(ctx, w, h, ts);
 
       const particles = particlesRef.current;
       const mx = mouseRef.current.x;
       const my = mouseRef.current.y;
 
-      // Draw connections
       if (showConnections) {
         ctx.save();
         for (let i = 0; i < particles.length; i++) {
@@ -188,11 +185,9 @@ export function ParticlesBackground({
         ctx.restore();
       }
 
-      // Update & draw particles
       for (let i = 0; i < particles.length; i++) {
         const p = particles[i];
 
-        // Mouse repulsion
         const dx = p.x - mx;
         const dy = p.y - my;
         const dist = Math.sqrt(dx * dx + dy * dy);
@@ -202,7 +197,6 @@ export function ParticlesBackground({
           p.vy += (dy / dist) * force * 0.04;
         }
 
-        // Damping
         p.vx *= 0.99;
         p.vy *= 0.99;
 
@@ -211,11 +205,9 @@ export function ParticlesBackground({
         p.rotation += p.rotationSpeed;
         p.life++;
 
-        // Opacity breathing
         p.opacity += p.opacitySpeed;
         if (p.opacity > 0.8 || p.opacity < 0.05) p.opacitySpeed *= -1;
 
-        // Fade in/out by life
         const lifeRatio = p.life / p.maxLife;
         const lifeFade = lifeRatio < 0.1 ? lifeRatio / 0.1
           : lifeRatio > 0.85 ? (1 - lifeRatio) / 0.15
@@ -223,7 +215,6 @@ export function ParticlesBackground({
 
         const finalOpacity = p.opacity * lifeFade;
 
-        // Wrap / respawn
         if (
           p.life > p.maxLife ||
           p.x < -20 || p.x > w + 20 ||
@@ -237,7 +228,6 @@ export function ParticlesBackground({
         ctx.globalAlpha = Math.max(0, Math.min(1, finalOpacity));
 
         if (p.type === 'circle') {
-          // Glow for brighter particles
           if (p.opacity > 0.45) {
             const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.radius * 3);
             glow.addColorStop(0, p.color.replace(')', ', 0.3)').replace('rgb', 'rgba'));
@@ -258,7 +248,6 @@ export function ParticlesBackground({
           drawDiamond(ctx, p.x, p.y, p.radius, p.rotation);
           ctx.fill();
         } else {
-          // Spark: cross shape
           ctx.strokeStyle = p.color;
           ctx.lineWidth = 0.8;
           ctx.shadowColor = p.color;

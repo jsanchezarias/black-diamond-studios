@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
@@ -375,12 +376,12 @@ export function TerminalChatProgramador({ userId, userEmail }: TerminalChatProgr
     if (!file || !conversacionActiva || !programadorChatId) return;
 
     if (!file.type.startsWith('image/')) {
-      alert('Por favor selecciona una imagen válida');
+      toast.error('Por favor selecciona una imagen válida');
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      alert('La imagen no puede superar 5MB');
+      toast.error('La imagen no puede superar 5MB');
       return;
     }
 
@@ -397,7 +398,7 @@ export function TerminalChatProgramador({ userId, userEmail }: TerminalChatProgr
 
       if (uploadError) {
         if (process.env.NODE_ENV === 'development') console.error('Error subiendo imagen:', uploadError);
-        alert('Error al subir la imagen');
+        toast.error('Error al subir la imagen');
         return;
       }
 
@@ -418,7 +419,7 @@ export function TerminalChatProgramador({ userId, userEmail }: TerminalChatProgr
 
       if (messageError) {
         if (process.env.NODE_ENV === 'development') console.error('Error enviando mensaje con imagen:', messageError);
-        alert('Error al enviar la imagen');
+        toast.error('Error al enviar la imagen');
         return;
       }
 
@@ -426,7 +427,7 @@ export function TerminalChatProgramador({ userId, userEmail }: TerminalChatProgr
       await loadConversaciones();
     } catch (err) {
       if (process.env.NODE_ENV === 'development') console.error('Error completo:', err);
-      alert('Error al procesar la imagen');
+      toast.error('Error al procesar la imagen');
     } finally {
       setUploadingImage(false);
       if (fileInputRef.current) {
@@ -453,7 +454,7 @@ export function TerminalChatProgramador({ userId, userEmail }: TerminalChatProgr
 
       if (error) {
         if (process.env.NODE_ENV === 'development') console.error('❌ Error enviando mensaje:', error);
-        alert('Error al enviar mensaje');
+        toast.error('Error al enviar mensaje');
         return;
       }
 
@@ -462,7 +463,7 @@ export function TerminalChatProgramador({ userId, userEmail }: TerminalChatProgr
       await loadConversaciones();
     } catch (err) {
       if (process.env.NODE_ENV === 'development') console.error('❌ Error completo:', err);
-      alert('Error al enviar mensaje');
+      toast.error('Error al enviar mensaje');
     }
   };
 
@@ -708,7 +709,7 @@ export function TerminalChatProgramador({ userId, userEmail }: TerminalChatProgr
                               </span>
                             </div>
                             <div className="flex items-center gap-1 flex-shrink-0">
-                              {tieneNoLeidos > 0 && (
+                              {tieneNoLeidos && (
                                 <Badge className="bg-primary/90 text-primary-foreground text-[9px] sm:text-[10px] px-1 sm:px-1.5 min-w-[16px] sm:min-w-[18px] h-3.5 sm:h-4 flex items-center justify-center font-light">
                                   {conv.mensajesNoLeidos}
                                 </Badge>

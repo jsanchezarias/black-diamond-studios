@@ -34,6 +34,7 @@ import { useServicios } from './ServiciosContext';
 import { usePagos } from './PagosContext';
 import { useInventory } from './InventoryContext';
 import { useGastos } from './GastosContext';
+import { useAgendamientos } from './AgendamientosContext';
 import { toast } from 'sonner';
 // Lazy loading de paneles — solo se cargan cuando se activa la pestaña correspondiente
 const AsistenciaPanel = lazy(() => import('./AsistenciaPanel').then(m => ({ default: m.AsistenciaPanel })));
@@ -112,6 +113,7 @@ export function AdminDashboard({ accessToken, userId, userEmail = '', onLogout }
   }
 
   const { obtenerAdelantosPendientes } = pagosCtx;
+  const { getAgendamientosPendientesAprobacion } = useAgendamientos();
   const { modelos = [], modelosArchivadas = [] } = modelosCtx;
   const { servicios = [] } = serviciosCtx;
   const { inventario = [] } = inventoryCtx;
@@ -229,6 +231,7 @@ export function AdminDashboard({ accessToken, userId, userEmail = '', onLogout }
 
   const moduloSeleccionado = modulos.find(m => m.id === moduloActivo);
   const adelantosPendientes = obtenerAdelantosPendientes().length;
+  const agendamientosPendientes = getAgendamientosPendientesAprobacion().length;
 
   // Estadísticas del sistema
   const globalStats = {
@@ -433,6 +436,11 @@ export function AdminDashboard({ accessToken, userId, userEmail = '', onLogout }
                     {adelantosPendientes} pendientes
                   </Badge>
                 )}
+                {moduloActivo === 'agendamientos' && agendamientosPendientes > 0 && (
+                  <Badge className="bg-yellow-500 text-black text-xs px-2 py-0.5 flex-shrink-0">
+                    {agendamientosPendientes} pendientes
+                  </Badge>
+                )}
               </div>
             )}
           </div>
@@ -507,24 +515,37 @@ export function AdminDashboard({ accessToken, userId, userEmail = '', onLogout }
                         className="bg-secondary rounded-lg overflow-hidden border border-border/50 hover:border-primary/30 transition-all"
                       >
                         <div className="aspect-square overflow-hidden">
-                          <img 
-                            src={modelo.fotoPerfil} 
+                          <img
+                            src={modelo.fotoPerfil}
                             alt={modelo.nombre}
                             className="w-full h-full object-cover"
+                            loading="lazy"
+                            width={300}
+                            height={300}
                           />
                         </div>
                         <div className="p-4 space-y-3">
                           <div>
                             <h3 className="font-medium text-lg">{modelo.nombreArtistico || modelo.nombre}</h3>
-                            <div className="flex items-center gap-2 mt-1">
+                            <div className="flex items-center gap-2 mt-1 flex-wrap">
                               <Badge variant="outline" className="text-xs">
                                 {modelo.edad} años
                               </Badge>
-                              <Badge 
+                              <Badge
                                 className={modelo.activa ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'bg-gray-500/20 text-gray-400 border-gray-500/30'}
                               >
                                 {modelo.activa ? 'Activa' : 'Inactiva'}
                               </Badge>
+                              {/* Document status badge */}
+                              {modelo.documentoFrente && modelo.documentoReverso ? (
+                                modelo.documento_verificado ? (
+                                  <Badge className="text-xs bg-green-500/10 text-green-400 border-green-500/30">✅ Docs verificados</Badge>
+                                ) : (
+                                  <Badge className="text-xs bg-blue-500/10 text-blue-400 border-blue-500/30">📄 Docs cargados</Badge>
+                                )
+                              ) : (
+                                <Badge className="text-xs bg-yellow-500/10 text-yellow-400 border-yellow-500/30">⚠️ Docs pendientes</Badge>
+                              )}
                             </div>
                           </div>
                           
@@ -630,7 +651,7 @@ export function AdminDashboard({ accessToken, userId, userEmail = '', onLogout }
               <FinanzasPanel serviciosFinalizados={serviciosFinalizados} />
             </TabsContent>
             <TabsContent value="gastos">
-              <GastosOperativosPanel userEmail={userId} />
+              <GastosOperativosPanel userEmail={userEmail} />
             </TabsContent>
           </Tabs>
         )}
@@ -645,7 +666,7 @@ export function AdminDashboard({ accessToken, userId, userEmail = '', onLogout }
             <TabsContent value="solicitudes">
               <div className="space-y-4">
                 {/* Panel de Solicitudes de Entrada */}
-                <SolicitudesEntradaPanel userEmail={userId} />
+                <SolicitudesEntradaPanel userEmail={userEmail} />
 
                 {/* Estadísticas de Operaciones */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -717,7 +738,7 @@ export function AdminDashboard({ accessToken, userId, userEmail = '', onLogout }
               <ConfiguracionChatPanel />
             </TabsContent>
             <TabsContent value="moderador">
-              <ChatModeratorPanel />
+              <ChatModeratorPanel userEmail={userEmail} />
             </TabsContent>
           </Tabs>
         )}

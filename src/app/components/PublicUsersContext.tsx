@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useRef, useCallback } from 'react';
+import { toast } from 'sonner';
 import { flushSync } from 'react-dom';
 import { supabase, projectId, publicAnonKey } from '../../utils/supabase/info'; // ✅ Corregido: ruta correcta
 
@@ -737,7 +738,7 @@ export function PublicUsersProvider({ children }: { children: ReactNode }) {
         if (process.env.NODE_ENV === 'development') console.error('❌ Error enviando mensaje:', error);
         // Remover mensaje temporal en caso de error
         setMessages(prev => prev.filter(m => m.id !== tempMessage.id));
-        alert(`Error al enviar mensaje: ${error.message}`);
+        toast.error(`Error al enviar mensaje: ${error.message}`);
         return;
       }
       
@@ -756,7 +757,7 @@ export function PublicUsersProvider({ children }: { children: ReactNode }) {
       // Remover mensaje temporal
       setMessages(prev => prev.filter(m => m.id !== tempMessage.id));
       
-      alert(`❌ Error: ${error.message || 'Error desconocido'}\n\n💡 Intenta de nuevo.`);
+      toast.error(error.message || 'Error desconocido al enviar mensaje');
     }
   };
 

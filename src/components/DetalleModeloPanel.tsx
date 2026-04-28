@@ -29,18 +29,18 @@ interface DetalleModeloPanelProps {
 }
 
 export function DetalleModeloPanel({ modelo, onClose, onEdit }: DetalleModeloPanelProps) {
-  const { serviciosActivos, serviciosFinalizados } = useServicios();
+  const { servicios, serviciosFinalizados } = useServicios();
   const { multas, obtenerTotalMultasPendientes } = useMultas();
   const { adelantos, obtenerAdelantosPendientes } = usePagos();
   const { archivarModelo } = useModelos();
   const [mostrarArchivarDialog, setMostrarArchivarDialog] = useState(false);
   const [motivoArchivado, setMotivoArchivado] = useState('');
 
-  // Filtrar datos de esta modelo
-  const serviciosModelo = serviciosFinalizados.filter(s => s.modeloId === modelo.id);
+  // Filtrar datos de esta modelo por email
+  const serviciosModelo = serviciosFinalizados.filter(s => s.modeloEmail === modelo.email);
   const multasModelo = multas.filter(m => m.modeloId === modelo.id);
-  const adelantosModelo = adelantos.filter(a => a.modeloId === modelo.id);
-  const servicioActivo = serviciosActivos.find(s => s.modeloId === modelo.id);
+  const adelantosModelo = adelantos.filter(a => a.modeloEmail === modelo.email);
+  const servicioActivo = servicios.find(s => s.modeloEmail === modelo.email && s.estadoPago === 'pendiente');
 
   // Calcular estadísticas
   const totalServicios = serviciosModelo.length;
@@ -280,9 +280,9 @@ export function DetalleModeloPanel({ modelo, onClose, onEdit }: DetalleModeloPan
                               <div className="flex items-center gap-3">
                                 <Badge variant="outline">{servicio.tipoServicio}</Badge>
                                 <Badge variant="outline">{servicio.tiempoServicio}</Badge>
-                                {servicio.adicionales && servicio.adicionales.length > 0 && (
+                                {servicio.adicionalesExtra && servicio.adicionalesExtra.length > 0 && (
                                   <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30">
-                                    +{servicio.adicionales.length} adicionales
+                                    +{servicio.adicionalesExtra.length} adicionales
                                   </Badge>
                                 )}
                               </div>
@@ -525,40 +525,6 @@ export function DetalleModeloPanel({ modelo, onClose, onEdit }: DetalleModeloPan
 
             {/* Documentos */}
             <TabsContent value="documentos" className="space-y-4 mt-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base sm:text-lg">Documento Identidad - Frente</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="aspect-[16/10] rounded-lg overflow-hidden border-2 border-primary/30">
-                      <img 
-                        src={modelo.documentoFrente} 
-                        alt="Documento Frente"
-                        className="w-full h-full object-cover cursor-default"
-                        onClick={() => window.open(modelo.documentoFrente, '_blank')}
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base sm:text-lg">Documento Identidad - Reverso</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="aspect-[16/10] rounded-lg overflow-hidden border-2 border-primary/30">
-                      <img 
-                        src={modelo.documentoReverso} 
-                        alt="Documento Reverso"
-                        className="w-full h-full object-cover cursor-default"
-                        onClick={() => window.open(modelo.documentoReverso, '_blank')}
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base sm:text-lg">Información Personal</CardTitle>

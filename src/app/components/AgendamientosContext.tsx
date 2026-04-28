@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '../../utils/supabase/info';
 import { configurarVerificacionPeriodica, AgendamientoParaRecordatorio } from './NotificacionesRecordatorios';
+import { notificarNuevoAgendamiento, notificarAgendamientoConfirmado } from './NotificacionesHelpers';
 
 export interface Agendamiento {
   id: string;
@@ -28,6 +29,7 @@ export interface Agendamiento {
   comprobantePago?: string;
   tarifaNombre?: string;
   tarifaDescripcion?: string;
+  clienteRefId?: string;
 }
 
 export const formatearFecha = (fecha: string) => {
@@ -69,7 +71,7 @@ function rowToAgendamiento(row: any): Agendamiento {
     clienteId: row.cliente_id ?? row.clienteId ?? '',
     clienteNombre: row.cliente_nombre ?? row.clienteNombre ?? (row.clientes?.nombre ?? ''),
     clienteTelefono: row.cliente_telefono ?? row.clienteTelefono ?? (row.clientes?.telefono ?? ''),
-    fecha: row.fecha ?? '',
+    fecha: (row.fecha ? row.fecha.split('T')[0].split(' ')[0] : ''),
     hora: row.hora ?? '',
     duracionMinutos: row.duracion_minutos ?? row.duracion ?? row.duracionMinutos ?? 60,
     tipoServicio: row.tipo_servicio ?? row.tipoServicio ?? 'sede',
@@ -88,6 +90,7 @@ function rowToAgendamiento(row: any): Agendamiento {
     comprobantePago: row.comprobante_pago ?? row.comprobantePago,
     tarifaNombre: row.tarifa_nombre ?? row.tarifaNombre ?? row.servicio,
     tarifaDescripcion: row.tarifa_descripcion ?? row.tarifaDescripcion,
+    clienteRefId: row.cliente_ref_id ?? undefined,
   };
 }
 
@@ -123,6 +126,7 @@ function agendamientoToRow(a: Partial<Agendamiento>): Record<string, any> {
   if (a.comprobantePago !== undefined) row.comprobante_pago = a.comprobantePago;
   if (a.tarifaNombre !== undefined) row.tarifa_nombre = a.tarifaNombre;
   if (a.tarifaDescripcion !== undefined) row.tarifa_descripcion = a.tarifaDescripcion;
+  if (a.clienteRefId !== undefined) row.cliente_ref_id = a.clienteRefId;
   // ✅ Columna obligatoria: siempre debe tener valor (fallback en cadena)
   row.servicio = a.tarifaNombre ?? a.tipoServicio ?? 'Servicio general';
   return row;
@@ -155,7 +159,7 @@ export function AgendamientosProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     cargarAgendamientos();
 
-    // ✅ REALTIME: recargar agendamientos ante cualquier cambio con ordenamiento defensivo
+    // ✅ REALTIME: recargar agendamientos ante cualquier cambio (últimos 90 días)
     const channel = supabase
       .channel('agendamientos-rt')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'agendamientos' }, (payload) => {
@@ -189,12 +193,16 @@ export function AgendamientosProvider({ children }: { children: ReactNode }) {
 
   const cargarAgendamientos = async () => {
     try {
+      // Cargar agendamientos de los últimos 90 días y futuros
+      const fechaLimite = new Date();
+      fechaLimite.setDate(fechaLimite.getDate() - 90);
       const { data, error } = await supabase
         .from('agendamientos')
         .select('*')
+        .gte('fecha', fechaLimite.toISOString().split('T')[0])
         .order('fecha', { ascending: true })
         .order('hora', { ascending: true })
-        .limit(100);
+        .limit(500);
 
       if (error) {
         if (process.env.NODE_ENV === 'development') console.error('❌ Error cargando agendamientos:', error.message);
@@ -234,6 +242,20 @@ export function AgendamientosProvider({ children }: { children: ReactNode }) {
           return fechaA.getTime() - fechaB.getTime();
         });
       });
+
+      // 🔔 Notificar a la modelo sobre el nuevo agendamiento
+      if (nuevo.modeloEmail) {
+        notificarNuevoAgendamiento({
+          modeloEmail: nuevo.modeloEmail,
+          modeloNombre: nuevo.modeloNombre,
+          clienteNombre: nuevo.clienteNombre,
+          fecha: nuevo.fecha,
+          hora: nuevo.hora,
+          duracion: nuevo.duracionMinutos,
+          tipoServicio: nuevo.tipoServicio,
+          agendamientoId: nuevo.id,
+        }).catch(() => { /* non-critical */ });
+      }
 
       return { success: true, data: nuevo };
     } catch (error) {
@@ -350,6 +372,17 @@ export function AgendamientosProvider({ children }: { children: ReactNode }) {
       estado: 'aprobado',
       notas: `Aprobado por ${aprobadoPor} el ${new Date().toLocaleString('es-CO')}`,
     });
+
+    // 🔔 Notificar a la modelo que su agendamiento fue aprobado
+    const ag = agendamientos.find(a => a.id === id);
+    if (ag?.modeloEmail) {
+      notificarAgendamientoConfirmado({
+        modeloEmail: ag.modeloEmail,
+        clienteNombre: ag.clienteNombre,
+        fecha: ag.fecha,
+        hora: ag.hora,
+      }).catch(() => { /* non-critical */ });
+    }
   };
 
   const rechazarAgendamiento = async (id: string, motivo: string, rechazadoPor: string) => {
@@ -369,7 +402,7 @@ export function AgendamientosProvider({ children }: { children: ReactNode }) {
     const hoy = new Date().toISOString().split('T')[0];
     return agendamientos
       .filter(a => a.fecha === hoy)
-      .sort((a, b) => a.hora.localeCompare(b.hora));
+      .sort((a, b) => (a.hora ?? '').localeCompare(b.hora ?? ''));
   };
 
   const getAgendamientosPendientesAprobacion = (): Agendamiento[] => {

@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { X, DollarSign, Gem, Heart, Star, Zap, Crown, Sparkles, CreditCard, Building2 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent } from '../../components/ui/card';
@@ -43,7 +44,7 @@ export function TipModal({ isOpen, onClose, onSendTip, modelName, userPhone }: T
     const amount = selectedAmount || parseInt(customAmount);
     
     if (!amount || amount <= 0) {
-      alert('Por favor selecciona o ingresa un monto válido');
+      toast.error('Por favor selecciona o ingresa un monto válido');
       return;
     }
 

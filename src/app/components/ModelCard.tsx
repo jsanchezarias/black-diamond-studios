@@ -34,7 +34,7 @@ interface ModelData {
 
 interface ModelCardProps {
   model: ModelData;
-  onContact: () => void;
+  onContact: (model: ModelData, service?: Service, location?: 'sede' | 'domicilio', price?: string) => void;
 }
 
 export function ModelCard({ model, onContact }: ModelCardProps) {
@@ -101,33 +101,16 @@ export function ModelCard({ model, onContact }: ModelCardProps) {
     return () => window.removeEventListener('resize', updateColumns);
   }, [model.gallery.length]);
 
-  // Función para abrir Telegram con mensaje personalizado
+  // Función para solicitar reserva desde el sistema
   const handleReservar = () => {
-    let mensaje = '';
-    
     if (selectedService) {
-      // Mensaje con servicio seleccionado
-      // Si la modelo NO hace domicilio, siempre usar precio de sede y ubicación en sede
       const precioSeleccionado = model.domicilio 
         ? (selectedLocation === 'sede' ? selectedService.price : (selectedService.priceHome || selectedService.price))
         : selectedService.price;
-      const ubicacion = model.domicilio 
-        ? (selectedLocation === 'sede' ? 'En Sede' : 'A Domicilio')
-        : 'En Sede';
-      
-      mensaje = `Hola! 👋\\n\\n` +
-                `Quiero reservar con *${model.name}*\\n\\n` +
-                `📋 *Servicio:* ${selectedService.name}\\n` +
-                `⏱️ *Duración:* ${selectedService.duration}\\n` +
-                `📍 *Ubicación:* ${ubicacion}\\n` +
-                `💰 *Tarifa:* $${precioSeleccionado}\\n\\n` +
-                `¿Cómo puedo confirmar la reserva?`;
+      onContact(model, selectedService, selectedLocation, precioSeleccionado);
     } else {
-      // Mensaje sin servicio seleccionado
-      mensaje = `Hola! 👋\\n\\nQuiero reservar con *${model.name}*\\n\\n¿Podrían enviarme más información sobre disponibilidad y tarifas?`;
+      onContact(model);
     }
-    
-    window.open(`https://t.me/BlackDiamondScorts?text=${encodeURIComponent(mensaje)}`, '_blank');
   };
 
   // Manejar navegación con teclado
@@ -188,156 +171,105 @@ export function ModelCard({ model, onContact }: ModelCardProps) {
           <div className="flex flex-col">
             {/* Cabecera: Foto de perfil + Info básica */}
             <div className="w-full flex-shrink-0 flex flex-col border-b border-primary/10">
-              {/* Header con foto de perfil */}
+              {/* Header tipo Carrusel Full Width */}
               <div
                 ref={headerRef}
-                className="relative bg-gradient-to-br from-black to-neutral-950 p-6 backdrop-blur-sm flex-shrink-0 overflow-hidden"
+                className="relative w-full h-80 sm:h-96 md:h-[400px] flex-shrink-0 overflow-hidden group bg-black"
               >
-                <div className="flex items-start gap-5">
-                  {/* Foto de perfil circular */}
-                  <div className="relative flex-shrink-0">
-                    <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-amber-500/30 shadow-lg shadow-amber-500/20 bd-gold-photo-border">
-                      <ImageWithFallback
-                        src={model.photo}
-                        alt={model.name}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    {model.available && (
-                      <div className="absolute bottom-1 right-1 w-7 h-7 bg-amber-400 rounded-full border-4 border-black shadow-lg shadow-amber-400/60"></div>
-                    )}
-                  </div>
+                {model.gallery.length > 0 ? (
+                  <>
+                    <img
+                      src={model.gallery[selectedImage]}
+                      alt={model.name}
+                      className="w-full h-full object-cover transition-transform duration-500 ease-out cursor-pointer"
+                      onClick={() => setShowFullscreen(true)}
+                    />
+                    
+                    {/* Flechas del Carrusel */}
+                    {model.gallery.length > 1 && (
+                      <>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedImage((prev) => (prev > 0 ? prev - 1 : model.gallery.length - 1));
+                          }}
+                          className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/40 border border-white/10 text-white flex items-center justify-center backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/60 shadow-lg"
+                        >
+                          <ChevronLeft className="w-6 h-6" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedImage((prev) => (prev < model.gallery.length - 1 ? prev + 1 : 0));
+                          }}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/40 border border-white/10 text-white flex items-center justify-center backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/60 shadow-lg"
+                        >
+                          <ChevronRight className="w-6 h-6" />
+                        </button>
 
-                  {/* Info básica */}
-                  <div className="flex-1 pt-1">
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <h3 className="text-3xl font-bold mb-1 bd-gold-shimmer" style={{ fontFamily: 'Playfair Display, serif' }}>
-                          {model.name}
-                        </h3>
-                        <p className="text-base text-muted-foreground">{model.age} años</p>
-                      </div>
-                      <Badge className="bg-primary/10 text-primary border border-primary/30 shadow-sm hover:shadow-md transition-shadow">
-                        <Star className="w-3 h-3 mr-1 fill-primary" />
+                        {/* Puntos (Dots) */}
+                        <div className="absolute bottom-24 left-0 right-0 flex justify-center gap-1.5 z-10">
+                          {model.gallery.map((_, i) => (
+                            <div
+                              key={i}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedImage(i);
+                              }}
+                              className={`h-1.5 rounded-full cursor-pointer transition-all duration-300 shadow-sm ${
+                                i === selectedImage
+                                  ? 'w-6 bg-amber-400'
+                                  : 'w-1.5 bg-white/50 hover:bg-white/80'
+                              }`}
+                            />
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center bg-neutral-900">
+                    <ImageWithFallback
+                      src={model.photo}
+                      alt={model.name}
+                      className="w-full h-full object-cover opacity-80"
+                    />
+                  </div>
+                )}
+
+                {/* Overlay Degradado y Status */}
+                <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-black via-black/80 to-transparent pointer-events-none" />
+                <div className="absolute bottom-0 left-0 right-0 p-5 z-10 flex justify-between items-end">
+                  <div className="flex-1 pointer-events-auto">
+                    <div className="flex items-center gap-3 mb-1">
+                      <h3 className="text-3xl font-bold text-white drop-shadow-md bd-gold-shimmer" style={{ fontFamily: 'Playfair Display, serif' }}>
+                        {model.name}
+                      </h3>
+                      {model.available && (
+                        <span className="flex h-3 w-3 relative">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-2 items-center">
+                      <Badge className="bg-amber-400/20 text-amber-300 border border-amber-400/30 shadow-sm backdrop-blur-sm px-2 py-0.5">
+                        <Star className="w-3 h-3 mr-1 fill-amber-400" />
                         {model.rating}
                       </Badge>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2 mb-3">
-                      <Badge variant="outline" className="border-primary/30 text-xs backdrop-blur-sm">
+                      <Badge variant="outline" className="border-white/20 text-white/90 bg-black/30 backdrop-blur-sm px-2 py-0.5 text-xs">
                         <MapPin className="w-3 h-3 mr-1" />
                         {model.location}
                       </Badge>
-                      {model.available ? (
-                        <Badge className="bg-green-500/20 text-green-400 border-green-500/30 text-xs shadow-sm">
-                          Disponible Ahora
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="border-muted text-xs">
-                          Ocupada
-                        </Badge>
-                      )}
+                      <span className="text-sm font-medium text-white/80 ml-1">
+                        {model.age} años
+                      </span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Galería - LIMITADA por la altura restante disponible */}
-              <div className="p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-semibold text-sm" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-                    Galería de Fotos
-                  </h4>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowGallery(true)}
-                    className="text-primary hover:text-primary/80 text-xs"
-                  >
-                    Ver todas <ChevronRight className="w-3 h-3 ml-1" />
-                  </Button>
-                </div>
-                
-                {/* Scroll contenedor con altura calculada dinámicamente */}
-                <div 
-                  className="overflow-y-auto pr-1"
-                  style={{
-                    maxHeight: '300px'
-                  }}
-                >
-                  <div 
-                    className="grid gap-2"
-                    style={{
-                      // Grid adaptativo: 3 columnas en desktop, 2 en tablet, 1 en mobile
-                      gridTemplateColumns: model.gallery.length === 1 
-                        ? '1fr' 
-                        : 'repeat(3, 1fr)',
-                      // Auto flow dense para llenar espacios vacíos
-                      gridAutoFlow: 'dense',
-                      gridAutoRows: 'minmax(80px, auto)', // Filas adaptativas
-                    }}
-                  >
-                    {model.gallery.slice(0, 9).map((img, idx) => {
-                      const orientation = imageOrientations[idx] || 'square';
-                      
-                      // Determinar si una foto vertical debe ocupar 2 filas
-                      // (solo si hay suficientes fotos y no es la última)
-                      const shouldSpanTwoRows = orientation === 'vertical' && 
-                                                model.gallery.length > 4 && 
-                                                idx < model.gallery.length - 1;
-                      
-                      return (
-                        <div
-                          key={idx}
-                          className={`rounded-lg overflow-hidden cursor-default shadow-md hover:shadow-xl relative group ${
-                            // Fotos horizontales ocupan 2 columnas
-                            orientation === 'horizontal' && model.gallery.length > 2 
-                              ? 'col-span-2' 
-                              : 'col-span-1'
-                          } ${
-                            // Fotos verticales pueden ocupar 2 filas para llenar espacio
-                            shouldSpanTwoRows ? 'row-span-2' : ''
-                          }`}
-                          onClick={() => {
-                            setSelectedImage(idx);
-                            setShowGallery(true);
-                          }}
-                        >
-                          {/* Imagen con aspect ratio natural según orientación */}
-                          <ImageWithFallback
-                            src={img}
-                            alt={`${model.name} - Foto ${idx + 1}`}
-                            className="w-full h-full object-cover"
-                            style={{
-                              // Aspect ratio natural según orientación
-                              // Para row-span-2, usar h-full para llenar el espacio
-                              aspectRatio: shouldSpanTwoRows 
-                                ? 'auto' 
-                                : orientation === 'horizontal' 
-                                ? '16/9' 
-                                : orientation === 'vertical'
-                                ? '3/4'
-                                : '1/1'
-                            }}
-                          />
-                          {/* Overlay sutil en hover */}
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-2">
-                            <ZoomIn className="w-5 h-5 text-white" />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {/* Hint si hay más fotos */}
-                  {model.gallery.length > 9 && (
-                    <div className="mt-3 text-center">
-                      <p className="text-xs text-muted-foreground">
-                        +{model.gallery.length - 9} fotos más • Click en "Ver todas"
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
+
             </div>
 
             {/* Contenido: Info, Servicios y Tarifas */}

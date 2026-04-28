@@ -31,6 +31,7 @@ const ModeradorDashboard = lazy(() => import('./app/components/ModeradorDashboar
 const ContadorDashboard = lazy(() => import('./app/components/ContadorDashboard').then(m => ({ default: m.ContadorDashboard })));
 const RecepcionistaDashboard = lazy(() => import('./app/components/RecepcionistaDashboard').then(m => ({ default: m.RecepcionistaDashboard })));
 const SupervisorDashboard = lazy(() => import('./app/components/SupervisorDashboard').then(m => ({ default: m.SupervisorDashboard })));
+const ClienteDashboard = lazy(() => import('./app/components/ClienteDashboard').then(m => ({ default: m.ClienteDashboard })));
 
 // ✅ Componente que envuelve todos los providers en un solo lugar
 function AllProvidersWrapper({ children }: { children: React.ReactNode }) {
@@ -424,8 +425,16 @@ export default function App() {
               />
             )}
 
+            {currentUser.role === 'cliente' && (
+              <ClienteDashboard
+                userId={currentUser.userId}
+                userEmail={currentUser.email}
+                onLogout={handleLogout}
+              />
+            )}
+
             {/* Fallback para roles no reconocidos */}
-            {!['programador', 'owner', 'admin', 'modelo', 'moderador', 'contador', 'recepcionista', 'supervisor'].includes(currentUser.role) && (
+            {!['programador', 'owner', 'admin', 'modelo', 'moderador', 'contador', 'recepcionista', 'supervisor', 'cliente'].includes(currentUser.role) && (
               <div className="flex items-center justify-center min-h-screen flex-col gap-4">
                 <h1 className="text-3xl font-bold" style={{ color: '#c9a961' }}>
                   ¡Bienvenido {currentUser.email}!

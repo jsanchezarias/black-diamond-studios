@@ -33,6 +33,9 @@ export function EditarModeloModal({ open, onClose, modelo }: EditarModeloModalPr
     fotoPerfil: '',
     documentoFrente: '',
     documentoReverso: '',
+    documento_tipo: 'cedula',
+    documento_numero: '',
+    documento_verificado: false,
     edad: 21,
     altura: '',
     medidas: '',
@@ -76,8 +79,11 @@ export function EditarModeloModal({ open, onClose, modelo }: EditarModeloModalPr
         email: modelo.email,
         password: modelo.password,
         fotoPerfil: modelo.fotoPerfil,
-        documentoFrente: modelo.documentoFrente,
-        documentoReverso: modelo.documentoReverso,
+        documentoFrente: modelo.documentoFrente || '',
+        documentoReverso: modelo.documentoReverso || '',
+        documento_tipo: modelo.documento_tipo || 'cedula',
+        documento_numero: modelo.documento_numero || '',
+        documento_verificado: modelo.documento_verificado || false,
         edad: modelo.edad || 21,
         altura: modelo.altura || '',
         medidas: modelo.medidas || '',
@@ -346,6 +352,9 @@ export function EditarModeloModal({ open, onClose, modelo }: EditarModeloModalPr
         disponible: formData.disponible,
         domicilio: formData.domicilio, // ✅ NUEVO CAMPO
         politicaTarifa: formData.politicaTarifa, // ✅ NUEVO: Política de tarifa (1, 2, 3)
+        documento_tipo: formData.documento_tipo,
+        documento_numero: formData.documento_numero,
+        documento_verificado: formData.documento_verificado,
       };
 
       // Subir foto de perfil si hay un archivo nuevo
@@ -361,9 +370,36 @@ export function EditarModeloModal({ open, onClose, modelo }: EditarModeloModalPr
         updateData.fotoPerfil = formData.fotoPerfil;
       }
 
-      // ❌ REMOVIDO: Subir documentos (no existen en la tabla)
-      // if (archivoDocumentoFrente) { ... }
-      // if (archivoDocumentoReverso) { ... }
+      // ✅ Subir documentos al bucket 'documentos' (privado)
+      if (archivoDocumentoFrente) {
+        const ext = archivoDocumentoFrente.name.split('.').pop();
+        const fileName = `modelo-${modelo.id}-frente-${Date.now()}.${ext}`;
+        const { supabase: sb } = await import('../utils/supabase/info');
+        const { error: uploadErr } = await sb.storage
+          .from('documentos')
+          .upload(fileName, archivoDocumentoFrente, { cacheControl: '3600', upsert: true });
+        if (!uploadErr) {
+          updateData.documentoFrente = fileName;
+          updateData.documento_fecha_subida = new Date().toISOString();
+        }
+      } else {
+        updateData.documentoFrente = formData.documentoFrente || undefined;
+      }
+
+      if (archivoDocumentoReverso) {
+        const ext = archivoDocumentoReverso.name.split('.').pop();
+        const fileName = `modelo-${modelo.id}-reverso-${Date.now()}.${ext}`;
+        const { supabase: sb } = await import('../utils/supabase/info');
+        const { error: uploadErr } = await sb.storage
+          .from('documentos')
+          .upload(fileName, archivoDocumentoReverso, { cacheControl: '3600', upsert: true });
+        if (!uploadErr) {
+          updateData.documentoReverso = fileName;
+          updateData.documento_fecha_subida = new Date().toISOString();
+        }
+      } else {
+        updateData.documentoReverso = formData.documentoReverso || undefined;
+      }
 
       // Subir fotos adicionales nuevas
       const fotosAdicionalesUrls = [...formData.fotosAdicionales];
@@ -419,6 +455,9 @@ export function EditarModeloModal({ open, onClose, modelo }: EditarModeloModalPr
       fotoPerfil: '',
       documentoFrente: '',
       documentoReverso: '',
+      documento_tipo: 'cedula',
+      documento_numero: '',
+      documento_verificado: false,
       edad: 21,
       altura: '',
       medidas: '',
@@ -952,6 +991,31 @@ export function EditarModeloModal({ open, onClose, modelo }: EditarModeloModalPr
 
             {/* TAB: DOCUMENTOS */}
             <TabsContent value="documentos" className="space-y-4">
+              {/* Tipo y número */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Tipo de documento</Label>
+                  <select
+                    value={formData.documento_tipo}
+                    onChange={e => setFormData(prev => ({ ...prev, documento_tipo: e.target.value }))}
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  >
+                    <option value="cedula">Cédula de Ciudadanía</option>
+                    <option value="pasaporte">Pasaporte</option>
+                    <option value="extranjeria">Cédula de Extranjería</option>
+                  </select>
+                </div>
+                <div>
+                  <Label>Número de documento</Label>
+                  <Input
+                    type="text"
+                    placeholder="Ej: 1234567890"
+                    value={formData.documento_numero}
+                    onChange={e => setFormData(prev => ({ ...prev, documento_numero: e.target.value }))}
+                  />
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 {/* Documento Frente */}
                 <div>
@@ -1013,6 +1077,31 @@ export function EditarModeloModal({ open, onClose, modelo }: EditarModeloModalPr
                   </label>
                 </div>
               </div>
+
+              {/* Estado de verificación */}
+              {(formData.documentoFrente && formData.documentoReverso) && (
+                <div className="flex items-center justify-between p-3 rounded-lg bg-secondary border border-border">
+                  <div className="flex items-center gap-2">
+                    <span>{formData.documento_verificado ? '✅' : '📋'}</span>
+                    <span className="text-sm text-muted-foreground">
+                      {formData.documento_verificado
+                        ? 'Documentos verificados'
+                        : 'Documentos cargados, pendiente verificación'}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, documento_verificado: !prev.documento_verificado }))}
+                    className={`text-xs px-3 py-1 rounded-full border transition-colors ${
+                      formData.documento_verificado
+                        ? 'border-green-500/50 text-green-400 bg-green-500/10'
+                        : 'border-amber-500/50 text-amber-400 bg-amber-500/10 hover:bg-amber-500/20'
+                    }`}
+                  >
+                    {formData.documento_verificado ? 'Verificado ✓' : 'Marcar verificado'}
+                  </button>
+                </div>
+              )}
 
               <div className="bg-yellow-950/20 border border-yellow-500/30 rounded-lg p-4">
                 <div className="flex items-start gap-2">

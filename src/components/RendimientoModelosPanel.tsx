@@ -13,6 +13,7 @@ type PeriodoOption = 'semana' | 'mes' | 'trimestre' | 'año';
 interface RendimientoModelo {
   id: number;
   nombre: string;
+  nombreArtistico?: string;
   fotoPerfil: string;
   totalServicios: number;
   totalIngresos: number;
@@ -149,10 +150,13 @@ export function RendimientoModelosPanel() {
               </div>
               <CardHeader className="pb-3">
                 <div className="flex items-center gap-3">
-                  <img 
-                    src={modelo.fotoPerfil} 
+                  <img
+                    src={modelo.fotoPerfil}
                     alt={modelo.nombreArtistico || modelo.nombre}
                     className="w-16 h-16 rounded-full object-cover border-2 border-primary/30"
+                    loading="lazy"
+                    width={64}
+                    height={64}
                   />
                   <div className="flex-1 min-w-0">
                     <CardTitle className="text-lg truncate">{modelo.nombreArtistico || modelo.nombre}</CardTitle>

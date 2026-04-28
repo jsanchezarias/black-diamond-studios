@@ -132,7 +132,7 @@ export function ModeradorDashboard({ userEmail, onLogout }: ModeradorDashboardPr
           </TabsList>
 
           <TabsContent value="chat" className="mt-0">
-            <ChatModeratorPanel />
+            <ChatModeratorPanel userEmail={userEmail} />
           </TabsContent>
 
           <TabsContent value="notificaciones" className="mt-0">

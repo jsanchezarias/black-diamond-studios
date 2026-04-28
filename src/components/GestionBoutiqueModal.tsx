@@ -6,6 +6,7 @@ import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
 import { useInventory, Producto } from '../app/components/InventoryContext'; // ✅ Importar Producto desde el contexto
+import { supabase } from '../utils/supabase/info';
 
 interface GestionBoutiqueModalProps {
   open: boolean;
@@ -41,29 +42,61 @@ export function GestionBoutiqueModal({ open, onClose, producto, modo }: GestionB
     'Otro',
   ];
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      // Validar tamaño (máximo 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error('La imagen no debe superar los 5MB');
-        return;
-      }
+    if (!file) return;
 
-      // Validar tipo
-      if (!file.type.startsWith('image/')) {
-        toast.error('Solo se permiten archivos de imagen');
-        return;
-      }
+    // Validar tamaño (máximo 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('La imagen no debe superar los 5MB');
+      return;
+    }
 
-      // Convertir a base64 para preview
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64 = reader.result as string;
+    // Validar tipo
+    if (!file.type.startsWith('image/')) {
+      toast.error('Solo se permiten archivos de imagen');
+      return;
+    }
+
+    // Mostrar preview local inmediatamente
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+
+    // Intentar subir a Supabase Storage
+    try {
+      const ext = file.name.split('.').pop();
+      const nombre = `producto-${Date.now()}.${ext}`;
+      const { error } = await supabase.storage
+        .from('fotos-modelos')
+        .upload(nombre, file, { upsert: true });
+
+      if (!error) {
+        const { data } = supabase.storage.from('fotos-modelos').getPublicUrl(nombre);
+        setImagePreview(data.publicUrl);
+        setFormData(prev => ({ ...prev, imagen: data.publicUrl }));
+        toast.success('Foto subida correctamente');
+      } else {
+        // Si falla el storage, usar base64 como fallback
+        const readerFallback = new FileReader();
+        readerFallback.onloadend = () => {
+          const base64 = readerFallback.result as string;
+          setImagePreview(base64);
+          setFormData(prev => ({ ...prev, imagen: base64 }));
+        };
+        readerFallback.readAsDataURL(file);
+      }
+    } catch {
+      // Fallback silencioso a base64
+      const readerFallback = new FileReader();
+      readerFallback.onloadend = () => {
+        const base64 = readerFallback.result as string;
         setImagePreview(base64);
         setFormData(prev => ({ ...prev, imagen: base64 }));
       };
-      reader.readAsDataURL(file);
+      readerFallback.readAsDataURL(file);
     }
   };
 

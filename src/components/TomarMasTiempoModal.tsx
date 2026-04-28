@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { useState } from 'react';
 import { X, Clock, DollarSign, Upload, Image as ImageIcon } from 'lucide-react';
 import { Button } from './ui/button';
@@ -35,18 +36,18 @@ export function TomarMasTiempoModal({ isOpen, onClose, servicioId }: TomarMasTie
     e.preventDefault();
     
     if (!costoAdicional) {
-      alert('Por favor ingresa el costo del tiempo adicional');
+      toast.error('Por favor ingresa el costo del tiempo adicional');
       return;
     }
 
-    agregarTiempoAdicional(servicioId, {
+    agregarTiempoAdicional(String(servicioId), {
       tiempoAdicional,
       costoAdicional: parseFloat(costoAdicional),
       comprobante: comprobante || undefined,
     });
 
     // Mostrar confirmación
-    alert(`✅ Tiempo adicional agregado\n\nTiempo: ${tiempoAdicional}\nCosto: $${parseFloat(costoAdicional).toLocaleString()}\n\nEl costo se agregará al total del servicio.`);
+    toast.success(`✅ Tiempo adicional agregado\n\nTiempo: ${tiempoAdicional}\nCosto: $${parseFloat(costoAdicional).toLocaleString()}\n\nEl costo se agregará al total del servicio.`);
 
     // Reset
     setTiempoAdicional('30 minutos');

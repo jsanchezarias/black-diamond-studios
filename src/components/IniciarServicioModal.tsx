@@ -43,7 +43,7 @@ interface IniciarServicioModalProps {
 }
 
 interface ProductoSeleccionado {
-  id: number;
+  id: string;
   nombre: string;
   precio: number;
   cantidad: number;
@@ -60,7 +60,7 @@ export function IniciarServicioModal({ isOpen, onClose, modeloEmail, modeloNombr
   
   // Tipo de registro: agendamiento programado o walk-in
   const [tipoRegistro, setTipoRegistro] = useState<'agendamiento' | 'walkin'>('agendamiento');
-  const [agendamientoSeleccionado, setAgendamientoSeleccionado] = useState<number | null>(null);
+  const [agendamientoSeleccionado, setAgendamientoSeleccionado] = useState<string | null>(null);
   
   // Estado para cliente encontrado
   const [clienteEncontrado, setClienteEncontrado] = useState<Cliente | null>(null);
@@ -177,12 +177,12 @@ export function IniciarServicioModal({ isOpen, onClose, modeloEmail, modeloNombr
   };
 
   // Quitar producto de la selección
-  const quitarProducto = (id: number) => {
+  const quitarProducto = (id: string) => {
     setProductosSeleccionados(prev => prev.filter(p => p.id !== id));
   };
 
   // Cambiar cantidad de producto
-  const cambiarCantidad = (id: number, cantidad: number) => {
+  const cambiarCantidad = (id: string, cantidad: number) => {
     if (cantidad <= 0) {
       quitarProducto(id);
     } else {
@@ -231,31 +231,33 @@ export function IniciarServicioModal({ isOpen, onClose, modeloEmail, modeloNombr
 
     // Preparar datos de consumo detallado
     const consumosDetallados = productosSeleccionados.map(producto => ({
+      productoId: producto.id,
+      nombre: producto.nombre,
       descripcion: producto.nombre,
-      costo: producto.precio,
+      costo: producto.precio * producto.cantidad,
       cantidad: producto.cantidad,
-      timestamp: new Date(),
     }));
 
-    iniciarServicio({
+    const agendamientoIdStr = tipoRegistro === 'agendamiento' && agendamientoSeleccionado != null
+      ? String(agendamientoSeleccionado)
+      : '';
+    iniciarServicio(agendamientoIdStr, {
       modeloEmail,
       modeloNombre,
-      clienteId,
+      clienteId: clienteId ?? '',
       clienteNombre: formData.clienteNombre,
       clienteTelefono: formData.clienteTelefono,
       clienteEmail: formData.clienteEmail || undefined,
-      agendamientoId: tipoRegistro === 'agendamiento' ? agendamientoSeleccionado : undefined,
-      tipoServicio: formData.tipoServicio,
+      tipoServicio: formData.tipoServicio === 'Sede' ? 'sede' : 'domicilio',
       habitacion: formData.tipoServicio === 'Sede' ? formData.habitacion : undefined,
       tiempoServicio: formData.tiempoServicio,
       costoServicio: parseFloat(formData.costoServicio) || 0,
       metodoPago: formData.metodoPago,
       comprobantePago: comprobantePago || undefined,
-      adicionales: formData.adicionales,
+      adicionales: typeof formData.adicionales === 'string' ? parseFloat(formData.adicionales) || 0 : (formData.adicionales ?? 0),
       costoAdicionales: parseFloat(formData.costoAdicionales) || 0,
-      consumo: '', // Dejar vacío ya que ahora usamos consumosDetallados
-      costoConsumo: 0, // Dejar en 0 ya que está en consumosDetallados
-      consumosDetallados, // Agregar los productos seleccionados
+      costoConsumo: 0,
+      consumosDetallados,
       duracionMinutos: 0,
     });
 
@@ -616,10 +618,13 @@ export function IniciarServicioModal({ isOpen, onClose, modeloEmail, modeloNombr
                       className="group relative bg-card border border-border hover:border-primary/50 rounded-lg overflow-hidden transition-all hover:shadow-lg hover:scale-105"
                     >
                       <div className="aspect-square overflow-hidden">
-                        <img 
-                          src={producto.imagen} 
+                        <img
+                          src={producto.imagen}
                           alt={producto.nombre}
                           className="w-full h-full object-cover"
+                          loading="lazy"
+                          width={120}
+                          height={120}
                         />
                       </div>
                       <div className="p-2 space-y-1">
@@ -646,10 +651,13 @@ export function IniciarServicioModal({ isOpen, onClose, modeloEmail, modeloNombr
                           key={producto.id}
                           className="flex items-center gap-3 p-3 bg-primary/5 border border-primary/20 rounded-lg"
                         >
-                          <img 
-                            src={producto.imagen} 
+                          <img
+                            src={producto.imagen}
                             alt={producto.nombre}
                             className="w-12 h-12 object-cover rounded"
+                            loading="lazy"
+                            width={48}
+                            height={48}
                           />
                           <div className="flex-1 min-w-0">
                             <p className="font-medium text-sm truncate">{producto.nombre}</p>

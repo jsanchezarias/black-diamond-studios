@@ -40,6 +40,8 @@ export function GestionVideos() {
   const [videoEditando, setVideoEditando] = useState<string | null>(null);
   const [videoVisualizando, setVideoVisualizando] = useState<string | null>(null);
   const [videoEliminar, setVideoEliminar] = useState<{id: string, titulo: string} | null>(null);
+  const [editTitulo, setEditTitulo] = useState('');
+  const [editDescripcion, setEditDescripcion] = useState('');
   
   // Estados del formulario
   const [titulo, setTitulo] = useState('');
@@ -103,25 +105,26 @@ export function GestionVideos() {
   // ============================================
   // ✏️ EDITAR VIDEO
   // ============================================
-  const handleEditarVideo = async (videoId: string) => {
+  const handleEditarVideo = (videoId: string) => {
     const video = videos.find(v => v.id === videoId);
     if (!video) return;
-
-    const nuevoTitulo = prompt('Nuevo título:', video.titulo);
-    if (nuevoTitulo && nuevoTitulo.trim()) {
-      await actualizarVideo(videoId, { titulo: nuevoTitulo.trim() });
-    }
+    setEditTitulo(video.titulo);
+    setEditDescripcion(video.descripcion || '');
+    setVideoEditando(videoId);
   };
 
-  const handleEditarDescripcion = async (videoId: string) => {
-    const video = videos.find(v => v.id === videoId);
-    if (!video) return;
-
-    const nuevaDescripcion = prompt('Nueva descripción:', video.descripcion || '');
-    if (nuevaDescripcion !== null) {
-      await actualizarVideo(videoId, { descripcion: nuevaDescripcion.trim() || undefined });
-    }
+  const handleGuardarEdicion = async (videoId: string) => {
+    if (!editTitulo.trim()) { toast.error('El título no puede estar vacío'); return; }
+    await actualizarVideo(videoId, {
+      titulo: editTitulo.trim(),
+      descripcion: editDescripcion.trim() || undefined,
+    });
+    setVideoEditando(null);
+    toast.success('Video actualizado');
   };
+
+  // Keep for backwards compat — not used anymore
+  const handleEditarDescripcion = async (_videoId: string) => {};
 
   // ============================================
   // 🔄 TOGGLE ACTIVO
@@ -449,6 +452,44 @@ export function GestionVideos() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Panel de edición inline */}
+                  <AnimatePresence>
+                    {videoEditando === video.id && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="mt-4 pt-4 border-t border-primary/20 space-y-3"
+                      >
+                        <div className="space-y-1">
+                          <label className="text-xs text-muted-foreground">Título</label>
+                          <input
+                            className="w-full bg-secondary border border-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary"
+                            value={editTitulo}
+                            onChange={e => setEditTitulo(e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs text-muted-foreground">Descripción</label>
+                          <textarea
+                            rows={2}
+                            className="w-full bg-secondary border border-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary resize-none"
+                            value={editDescripcion}
+                            onChange={e => setEditDescripcion(e.target.value)}
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <Button size="sm" className="gap-1" onClick={() => handleGuardarEdicion(video.id)}>
+                            <Save className="w-3.5 h-3.5" /> Guardar
+                          </Button>
+                          <Button size="sm" variant="outline" className="gap-1" onClick={() => setVideoEditando(null)}>
+                            <X className="w-3.5 h-3.5" /> Cancelar
+                          </Button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
                   {/* Vista previa expandida */}
                   <AnimatePresence>

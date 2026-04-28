@@ -350,8 +350,8 @@ export function NotificacionesPanel() {
                       </p>
                     </div>
                     <Switch
-                      checked={preferencias?.notificacionesPush ?? false}
-                      onCheckedChange={(v) => handleActualizarPreferencia('notificacionesPush', v)}
+                      checked={preferencias?.push ?? false}
+                      onCheckedChange={(v) => handleActualizarPreferencia('push', v)}
                     />
                   </div>
 
@@ -365,8 +365,8 @@ export function NotificacionesPanel() {
                       </p>
                     </div>
                     <Switch
-                      checked={preferencias?.notificacionesEmail ?? false}
-                      onCheckedChange={(v) => handleActualizarPreferencia('notificacionesEmail', v)}
+                      checked={preferencias?.email ?? false}
+                      onCheckedChange={(v) => handleActualizarPreferencia('email', v)}
                     />
                   </div>
                 </div>

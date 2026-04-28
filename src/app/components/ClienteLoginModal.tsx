@@ -109,6 +109,14 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
     }
   };
 
+  const normalizarTelefono = (tel: string): string => {
+    const soloDigitos = tel.replace(/[^0-9]/g, '');
+    if (soloDigitos.startsWith('57') && soloDigitos.length >= 12) {
+      return soloDigitos.substring(2);
+    }
+    return soloDigitos;
+  };
+
   const handleLogin = async () => {
     if (!loginTelefono.trim() || !loginPassword.trim()) {
       setError('Por favor ingresa tu teléfono y contraseña');
@@ -119,30 +127,75 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
     setError('');
 
     try {
-      const emailSintetico = telefonoToEmail(loginTelefono);
+      const isEmail = loginTelefono.includes('@');
+      const telNormalizado = !isEmail ? normalizarTelefono(loginTelefono) : '';
+      const emailSintetico = !isEmail ? telefonoToEmail(telNormalizado) : '';
 
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: emailSintetico,
-        password: loginPassword,
-      });
+      let authData: any = null;
 
-      if (authError) {
-        if (authError.message.includes('Invalid login credentials')) {
-          setError('Teléfono o contraseña incorrectos. Por favor verifica tus datos.');
-        } else {
-          setError('Error al iniciar sesión. Por favor intenta nuevamente.');
+      if (isEmail) {
+        // Login directo con Email
+        const { data: authDataEmail, error: authErrorEmail } = await supabase.auth.signInWithPassword({
+          email: loginTelefono.trim(),
+          password: loginPassword,
+        });
+
+        if (!authErrorEmail && authDataEmail.user) {
+          authData = authDataEmail;
+        } else if (authErrorEmail?.message.includes('Invalid login')) {
+          setError('Credenciales incorrectas.');
+          setProcesando(false);
+          return;
         }
+      } else {
+        // Intento 1: login con email sintético (usuarios registrados por teléfono sin email)
+        const { data: authData1, error: authError1 } = await supabase.auth.signInWithPassword({
+          email: emailSintetico,
+          password: loginPassword,
+        });
+
+        if (!authError1 && authData1.user) {
+          authData = authData1;
+        } else {
+          // Intento 2: buscar email real en tabla clientes por teléfono
+          const { data: clientePorTel } = await supabase
+            .from('clientes')
+            .select('email')
+            .or(`telefono.eq.${telNormalizado},telefono.eq.+57${telNormalizado},telefono.eq.57${telNormalizado}`)
+            .not('email', 'is', null)
+            .maybeSingle();
+
+          if (clientePorTel?.email) {
+            const { data: authData2, error: authError2 } = await supabase.auth.signInWithPassword({
+              email: clientePorTel.email,
+              password: loginPassword,
+            });
+            if (!authError2 && authData2.user) {
+              authData = authData2;
+            } else if (authError2?.message.includes('Invalid login')) {
+              setError('Contraseña incorrecta.');
+              return;
+            } else if (authError2?.message.includes('Email not confirmed')) {
+              setError('Email no confirmado. Contacta al administrador.');
+              return;
+            }
+          }
+        }
+      }
+
+      if (!authData?.user) {
+        setError('No encontramos una cuenta con ese número. ¿Ya te registraste?');
         return;
       }
 
-      // Obtener datos completos del cliente desde la tabla
-      const { data: clienteData, error: clienteError } = await supabase
+      // Obtener perfil de cliente por user_id o por email
+      const { data: clienteData } = await supabase
         .from('clientes')
         .select('*')
-        .eq('user_id', authData.user.id)
-        .single();
+        .or(`user_id.eq.${authData.user.id},email.eq.${authData.user.email}`)
+        .maybeSingle();
 
-      if (clienteError || !clienteData) {
+      if (!clienteData) {
         setError('No se encontró tu perfil de cliente. Contacta al administrador.');
         await supabase.auth.signOut();
         return;
@@ -165,11 +218,24 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
         })
         .eq('id', clienteData.id);
 
+      // Guardar también en localStorage para que App.tsx reconozca la sesión del dashboard
+      if (authData.session && authData.user) {
+        localStorage.setItem('blackDiamondUser', JSON.stringify({
+          accessToken: authData.session.access_token,
+          userId: authData.user.id,
+          email: authData.user.email || '',
+          role: 'cliente'
+        }));
+      }
+
       loginUser(clienteData);
       setExitoso(true);
       setTimeout(() => {
         onLoginSuccess(clienteData);
         handleClose();
+        
+        // Redirigir automáticamente al dashboard si es cliente nuevo o si se prefiriera
+        window.location.reload(); 
       }, 1500);
     } catch (err: any) {
       setError('Error al iniciar sesión. Por favor verifica tu conexión e intenta nuevamente.');
@@ -196,14 +262,32 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
     setError('');
 
     try {
-      const emailSintetico = telefonoToEmail(telefono);
+      const telNormalizado = normalizarTelefono(telefono);
+      const emailSintetico = telefonoToEmail(telNormalizado);
+      const emailParaAuth = email.trim() || emailSintetico;
+      const telefonoLimpio = telefono.replace(/[^0-9]/g, '').slice(-10);
+
+      // 0. Verificar en la tabla clientes primero
+      const { data: clienteExistente } = await supabase
+        .from('clientes')
+        .select('id, email')
+        .or(
+          `telefono.eq.${telefonoLimpio},telefono.eq.57${telefonoLimpio},telefono.eq.+57${telefonoLimpio}`
+        )
+        .maybeSingle();
+
+      if (clienteExistente) {
+        setError('Ya existe una cuenta con ese número de teléfono. Intenta iniciar sesión.');
+        setProcesando(false);
+        return;
+      }
 
       // 1. Crear usuario en Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: emailSintetico,
+        email: emailParaAuth,
         password,
         options: {
-          data: { nombre, nombreUsuario, telefono },
+          data: { nombre, nombreUsuario, telefono: telNormalizado, role: 'cliente' },
         },
       });
 
@@ -239,7 +323,7 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
 
       const { data: clienteData, error: clienteError } = await supabase
         .from('clientes')
-        .insert(nuevoCliente)
+        .upsert(nuevoCliente, { onConflict: 'user_id' })
         .select()
         .single();
 
@@ -326,15 +410,15 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
 
             <div className="space-y-2 overflow-hidden">
               <Label htmlFor="loginTelefono" className="flex items-center gap-2 text-xs sm:text-sm flex-wrap">
-                <Phone className="w-4 h-4 text-primary flex-shrink-0" />
-                <span className="break-words min-w-0">Número de Teléfono</span>
+                <User className="w-4 h-4 text-primary flex-shrink-0" />
+                <span className="break-words min-w-0">Email o Teléfono</span>
               </Label>
               <Input
                 id="loginTelefono"
-                type="tel"
+                type="text"
                 value={loginTelefono}
                 onChange={(e) => setLoginTelefono(e.target.value)}
-                placeholder="3017626768"
+                placeholder="ejemplo@email.com o 3017626768"
                 className="bg-secondary/50 w-full"
                 disabled={procesando}
               />
@@ -522,9 +606,41 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
 
         <div className="space-y-4">
           {error && (
-            <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-red-400">{error}</p>
+            <div style={{
+              background: 'rgba(255,0,0,0.1)',
+              border: '1px solid rgba(255,0,0,0.3)',
+              borderRadius: 8,
+              padding: '12px 16px',
+              marginBottom: 16
+            }}>
+              <div className="flex items-start gap-2 mb-2">
+                <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                <p style={{ color: '#FF4444', margin: 0, fontSize: 14 }}>
+                  {error}
+                </p>
+              </div>
+              {(error.toLowerCase().includes('teléfono') || error.toLowerCase().includes('cuenta')) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModo('login');
+                    setError('');
+                  }}
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid #FF4444',
+                    color: '#FF4444',
+                    padding: '6px 12px',
+                    borderRadius: 6,
+                    cursor: 'pointer',
+                    fontSize: 12,
+                    display: 'block',
+                    marginTop: 8
+                  }}
+                >
+                  Ir a iniciar sesión →
+                </button>
+              )}
             </div>
           )}
 

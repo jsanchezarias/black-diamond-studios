@@ -68,30 +68,20 @@ export function GastosProvider({ children }: { children: ReactNode }) {
   const [serviciosPublicos, setServiciosPublicos] = useState<ServicioPublico[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // ✅ Cargar datos desde Supabase al inicializar + Realtime
+  // ✅ Cargar datos desde Supabase al inicializar + polling cada 5 minutos
+  // (gastos y servicios son datos administrativos que no requieren Realtime)
   useEffect(() => {
     cargarGastos();
     cargarServicios();
 
-    // ✅ REALTIME: recargar gastos operativos ante cualquier cambio
-    const channelGastos = supabase
-      .channel('gastos-operativos-rt')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'gastos_operativos' }, () => {
-        cargarGastos();
-      })
-      .subscribe();
-
-    // ✅ REALTIME: recargar servicios públicos ante cualquier cambio
-    const channelServicios = supabase
-      .channel('servicios-publicos-rt')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'servicios_publicos' }, () => {
-        cargarServicios();
-      })
-      .subscribe();
+    // Polling cada 5 minutos en lugar de Realtime para reducir conexiones WebSocket
+    const pollingInterval = setInterval(() => {
+      cargarGastos();
+      cargarServicios();
+    }, 5 * 60 * 1000);
 
     return () => {
-      supabase.removeChannel(channelGastos);
-      supabase.removeChannel(channelServicios);
+      clearInterval(pollingInterval);
     };
   }, []);
 
@@ -172,7 +162,8 @@ export function GastosProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase
         .from('servicios_publicos') // ✅ Tabla correcta según diccionario
         .select('*')
-        .order('nombre', { ascending: true });
+        .order('nombre', { ascending: true })
+        .limit(100);
 
       if (error) {
         if (process.env.NODE_ENV === 'development') console.error('❌ Error cargando servicios:', error);

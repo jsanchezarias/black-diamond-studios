@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
-import { useInventory } from '../app/components/InventoryContext';
+import { useInventory, Producto } from '../app/components/InventoryContext';
 import { GestionBoutiqueModal } from './GestionBoutiqueModal';
 import { toast } from 'sonner';
 import {
@@ -17,17 +17,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "./ui/alert-dialog";
-
-interface Producto {
-  id: number;
-  nombre: string;
-  precioRegular: number;
-  precioServicio: number;
-  stock: number;
-  categoria: string;
-  descripcion: string;
-  imagen: string;
-}
 
 export function BoutiquePanel() {
   const { inventario, eliminarProducto } = useInventory();
@@ -219,10 +208,13 @@ export function BoutiquePanel() {
                 {/* Imagen */}
                 <div className="relative h-48 bg-secondary flex items-center justify-center overflow-hidden">
                   {producto.imagen ? (
-                    <img 
-                      src={producto.imagen} 
+                    <img
+                      src={producto.imagen}
                       alt={producto.nombre}
                       className="w-full h-full object-cover"
+                      loading="lazy"
+                      width={320}
+                      height={192}
                     />
                   ) : (
                     <div className="text-center">

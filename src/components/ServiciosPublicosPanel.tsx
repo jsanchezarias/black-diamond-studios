@@ -8,6 +8,27 @@ import { AgregarServicioPublicoModal } from './AgregarServicioPublicoModal';
 import { PagarServicioModal } from './PagarServicioModal';
 import { toast } from 'sonner';
 
+const toDate = (fecha: string | Date | null | undefined): Date | null => {
+  if (!fecha) return null;
+  if (fecha instanceof Date) return isNaN(fecha.getTime()) ? null : fecha;
+  const d = new Date(fecha);
+  return isNaN(d.getTime()) ? null : d;
+};
+
+const formatFecha = (fecha: string | Date | null | undefined): string => {
+  const d = toDate(fecha);
+  if (!d) return 'Sin fecha';
+  return d.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' });
+};
+
+// fechaLimitePago es number (día 1-31) en Supabase pero versiones antiguas podían ser Date/string
+const getDiaLimitePago = (v: number | Date | string | null | undefined): number => {
+  if (v === null || v === undefined) return 0;
+  if (typeof v === 'number') return v;
+  const d = toDate(v as string | Date);
+  return d ? d.getDate() : 0;
+};
+
 export function ServiciosPublicosPanel() {
   const { 
     serviciosPublicos, 
@@ -77,12 +98,13 @@ export function ServiciosPublicosPanel() {
     otro: '📋',
   };
 
-  const calcularDiasRestantes = (fecha: Date) => {
+  const calcularDiasRestantes = (fecha: string | Date | null | undefined) => {
+    const d = toDate(fecha);
+    if (!d) return 0;
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
-    const fechaPago = new Date(fecha);
-    fechaPago.setHours(0, 0, 0, 0);
-    return Math.ceil((fechaPago.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
+    d.setHours(0, 0, 0, 0);
+    return Math.ceil((d.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
   };
 
   const estadoBadge = (servicio: any) => {
@@ -296,7 +318,7 @@ export function ServiciosPublicosPanel() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
                         <div className="bg-card p-3 rounded-lg border border-border/50">
                           <p className="text-xs text-muted-foreground mb-1">Fecha Límite Pago</p>
-                          <p className="font-semibold">Día {servicio.fechaLimitePago.getDate()} de cada mes</p>
+                          <p className="font-semibold">Día {getDiaLimitePago(servicio.fechaLimitePago)} de cada mes</p>
                         </div>
                         {servicio.proximoPago && (
                           <div className="bg-card p-3 rounded-lg border border-border/50">
