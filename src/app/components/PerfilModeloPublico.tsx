@@ -4,7 +4,7 @@ import { supabase } from '../../utils/supabase/info';
 import {
   X, Star, MapPin, Clock, ChevronLeft, ChevronRight,
   Calendar, Home, Building, DollarSign, Ruler, Languages,
-  User, Phone, FileText, Timer, CheckCircle, Heart
+  User, Timer, CheckCircle, Heart
 } from 'lucide-react';
 
 interface PerfilModeloPublicoProps {
@@ -23,6 +23,7 @@ function formatPrecio(valor: number) {
   return '$' + valor.toLocaleString('es-CO');
 }
 
+/*
 function calcularEdad(fechaNacimiento?: string | null) {
   if (!fechaNacimiento) return null;
   const hoy = new Date();
@@ -32,6 +33,7 @@ function calcularEdad(fechaNacimiento?: string | null) {
   if (m < 0 || (m === 0 && hoy.getDate() < nac.getDate())) edad--;
   return edad;
 }
+*/
 
 export function PerfilModeloPublico({ modeloId, onClose, currentUser, onLoginRequired }: PerfilModeloPublicoProps) {
   const [perfil, setPerfil] = useState<any>(null);
@@ -154,7 +156,7 @@ export function PerfilModeloPublico({ modeloId, onClose, currentUser, onLoginReq
         }
       }
     } catch (err) {
-      console.error('Error cargando perfil:', err);
+      if (process.env.NODE_ENV === 'development') console.error('Error cargando perfil:', err);
     }
     setLoading(false);
   };
@@ -204,7 +206,7 @@ export function PerfilModeloPublico({ modeloId, onClose, currentUser, onLoginReq
         await supabase.from('notificaciones').insert(notificaciones);
       }
     } catch (err) {
-      console.error('Error enviando notificaciones:', err);
+      if (process.env.NODE_ENV === 'development') console.error('Error enviando notificaciones:', err);
     }
   };
 
@@ -290,20 +292,19 @@ export function PerfilModeloPublico({ modeloId, onClose, currentUser, onLoginReq
           creado_por_rol: 'cliente',
       };
 
-      console.log('INSERT DATA (PerfilModeloPublico):', insertData);
+      if (process.env.NODE_ENV === 'development') console.log('INSERT DATA (PerfilModeloPublico):', insertData);
+
+      if (!nombreCliente || nombreCliente.length < 2) {
+        toast.error('No se pudo obtener tu nombre. Actualiza tu perfil.');
+        setEnviando(false);
+        return;
+      }
 
       const { data: agendamiento, error } = await supabase
         .from('agendamientos')
         .insert(insertData)
         .select()
         .single();
-
-      // ✅ Validar que el nombre sea real antes de guardar
-      if (!nombreCliente || nombreCliente.length < 2) {
-        toast.error('No se pudo obtener tu nombre. Actualiza tu perfil.');
-        setEnviando(false);
-        return;
-      }
 
       if (error) throw error;
 
@@ -619,7 +620,7 @@ export function PerfilModeloPublico({ modeloId, onClose, currentUser, onLoginReq
                   min={hoyStr}
                   value={fecha}
                   onChange={e => setFecha(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm outline-none focus:border-amber-500/50 transition-colors"
+                  className="w-full bg-[#111] border border-white/20 rounded-xl px-4 py-3 text-white text-sm outline-none focus:border-amber-500/50 transition-colors"
                   style={{ colorScheme: 'dark' }}
                 />
               </div>
@@ -630,12 +631,12 @@ export function PerfilModeloPublico({ modeloId, onClose, currentUser, onLoginReq
                 <select
                   value={hora}
                   onChange={e => setHora(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm outline-none focus:border-amber-500/50 transition-colors"
-                  style={{ colorScheme: 'dark' }}
+                  className="w-full bg-[#111] border border-white/20 rounded-xl px-4 py-3 text-white text-sm outline-none focus:border-amber-500/50 transition-colors"
+                  style={{ colorScheme: 'dark', background: '#111 !important', color: 'white !important' }}
                 >
-                  <option value="">-- Selecciona una hora --</option>
+                  <option value="" className="bg-[#111] text-white" style={{ background: '#111 !important', color: 'white !important' }}>-- Selecciona una hora --</option>
                   {HORAS_DISPONIBLES.map(h => (
-                    <option key={h} value={h}>{h}</option>
+                    <option key={h} value={h} className="bg-[#111] text-white" style={{ background: '#111 !important', color: 'white !important' }}>{h}</option>
                   ))}
                 </select>
               </div>

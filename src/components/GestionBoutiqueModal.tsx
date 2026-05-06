@@ -24,6 +24,9 @@ export function GestionBoutiqueModal({ open, onClose, producto, modo }: GestionB
     nombre: producto?.nombre || '',
     precioRegular: producto?.precioRegular || 0,
     precioServicio: producto?.precioServicio || 0,
+    // ✅ Nuevos campos: precio inicial (antes/tachado) y precio final (vigente)
+    precioInicial: producto?.precioInicial || 0,
+    precioFinal: producto?.precioFinal || 0,
     stock: producto?.stock || 0,
     categoria: producto?.categoria || '',
     descripcion: producto?.descripcion || '',
@@ -46,15 +49,15 @@ export function GestionBoutiqueModal({ open, onClose, producto, modo }: GestionB
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validar tamaño (máximo 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('La imagen no debe superar los 5MB');
+    // Validar tipo (solo imágenes)
+    if (!file.type.startsWith('image/')) {
+      toast.error('Formato no válido', { description: 'Por favor selecciona un archivo de imagen (JPG, PNG, GIF).' });
       return;
     }
 
-    // Validar tipo
-    if (!file.type.startsWith('image/')) {
-      toast.error('Solo se permiten archivos de imagen');
+    // Validar tamaño (máximo 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Imagen demasiado pesada', { description: 'El tamaño máximo permitido es 5MB.' });
       return;
     }
 
@@ -77,19 +80,15 @@ export function GestionBoutiqueModal({ open, onClose, producto, modo }: GestionB
         const { data } = supabase.storage.from('fotos-modelos').getPublicUrl(nombre);
         setImagePreview(data.publicUrl);
         setFormData(prev => ({ ...prev, imagen: data.publicUrl }));
-        toast.success('Foto subida correctamente');
+        toast.success('Imagen cargada correctamente');
       } else {
-        // Si falla el storage, usar base64 como fallback
-        const readerFallback = new FileReader();
-        readerFallback.onloadend = () => {
-          const base64 = readerFallback.result as string;
-          setImagePreview(base64);
-          setFormData(prev => ({ ...prev, imagen: base64 }));
-        };
-        readerFallback.readAsDataURL(file);
+        throw error;
       }
-    } catch {
-      // Fallback silencioso a base64
+    } catch (err: any) {
+      if (process.env.NODE_ENV === 'development') console.error('Error storage:', err);
+      toast.error('Error al subir imagen', { description: 'No se pudo guardar en la nube, se usará memoria local temporal.' });
+      
+      // Fallback a base64 (memoria local) si falla el storage
       const readerFallback = new FileReader();
       readerFallback.onloadend = () => {
         const base64 = readerFallback.result as string;
@@ -119,6 +118,17 @@ export function GestionBoutiqueModal({ open, onClose, producto, modo }: GestionB
       return;
     }
 
+    // ✅ Validación: si hay precio inicial Y final, el inicial debe ser mayor (es el "antes")
+    const tieneErrorPrecio = 
+      formData.precioInicial > 0 &&
+      formData.precioFinal > 0 &&
+      formData.precioInicial <= formData.precioFinal;
+
+    if (tieneErrorPrecio) {
+      toast.error('El precio inicial debe ser mayor al precio final');
+      return;
+    }
+
     if (formData.stock < 0) {
       toast.error('El stock no puede ser negativo');
       return;
@@ -129,24 +139,35 @@ export function GestionBoutiqueModal({ open, onClose, producto, modo }: GestionB
       return;
     }
 
+    // ✅ Si hay precio final definido, lo usamos también como precioRegular para
+    // mantener compatibilidad con carrito/checkout actual
+    const datosFinal = {
+      ...formData,
+      precioRegular: formData.precioFinal > 0 ? formData.precioFinal : formData.precioRegular,
+      precioInicial: formData.precioInicial > 0 ? formData.precioInicial : null,
+      precioFinal: formData.precioFinal > 0 ? formData.precioFinal : null,
+    };
+
     // ✅ Manejo asíncrono con async/await
     const guardarProducto = async () => {
       try {
         if (modo === 'crear') {
-          await agregarProducto(formData);
+          await agregarProducto(datosFinal);
           toast.success(`Producto "${formData.nombre}" agregado a la boutique`);
         } else if (modo === 'editar' && producto) {
-          await actualizarProducto(producto.id, formData);
+          await actualizarProducto(producto.id, datosFinal);
           toast.success(`Producto "${formData.nombre}" actualizado`);
         }
 
         onClose();
-        
+
         // Reset form
         setFormData({
           nombre: '',
           precioRegular: 0,
           precioServicio: 0,
+          precioInicial: 0,
+          precioFinal: 0,
           stock: 0,
           categoria: '',
           descripcion: '',
@@ -296,6 +317,51 @@ export function GestionBoutiqueModal({ open, onClose, producto, modo }: GestionB
               <p className="text-xs text-gray-500">Precio cuando modelo está en servicio</p>
             </div>
 
+            {/* ✅ Precio Inicial (antes / tachado) */}
+            <div className="space-y-2">
+              <Label htmlFor="precioInicial" className="text-white flex items-center gap-2">
+                <DollarSign className="w-4 h-4 text-orange-400" />
+                Precio Inicial (antes)
+              </Label>
+              <Input
+                id="precioInicial"
+                type="number"
+                min="0"
+                step="0.01"
+                value={formData.precioInicial}
+                onChange={(e) => setFormData({ ...formData, precioInicial: parseFloat(e.target.value) || 0 })}
+                placeholder="0.00"
+                className="bg-white/5 border-white/10 text-white"
+              />
+              <p className="text-xs text-gray-500">Se mostrará tachado. Dejar en 0 si no hay descuento.</p>
+            </div>
+
+            {/* ✅ Precio Final (vigente / con descuento) */}
+            <div className="space-y-2">
+              <Label htmlFor="precioFinal" className="text-white flex items-center gap-2">
+                <DollarSign className="w-4 h-4 text-pink-500" />
+                Precio Final (vigente)
+              </Label>
+              <Input
+                id="precioFinal"
+                type="number"
+                min="0"
+                step="0.01"
+                value={formData.precioFinal}
+                onChange={(e) => setFormData({ ...formData, precioFinal: parseFloat(e.target.value) || 0 })}
+                placeholder="0.00"
+                className="bg-white/5 border-white/10 text-white"
+              />
+              <p className="text-xs text-gray-500">Precio que paga el cliente hoy. Dejar en 0 para usar el regular.</p>
+              
+              {/* ✅ Error inline si el precio inicial no es mayor al final */}
+              {formData.precioInicial > 0 && formData.precioFinal > 0 && formData.precioInicial <= formData.precioFinal && (
+                <p className="text-[10px] text-red-500 mt-1 font-medium bg-red-500/10 p-1 rounded border border-red-500/20">
+                  ⚠️ El precio inicial debe ser mayor al vigente.
+                </p>
+              )}
+            </div>
+
             {/* Stock */}
             <div className="space-y-2">
               <Label htmlFor="stock" className="text-white flex items-center gap-2">
@@ -359,12 +425,12 @@ export function GestionBoutiqueModal({ open, onClose, producto, modo }: GestionB
                 <DollarSign className="w-5 h-5 text-blue-400" />
               </div>
               <div className="flex-1">
-                <h4 className="font-medium text-blue-400 mb-1">Sistema de Precios Dual</h4>
-                <p className="text-sm text-blue-300/80">
-                  El <strong>precio regular</strong> se aplica para ventas directas en la boutique. 
-                  El <strong>precio en servicio</strong> se aplica automáticamente cuando el producto 
-                  se consume durante un servicio activo de la modelo.
-                </p>
+                <h4 className="font-medium text-blue-400 mb-1">Sistema de Precios</h4>
+                <ul className="text-sm text-blue-300/80 space-y-1 list-disc list-inside">
+                  <li><strong>Regular:</strong> precio base de venta directa.</li>
+                  <li><strong>En Servicio:</strong> precio cuando se consume durante un servicio activo.</li>
+                  <li><strong>Inicial / Final:</strong> opcional. Sirve para mostrar un precio "antes" tachado y un precio "ahora" en oferta. Si llenas <em>Final</em>, el cliente paga ese.</li>
+                </ul>
               </div>
             </div>
           </div>

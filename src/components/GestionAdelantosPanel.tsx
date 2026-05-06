@@ -6,13 +6,13 @@ import {
   Clock, 
   CheckCircle, 
   XCircle, 
-  AlertCircle,
+//  AlertCircle,
   DollarSign,
   Calendar,
   User,
   FileText,
-  TrendingUp,
-  Bell
+//  TrendingUp,
+//  Bell
 } from 'lucide-react';
 import { usePagos, Adelanto } from '../app/components/PagosContext';
 import { GestionarAdelantoModal } from './GestionarAdelantoModal';
@@ -37,6 +37,7 @@ export function GestionAdelantosPanel({ userEmail }: GestionAdelantosPanelProps)
     setMostrarModal(true);
   };
 
+/*
   const handleConfirmar = () => {
     if (!adelantoSeleccionado) return;
 
@@ -49,6 +50,7 @@ export function GestionAdelantosPanel({ userEmail }: GestionAdelantosPanelProps)
     setMostrarModal(false);
     setAdelantoSeleccionado(null);
   };
+*/
 
   const estadoBadge = (estado: string) => {
     switch (estado) {

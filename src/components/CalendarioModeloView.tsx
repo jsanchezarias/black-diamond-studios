@@ -1,9 +1,9 @@
 import { useState, useMemo } from 'react';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, isToday, addMonths, subMonths } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isToday, addMonths, subMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
 import { Button } from './ui/button';
-import { Badge } from './ui/badge';
+// import { Badge } from './ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 
 interface Agendamiento {
@@ -143,7 +143,7 @@ export function CalendarioModeloView({ citas, onCitaClick }: CalendarioModeloVie
                 {/* Indicadores de citas */}
                 {hasEvents && (
                   <div className="space-y-0.5">
-                    {citasDelDia.slice(0, 2).map((cita, idx) => (
+                    {citasDelDia.slice(0, 2).map((cita, _idx) => (
                       <div
                         key={cita.id}
                         onClick={() => onCitaClick?.(cita)}

@@ -14,14 +14,17 @@ import { es } from 'date-fns/locale';
 
 export function NotificacionBell() {
   const {
-    notificaciones,
-    noLeidas,
+    notificaciones: listadoNotificaciones = [],
+    noLeidas = 0,
     marcarComoLeida,
     marcarTodasComoLeidas,
     obtenerNotificacionesRecientes
   } = useNotificaciones();
 
-  const notificacionesRecientes = obtenerNotificacionesRecientes(10);
+  // Protección contra funciones no definidas en el contexto
+  const notificacionesRecientes = typeof obtenerNotificacionesRecientes === 'function' 
+    ? obtenerNotificacionesRecientes(10) 
+    : [];
 
   const handleNotificacionClick = async (notificacionId: string, accion?: any) => {
     // Marcar como leída
@@ -162,7 +165,7 @@ export function NotificacionBell() {
         </ScrollArea>
 
         {/* Footer */}
-        {notificaciones.length > 10 && (
+        {((listadoNotificaciones || []).length > 10) && (
           <>
             <Separator />
             <div className="p-3">

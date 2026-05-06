@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { supabase } from '../../utils/supabase/info'; // ✅ Corregido: ruta correcta
+import { toast } from 'sonner';
 
 export interface GastoOperativo {
   id: string;
@@ -66,22 +67,28 @@ const GastosContext = createContext<GastosContextType | undefined>(undefined);
 export function GastosProvider({ children }: { children: ReactNode }) {
   const [gastosOperativos, setGastosOperativos] = useState<GastoOperativo[]>([]);
   const [serviciosPublicos, setServiciosPublicos] = useState<ServicioPublico[]>([]);
-  const [loading, setLoading] = useState(true);
+  // const [loading, setLoading] = useState(true);
 
-  // ✅ Cargar datos desde Supabase al inicializar + polling cada 5 minutos
-  // (gastos y servicios son datos administrativos que no requieren Realtime)
   useEffect(() => {
-    cargarGastos();
-    cargarServicios();
-
-    // Polling cada 5 minutos en lugar de Realtime para reducir conexiones WebSocket
-    const pollingInterval = setInterval(() => {
-      cargarGastos();
-      cargarServicios();
-    }, 5 * 60 * 1000);
+    const channel = supabase
+      .channel('gastos-rt')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'gastos_operativos' }, () => {
+        cargarGastos();
+        toast.success('💸 Nuevo gasto registrado');
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'gastos_operativos' }, () => {
+        cargarGastos();
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'gastos_operativos' }, () => {
+        cargarGastos();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'servicios_publicos' }, () => {
+        cargarServicios();
+      })
+      .subscribe();
 
     return () => {
-      clearInterval(pollingInterval);
+      supabase.removeChannel(channel);
     };
   }, []);
 
@@ -126,6 +133,7 @@ export function GastosProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase
         .from('gastos_operativos')
         .select('*')
+        .or('eliminado.is.null,eliminado.eq.false')
         .order('fecha', { ascending: false })
         .limit(100);
 
@@ -153,7 +161,7 @@ export function GastosProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       if (process.env.NODE_ENV === 'development') console.error('❌ Error cargando gastos:', error);
     } finally {
-      setLoading(false);
+      // setLoading(false);
     }
   };
 
@@ -222,6 +230,19 @@ export function GastosProvider({ children }: { children: ReactNode }) {
 
       if (error) throw error;
 
+      // 💰 REGISTRO EN BALANCE (NUEVO)
+      await supabase.from('balance_financiero').insert({
+        tipo: 'egreso',
+        categoria: 'gasto',
+        concepto: `Gasto — ${gasto.concepto}`,
+        monto: gasto.monto,
+        referencia_id: id,
+        referencia_tabla: 'gastos_operativos',
+        fecha: new Date().toISOString().split('T')[0]
+      });
+
+      toast.info(`📤 Egreso registrado: $${gasto.monto.toLocaleString('es-CO')}`);
+
       await cargarGastos();
     } catch (error) {
       if (process.env.NODE_ENV === 'development') console.error('❌ Error agregando gasto:', error);
@@ -259,10 +280,9 @@ export function GastosProvider({ children }: { children: ReactNode }) {
 
   const eliminarGasto = async (id: string) => {
     try {
-      
       const { error } = await supabase
         .from('gastos_operativos')
-        .delete()
+        .update({ eliminado: true, eliminado_en: new Date().toISOString() })
         .eq('id', id);
 
       if (error) throw error;
@@ -422,6 +442,19 @@ export function GastosProvider({ children }: { children: ReactNode }) {
         proximoPago: proximoPago.toISOString(),
         notificacionEnviada: false,
       });
+
+      // 💰 REGISTRO EN BALANCE (NUEVO)
+      await supabase.from('balance_financiero').insert({
+        tipo: 'egreso',
+        categoria: 'gasto',
+        concepto: `Pago Servicio — ${servicio.nombre}`,
+        monto: monto,
+        referencia_id: id,
+        referencia_tabla: 'servicios_publicos',
+        fecha: new Date().toISOString().split('T')[0]
+      });
+
+      toast.info(`📤 Pago de servicio registrado: $${monto.toLocaleString('es-CO')}`);
     } catch (error) {
       if (process.env.NODE_ENV === 'development') console.error('❌ Error marcando servicio como pagado:', error);
       throw error;

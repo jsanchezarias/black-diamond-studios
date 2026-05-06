@@ -1,13 +1,13 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import { Calendar, BarChart3, Plus, Clock, Timer, DollarSign, DoorOpen, XCircle, UserX, MoreVertical, MessageSquare, Menu, X, Eye, Bell, PieChart, Settings, CheckCircle, Loader2 } from 'lucide-react';
+import { Calendar, BarChart3, Plus, DoorOpen, XCircle, UserX, MoreVertical, MessageSquare, Menu, X, Eye, Bell, PieChart, Settings, CheckCircle, Loader2 } from 'lucide-react';
 import { supabase } from '../../utils/supabase/info';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { Label } from '../../components/ui/label';
-import { Badge } from '../../components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
+// import { Input } from '../../components/ui/input';
+// import { Label } from '../../components/ui/label';
+// import { Badge } from '../../components/ui/badge';
+// import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { TerminalChatProgramador } from '../../components/TerminalChatProgramador';
 import { HabitacionesPanel } from '../../components/HabitacionesPanel';
 import { ConfiguracionChatPanel } from '../../components/ConfiguracionChatPanel';
@@ -18,8 +18,8 @@ import { CancelarAgendamientoModal } from '../../components/CancelarAgendamiento
 import { CrearAgendamientoModal } from '../../components/CrearAgendamientoModal';
 import { DetalleAgendamientoModal } from '../../components/DetalleAgendamientoModal';
 import { LogoIsotipo } from './LogoIsotipo';
-import { SelectErrorBoundary } from '../../components/SelectErrorBoundary';
-import { NotificacionesPanel } from './NotificacionesPanel';
+// import { SelectErrorBoundary } from '../../components/SelectErrorBoundary';
+// import { NotificacionesPanel } from './NotificacionesPanel';
 import { AnalyticsPanel } from './AnalyticsPanel'; // 📊 Sistema de Analytics
 import { ProgramadorAnalyticsPanel } from '../../components/ProgramadorAnalyticsPanel';
 import {
@@ -38,13 +38,14 @@ interface ProgramadorDashboardProps {
 
 const isDev = process.env.NODE_ENV === 'development';
 
-export function ProgramadorDashboard({ accessToken, userId, userEmail, onLogout }: ProgramadorDashboardProps) {
+export function ProgramadorDashboard({ accessToken: _accessToken, userId, userEmail, onLogout }: ProgramadorDashboardProps) {
   // Estados locales
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('solicitudes');
   const [noLeidas, setNoLeidas] = useState(0);
-  const [aceptandoId, setAceptandoId] = useState<string | null>(null);
+  const [aceptandoId, _setAceptandoId] = useState<string | null>(null);
   const [agendamientoTab, setAgendamientoTab] = useState<'nuevas' | 'aceptadas' | 'aprobadas'>('nuevas');
+  /*
   const [formData, setFormData] = useState({
     modeloEmail: undefined as string | undefined, // ✅ FIX: undefined en lugar de ''
     clienteNombre: '',
@@ -55,6 +56,7 @@ export function ProgramadorDashboard({ accessToken, userId, userEmail, onLogout 
     tipoServicio: '1 hora',
     notas: '',
   });
+  */
 
   const [modalCancelar, setModalCancelar] = useState<{
     isOpen: boolean;
@@ -74,7 +76,7 @@ export function ProgramadorDashboard({ accessToken, userId, userEmail, onLogout 
   }>({ isOpen: false, agendamiento: null });
 
   // Hooks de contexto con valores por defecto
-  let agendamientosCtx, clientesCtx, modelosCtx, agendamientos, modelos;
+  let agendamientosCtx, clientesCtx, modelosCtx;
 
   try {
     agendamientosCtx = useAgendamientos();
@@ -82,8 +84,8 @@ export function ProgramadorDashboard({ accessToken, userId, userEmail, onLogout 
     modelosCtx = useModelos();
 
     // Valores seguros con fallbacks
-    agendamientos = agendamientosCtx?.agendamientos || [];
-    modelos = modelosCtx?.modelos || [];
+    // const agendamientos = agendamientosCtx?.agendamientos || [];
+    // const modelos = modelosCtx?.modelos || [];
   } catch (error) {
     if (isDev) console.error('❌ ERROR AL OBTENER CONTEXTOS:', error);
     throw error;
@@ -103,7 +105,7 @@ export function ProgramadorDashboard({ accessToken, userId, userEmail, onLogout 
 
   const currentUser = { id: userId, email: userEmail };
   const [notificaciones, setNotificaciones] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  // const [loading, setLoading] = useState(false);
   const [solicitudesNuevas, setSolicitudesNuevas] = useState<any[]>([]);
   const [aceptadas, setAceptadas] = useState<any[]>([]);
   const [aprobadas, setAprobadas] = useState<any[]>([]);
@@ -113,7 +115,7 @@ export function ProgramadorDashboard({ accessToken, userId, userEmail, onLogout 
   const [loadingAceptar, setLoadingAceptar] = useState(false);
 
   const cargarAgendamientos = async () => {
-    setLoading(true)
+    // setLoading(true)
 
     const { data: { session } } = await supabase.auth.getSession()
     console.log('SESIÓN ACTIVA:', session?.user?.email, session?.user?.id)
@@ -126,7 +128,7 @@ export function ProgramadorDashboard({ accessToken, userId, userEmail, onLogout 
 
     if (error) {
       console.error('ERROR QUERY AGENDAMIENTOS:', error.message, error.code)
-      setLoading(false)
+      // setLoading(false)
       return
     }
 
@@ -164,7 +166,7 @@ export function ProgramadorDashboard({ accessToken, userId, userEmail, onLogout 
     setSolicitudesNuevas(nuevas)
     setAceptadas(aceptadas)
     setAprobadas(aprobadas)
-    setLoading(false)
+    // setLoading(false)
   }
 
   const cargarNotificaciones = async () => {
@@ -185,6 +187,7 @@ export function ProgramadorDashboard({ accessToken, userId, userEmail, onLogout 
     return new Date(+y, +m - 1, +d).toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short' });
   };
 
+  /*
   const CardAg = ({ apt }: { apt: any }) => {
     const isNueva = ['pendiente', 'solicitud_cliente'].includes(apt.estado);
     const isAceptada = apt.estado === 'aprobado';
@@ -284,6 +287,7 @@ export function ProgramadorDashboard({ accessToken, userId, userEmail, onLogout 
       </div>
     );
   };
+  */
 
   const agruparPorFecha = (lista: any[]) => {
     const grupos: Record<string, any[]> = {}
@@ -316,6 +320,11 @@ export function ProgramadorDashboard({ accessToken, userId, userEmail, onLogout 
   }, [modalAceptar]);
 
   useEffect(() => {
+    agendamientosCtx?.recargarAgendamientos();
+    clientesCtx?.cargarClientes();
+  }, []);
+
+  useEffect(() => {
     cargarAgendamientos()
     cargarNotificaciones()
 
@@ -332,7 +341,7 @@ export function ProgramadorDashboard({ accessToken, userId, userEmail, onLogout 
         setNoLeidas(prev => prev + 1);
 
         if (notifNueva.tipo === 'agendamiento_nuevo' && notifNueva.referencia_id) {
-          toast(
+          toast.custom(
             (t: any) => (
               <div>
                 <div style={{ fontWeight: 700, marginBottom: 4, fontSize: 13 }}>🔔 {notifNueva.titulo}</div>
@@ -408,39 +417,25 @@ export function ProgramadorDashboard({ accessToken, userId, userEmail, onLogout 
   };
 
   const cargarHabitaciones = async () => {
+    // Cargar TODAS las habitaciones para mostrar disponibles y ocupadas
     const { data } = await (supabase as any)
       .from('habitaciones')
       .select('id, numero, nombre, estado')
-      .in('estado', ['disponible', 'libre'])
       .order('numero', { ascending: true });
     const lista = data || [];
-    setHabitacionesDisponibles(lista);
-    setHabitacionSeleccionada(lista[0] || null);
+    setHabitacionesDisponibles(lista); // ahora contiene todas, el modal las filtra por estado
+    // Pre-seleccionar solo si hay disponible
+    const primera = lista.find((h: any) => ['disponible', 'libre'].includes(h.estado));
+    setHabitacionSeleccionada(primera || null);
   };
 
-  const aceptarConHabitacion = async (agendamiento: any, habitacionId: string) => {
-    if (!habitacionId) return;
+  const aceptarSinHabitacion = async (agendamiento: any) => {
     setLoadingAceptar(true);
     try {
-      const { data: habitacion } = await (supabase as any)
-        .from('habitaciones')
-        .select('id, numero, nombre')
-        .eq('id', habitacionId)
-        .single();
-
-      if (!habitacion) {
-        toast.error('Habitación no encontrada');
-        setLoadingAceptar(false);
-        return;
-      }
-
       const { error } = await supabase
         .from('agendamientos')
         .update({
           estado: 'aceptado_programador',
-          habitacion: 'Habitación ' + habitacion.numero,
-          habitacion_id: habitacion.id,
-          habitacion_numero: habitacion.numero,
           aceptado_por: currentUser.email,
           fecha_aceptacion: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -454,56 +449,44 @@ export function ProgramadorDashboard({ accessToken, userId, userEmail, onLogout 
         return;
       }
 
-      await (supabase as any)
-        .from('habitaciones')
-        .update({ estado: 'reservada', updated_at: new Date().toISOString() })
-        .eq('id', habitacion.id);
+      // 🆕 Notificar SOLO a la MODELO asignada
+      const modeloEmail = agendamiento.modelo_email || agendamiento.modeloEmail;
+      if (modeloEmail) {
+        const { data: modeloUser } = await supabase
+          .from('usuarios')
+          .select('id, email')
+          .eq('email', modeloEmail)
+          .single();
 
-      // Notificar admins/owners/recepcionistas
-      const { data: admins } = await supabase
-        .from('usuarios')
-        .select('id, email')
-        .in('role', ['admin', 'owner', 'recepcionista'])
-        .eq('estado', 'activo');
-
-      if (admins?.length) {
-        await (supabase as any).from('notificaciones').insert(
-          admins.map((u: any) => ({
-            usuario_id: u.id,
-            usuario_email: u.email,
-            titulo: '📋 Cita aceptada — Hab. ' + habitacion.numero,
-            mensaje:
-              (agendamiento.clienteNombre || agendamiento.cliente_nombre || 'Cliente') +
-              ' — ' + (agendamiento.tipoServicio || agendamiento.tipo_servicio || 'servicio') +
-              ' el ' + (agendamiento.fecha || '').toString().split('T')[0] +
-              ' a las ' + agendamiento.hora +
-              ' — Habitación ' + habitacion.numero,
-            tipo: 'agendamiento_confirmado',
+        if (modeloUser) {
+          await supabase.from('notificaciones').insert({
+            usuario_id: modeloUser.id,
+            para_usuario_id: modeloUser.id,
+            usuario_email: modeloUser.email,
+            titulo: '📅 Nuevo servicio asignado — acción requerida',
+            mensaje: 'Tienes un servicio confirmado para ' + agendamiento.fecha + ' a las ' + agendamiento.hora + '. Selecciona tu habitación y sube el comprobante de pago para comenzar.',
+            tipo: 'agendamiento_asignado',
             referencia_id: agendamiento.id,
             leida: false,
-            created_at: new Date().toISOString(),
-          }))
-        );
+            created_at: new Date().toISOString()
+          });
+        }
       }
 
-      // Notificar cliente
-      const clienteId = agendamiento.cliente_id;
-      if (clienteId) {
-        await (supabase as any).from('notificaciones').insert({
-          usuario_id: clienteId,
-          titulo: '✅ Tu cita fue aceptada',
-          mensaje:
-            'Tu cita del ' + (agendamiento.fecha || '').toString().split('T')[0] +
-            ' a las ' + agendamiento.hora +
-            ' fue aceptada. Habitación ' + habitacion.numero,
-          tipo: 'agendamiento_confirmado',
-          referencia_id: agendamiento.id,
-          leida: false,
-          created_at: new Date().toISOString(),
-        });
-      }
+      // Marcar notificación del programador como leída
+      await supabase
+        .from('notificaciones')
+        .update({ leida: true })
+        .eq('referencia_id', agendamiento.id)
+        .eq('usuario_id', currentUser.id);
 
-      toast.success('✅ Cita aceptada — Habitación ' + habitacion.numero + ' asignada');
+      setNotificaciones(prev => {
+        const afectadas = prev.filter(n => n.referencia_id === agendamiento.id && !n.leida).length;
+        setNoLeidas(c => Math.max(0, c - afectadas));
+        return prev.filter(n => n.referencia_id !== agendamiento.id);
+      });
+
+      toast.success('✅ Cita aceptada — Notificación enviada a la modelo');
       setModalAceptar(null);
       setHabitacionSeleccionada(null);
       cargarAgendamientos();
@@ -513,6 +496,7 @@ export function ProgramadorDashboard({ accessToken, userId, userEmail, onLogout 
     setLoadingAceptar(false);
   };
 
+  /*
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -606,6 +590,7 @@ export function ProgramadorDashboard({ accessToken, userId, userEmail, onLogout 
       toast.error(`Error al crear el agendamiento: ${errorMessage}`);
     }
   };
+  */
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
@@ -784,38 +769,8 @@ export function ProgramadorDashboard({ accessToken, userId, userEmail, onLogout 
 
       <main className="pt-24 px-3 sm:px-6 pb-12 max-w-7xl mx-auto">
         <div className="space-y-4 sm:space-y-6">
-          {activeTab === 'solicitudes' && (
+           {activeTab === 'solicitudes' && (
             <div className="space-y-4">
-              {/* Panel de Debug Temporal */}
-              <div className="bg-white/5 border border-white/10 rounded-xl p-4">
-                <p className="text-sm text-amber-400 font-semibold mb-2">🛠️ Debug Panel (Solicitudes Nuevas):</p>
-                <p>Total en solicitudesNuevas: {solicitudesNuevas.length}</p>
-                {solicitudesNuevas.length === 0 ? (
-                  <p className="text-red-400 text-xs mt-1">⚠️ No hay datos cargados o el filtro devolvió vacío.</p>
-                ) : (
-                  <div className="mt-2 space-y-2">
-                    {solicitudesNuevas.map(ag => (
-                      <div key={ag.id} style={{
-                        background: 'rgba(255,165,0,0.1)',
-                        border: '1px solid orange',
-                        borderRadius: 8,
-                        padding: 12,
-                        marginBottom: 8
-                      }}>
-                        <strong>{ag.cliente_nombre || ag.clienteNombre}</strong>
-                        <br/>
-                        {ag.fecha?.toString().split('T')[0]} — {ag.hora}
-                        <br/>
-                        Estado: {ag.estado}
-                        <br/>
-                        Servicio: {ag.tipo_servicio || ag.servicio}
-                        <br/>
-                        Precio: ${ag.precio?.toLocaleString('es-CO') || ag.montoPago?.toLocaleString('es-CO')}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
 
               {solicitudesNuevas.length === 0 ? (
                 <div style={{
@@ -949,7 +904,7 @@ export function ProgramadorDashboard({ accessToken, userId, userEmail, onLogout 
           )}
 
           {activeTab === 'agendamiento' && (() => {
-            const hoy = new Date().toISOString().split('T')[0];
+            // const hoy = new Date().toISOString().split('T')[0];
 
             const tabList = [
               { key: 'nuevas',     label: '🔔 Nuevas',      count: solicitudesNuevas.length,     color: 'text-amber-400' },
@@ -1394,29 +1349,31 @@ export function ProgramadorDashboard({ accessToken, userId, userEmail, onLogout 
               </div>
             </div>
 
-            {/* Habitaciones */}
-            <p className="text-xs text-white/50 mb-2 font-medium uppercase tracking-wider">Selecciona la habitación</p>
+            <p className="text-xs text-white/50 mb-3 font-medium uppercase tracking-wider">Habitaciones (Asignación por Modelo)</p>
 
             {habitacionesDisponibles.length === 0 ? (
               <div className="p-4 text-center text-sm rounded-xl mb-4" style={{ background: 'rgba(255,0,0,0.1)', color: '#FF4444' }}>
-                ⚠️ No hay habitaciones disponibles
+                ⚠️ No hay habitaciones registradas
               </div>
             ) : (
-              <div className="grid grid-cols-4 gap-2 mb-4">
-                {habitacionesDisponibles.map((hab: any) => (
-                  <button
-                    key={hab.id}
-                    onClick={() => setHabitacionSeleccionada(hab)}
-                    className="py-3 rounded-xl text-sm font-semibold transition-all"
-                    style={{
-                      border: habitacionSeleccionada?.id === hab.id ? '1.5px solid #FFD700' : '0.5px solid rgba(255,255,255,0.1)',
-                      background: habitacionSeleccionada?.id === hab.id ? 'rgba(255,215,0,0.15)' : 'rgba(255,255,255,0.03)',
-                      color: habitacionSeleccionada?.id === hab.id ? '#FFD700' : 'white',
-                    }}
-                  >
-                    🏠 {hab.numero}
-                  </button>
-                ))}
+              <div className="grid grid-cols-4 gap-2 mb-4 opacity-50 cursor-not-allowed">
+                {habitacionesDisponibles.map((hab: any) => {
+                  const enUso = !['disponible', 'libre'].includes(hab.estado);
+                  return (
+                    <div
+                      key={hab.id}
+                      title="La modelo asigna la habitación"
+                      className="py-3 rounded-xl text-sm font-bold transition-all relative text-center"
+                      style={{
+                        border: '0.5px solid rgba(255,255,255,0.15)',
+                        background: 'rgba(255,255,255,0.03)',
+                        color: 'rgba(255,255,255,0.4)',
+                      }}
+                    >
+                      {enUso ? '🔴' : '🟢'} {hab.numero}
+                    </div>
+                  );
+                })}
               </div>
             )}
 
@@ -1430,17 +1387,15 @@ export function ProgramadorDashboard({ accessToken, userId, userEmail, onLogout 
                 Cancelar
               </button>
               <button
-                onClick={() => aceptarConHabitacion(modalAceptar, habitacionSeleccionada?.id)}
-                disabled={!habitacionSeleccionada || loadingAceptar}
+                onClick={() => aceptarSinHabitacion(modalAceptar)}
+                disabled={loadingAceptar}
                 className="flex-[2] py-2.5 rounded-xl text-sm font-bold text-black disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 style={{ background: 'linear-gradient(135deg, #B8860B, #FFD700)' }}
               >
                 {loadingAceptar ? (
                   <><Loader2 className="w-4 h-4 animate-spin" /> Aceptando...</>
-                ) : habitacionSeleccionada ? (
-                  `✅ Aceptar — Hab. ${habitacionSeleccionada.numero}`
                 ) : (
-                  'Selecciona habitación'
+                  '✅ Aceptar agendamiento'
                 )}
               </button>
             </div>

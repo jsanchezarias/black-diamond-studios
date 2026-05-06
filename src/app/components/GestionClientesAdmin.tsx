@@ -1,8 +1,21 @@
 import { useState } from 'react';
 import { useClientes, Cliente } from './ClientesContext';
 import { useServicios } from './ServiciosContext';
-import { AlertTriangle, Ban, CheckCircle, DollarSign, X, User, Calendar, Clock, AlertCircle, TrendingUp, XCircle, Star } from 'lucide-react';
+import { AlertTriangle, Ban, CheckCircle, DollarSign, X, User, Calendar, Clock, AlertCircle, XCircle, Star } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '../../utils/supabase/info';
+
+interface Calificacion {
+  id: string;
+  estrellas: number;
+  puntualidad: number | null;
+  comportamiento: number | null;
+  pago: number | null;
+  etiquetas: string[];
+  observaciones: string | null;
+  created_at: string;
+  modelo_nombre?: string;
+}
 
 // ── VIP helper ───────────────────────────────────────────────────────────────
 const esVip = (c: Cliente) =>
@@ -14,7 +27,7 @@ const formatCOP = (n: number) =>
 
 export function GestionClientesAdmin() {
   const { clientes, actualizarCliente } = useClientes();
-  const { servicios, obtenerServiciosPorCliente, obtenerNoShowsPorCliente, contarNoShowsCliente, obtenerMultasPendientesCliente, calcularTotalMultasCliente, marcarMultaComoPagada } = useServicios();
+  const { obtenerServiciosPorCliente, obtenerNoShowsPorCliente, contarNoShowsCliente, obtenerMultasPendientesCliente, calcularTotalMultasCliente, marcarMultaComoPagada } = useServicios();
   
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -22,13 +35,16 @@ export function GestionClientesAdmin() {
   const [motivoBloqueo, setMotivoBloqueo] = useState('');
   const [showHistorialModal, setShowHistorialModal] = useState(false);
   const [showMultasModal, setShowMultasModal] = useState(false);
+  const [showCalificacionesModal, setShowCalificacionesModal] = useState(false);
+  const [calificacionesCliente, setCalificacionesCliente] = useState<Calificacion[]>([]);
+  const [loadingCalificaciones, setLoadingCalificaciones] = useState(false);
   const [filtro, setFiltro] = useState<'todos' | 'bloqueados' | 'con_multas' | 'con_noshow'>('todos');
 
   // Enriquecer clientes con datos de servicios
   const clientesEnriquecidos = clientes.map(cliente => {
     const serviciosCliente = obtenerServiciosPorCliente(cliente.id);
     const noShows = obtenerNoShowsPorCliente(cliente.id);
-    const multasPendientes = obtenerMultasPendientesCliente(cliente.id);
+    // const multasPendientes = obtenerMultasPendientesCliente(cliente.id);
     const totalMultas = calcularTotalMultasCliente(cliente.id);
 
     return {
@@ -115,6 +131,32 @@ export function GestionClientesAdmin() {
     } catch (error) {
       if (process.env.NODE_ENV === 'development') console.error('Error marcando multa como pagada:', error);
       toast.error('Error al marcar multa como pagada');
+    }
+  };
+
+  const handleVerCalificaciones = async (cliente: Cliente) => {
+    setSelectedCliente(cliente);
+    setShowCalificacionesModal(true);
+    setLoadingCalificaciones(true);
+    setCalificacionesCliente([]);
+    try {
+      const { data, error } = await supabase
+        .from('calificaciones_clientes')
+        .select('*, usuarios:modelo_id(nombre)')
+        .eq('cliente_id', cliente.id)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setCalificacionesCliente(
+        (data || []).map((r: any) => ({
+          ...r,
+          modelo_nombre: r.usuarios?.nombre ?? '—',
+        }))
+      );
+    } catch (err) {
+      if (process.env.NODE_ENV === 'development') console.error(err);
+      toast.error('Error al cargar calificaciones');
+    } finally {
+      setLoadingCalificaciones(false);
     }
   };
 
@@ -277,6 +319,13 @@ export function GestionClientesAdmin() {
                         className="px-3 py-1 bg-[#1A1A1A] hover:bg-[#2A2A2A] text-white rounded-lg text-sm transition-colors"
                       >
                         Historial
+                      </button>
+                      <button
+                        onClick={() => handleVerCalificaciones(cliente)}
+                        className="px-3 py-1 bg-[#c9a961]/10 hover:bg-[#c9a961]/20 text-[#c9a961] rounded-lg text-sm transition-colors flex items-center gap-1"
+                      >
+                        <Star className="w-3 h-3" />
+                        Calific.
                       </button>
                       {(cliente.multasPendientes || 0) > 0 && (
                         <button
@@ -478,6 +527,112 @@ export function GestionClientesAdmin() {
             <div className="mt-6">
               <button
                 onClick={() => setShowHistorialModal(false)}
+                className="w-full px-4 py-2 bg-[#1A1A1A] hover:bg-[#2A2A2A] text-white rounded-lg transition-colors"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de calificaciones */}
+      {showCalificacionesModal && selectedCliente && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#0A0A0A] rounded-lg border border-[#2A2A2A] p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-2xl font-playfair text-[#c9a961]">Calificaciones</h3>
+                <p className="text-gray-400">{selectedCliente.nombre}</p>
+              </div>
+              <button onClick={() => setShowCalificacionesModal(false)} className="text-gray-400 hover:text-white">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {loadingCalificaciones ? (
+              <div className="text-center py-12 text-gray-500">Cargando...</div>
+            ) : calificacionesCliente.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                <Star className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                <p>Este cliente no tiene calificaciones aún</p>
+              </div>
+            ) : (
+              <>
+                {/* Resumen */}
+                {(() => {
+                  const prom = calificacionesCliente.reduce((s, c) => s + c.estrellas, 0) / calificacionesCliente.length;
+                  const alertas = calificacionesCliente.filter(
+                    c => c.estrellas <= 2 || c.etiquetas?.some(e => ['grosero', 'mal_trato', 'problema_pago'].includes(e))
+                  ).length;
+                  return (
+                    <div className="grid grid-cols-3 gap-4 mb-6">
+                      <div className="bg-black p-4 rounded-lg border border-[#2A2A2A] text-center">
+                        <p className="text-gray-400 text-xs mb-1">Promedio</p>
+                        <p className="text-2xl font-bold text-[#c9a961]">{prom.toFixed(1)} ★</p>
+                      </div>
+                      <div className="bg-black p-4 rounded-lg border border-[#2A2A2A] text-center">
+                        <p className="text-gray-400 text-xs mb-1">Evaluaciones</p>
+                        <p className="text-2xl font-bold text-white">{calificacionesCliente.length}</p>
+                      </div>
+                      <div className={`p-4 rounded-lg border text-center ${alertas > 0 ? 'bg-red-950/30 border-red-500/40' : 'bg-black border-[#2A2A2A]'}`}>
+                        <p className="text-gray-400 text-xs mb-1">Alertas</p>
+                        <p className={`text-2xl font-bold ${alertas > 0 ? 'text-red-400' : 'text-gray-500'}`}>{alertas}</p>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Lista */}
+                <div className="space-y-3">
+                  {calificacionesCliente.map((cal) => {
+                    const esAlerta = cal.estrellas <= 2 || cal.etiquetas?.some(e => ['grosero', 'mal_trato', 'problema_pago'].includes(e));
+                    return (
+                      <div key={cal.id} className={`bg-black p-4 rounded-lg border ${esAlerta ? 'border-red-500/40' : 'border-[#2A2A2A]'}`}>
+                        <div className="flex items-start justify-between gap-3 mb-2">
+                          <div>
+                            <p className="text-white font-semibold text-sm">{cal.modelo_nombre}</p>
+                            <p className="text-gray-500 text-xs">{new Date(cal.created_at).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                          </div>
+                          <div className="flex gap-0.5 flex-shrink-0">
+                            {[1,2,3,4,5].map(s => (
+                              <span key={s} style={{ color: s <= cal.estrellas ? '#c9a961' : '#333', fontSize: 18 }}>★</span>
+                            ))}
+                          </div>
+                        </div>
+                        {(cal.puntualidad || cal.comportamiento || cal.pago) && (
+                          <div className="flex gap-4 text-xs text-gray-500 mb-2">
+                            {cal.puntualidad && <span>Puntualidad: <span className="text-[#c9a961]">{cal.puntualidad}★</span></span>}
+                            {cal.comportamiento && <span>Comportamiento: <span className="text-[#c9a961]">{cal.comportamiento}★</span></span>}
+                            {cal.pago && <span>Pago: <span className="text-[#c9a961]">{cal.pago}★</span></span>}
+                          </div>
+                        )}
+                        {cal.etiquetas && cal.etiquetas.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mb-2">
+                            {cal.etiquetas.map(e => (
+                              <span key={e} className="px-2 py-0.5 rounded-full text-xs"
+                                style={{
+                                  background: ['grosero','mal_trato','problema_pago','impuntual','no_volveria'].includes(e) ? 'rgba(239,68,68,0.15)' : 'rgba(201,169,97,0.12)',
+                                  color: ['grosero','mal_trato','problema_pago','impuntual','no_volveria'].includes(e) ? '#f87171' : '#c9a961',
+                                  border: `1px solid ${['grosero','mal_trato','problema_pago','impuntual','no_volveria'].includes(e) ? '#ef444455' : '#c9a96144'}`,
+                                }}
+                              >{e.replace(/_/g, ' ')}</span>
+                            ))}
+                          </div>
+                        )}
+                        {cal.observaciones && (
+                          <p className="text-gray-400 text-xs italic border-t border-[#1a1a1a] pt-2">"{cal.observaciones}"</p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+
+            <div className="mt-6">
+              <button
+                onClick={() => setShowCalificacionesModal(false)}
                 className="w-full px-4 py-2 bg-[#1A1A1A] hover:bg-[#2A2A2A] text-white rounded-lg transition-colors"
               >
                 Cerrar

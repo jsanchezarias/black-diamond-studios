@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -8,7 +9,7 @@ import {
   CheckCircle, 
   XCircle, 
   AlertCircle,
-  DollarSign,
+//  DollarSign,
   Calendar,
   User,
   FileText,
@@ -39,17 +40,16 @@ export function GestionarAdelantoModal({
 
   if (!adelanto) return null;
 
-  const handleConfirmar = () => {
+  const handleConfirmar = async () => {
     if (!accion) return;
 
     setProcesando(true);
 
-    // Simular procesamiento
-    setTimeout(() => {
+    try {
       if (accion === 'aprobar') {
-        onAprobar(adelanto.id);
+        await onAprobar(adelanto.id);
       } else {
-        onRechazar(adelanto.id);
+        await onRechazar(adelanto.id);
       }
 
       setProcesando(false);
@@ -59,7 +59,10 @@ export function GestionarAdelantoModal({
       setTimeout(() => {
         handleClose();
       }, 2000);
-    }, 800);
+    } catch (err: any) {
+      toast.error('Ocurrió un error inesperado', { description: err instanceof Error ? err.message : String(err) });
+      setProcesando(false);
+    }
   };
 
   const handleClose = () => {

@@ -130,12 +130,12 @@ export function CarritoBoutiqueModal({ isOpen, onClose, onProcederCheckout }: Ca
                           </Button>
                         </div>
                         <span className="text-xs text-muted-foreground">
-                          ${item.precio.toLocaleString('es-CO')} c/u
+                          ${(item.precio || 0).toLocaleString('es-CO')} c/u
                         </span>
                       </div>
                       <div className="text-right">
                         <p className="text-lg font-bold text-white">
-                          ${(item.precio * item.cantidad).toLocaleString('es-CO')}
+                          ${((item.precio || 0) * item.cantidad).toLocaleString('es-CO')}
                         </p>
                       </div>
                     </div>
@@ -153,12 +153,12 @@ export function CarritoBoutiqueModal({ isOpen, onClose, onProcederCheckout }: Ca
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Subtotal</span>
-                <span className="text-white">${obtenerTotal().toLocaleString('es-CO')}</span>
+                <span className="text-white">${(obtenerTotal() || 0).toLocaleString('es-CO')}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="font-semibold text-white">Total</span>
                 <span className="text-2xl font-bold text-primary">
-                  ${obtenerTotal().toLocaleString('es-CO')}
+                  ${(obtenerTotal() || 0).toLocaleString('es-CO')}
                 </span>
               </div>
             </div>

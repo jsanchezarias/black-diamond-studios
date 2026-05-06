@@ -1,4 +1,5 @@
-import { useState, lazy, Suspense } from 'react';
+import { useState, lazy, Suspense, useEffect } from 'react';
+import { supabase } from '../../utils/supabase/info';
 import IngresosWidget from '../../components/IngresosWidget';
 import { 
   BarChart3, 
@@ -25,27 +26,28 @@ import {
   X,
   LogOut
 } from 'lucide-react';
+import { NotificacionBell } from './NotificacionBell';
+import { BalanceDashboard } from './BalanceDashboard';
 import { LogoIsotipo } from './LogoIsotipo';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
+import { Switch } from '../../components/ui/switch';
 import { useModelos, Modelo } from './ModelosContext';
 import { useServicios } from './ServiciosContext';
 import { usePagos } from './PagosContext';
 import { useInventory } from './InventoryContext';
 import { useGastos } from './GastosContext';
 import { useAgendamientos } from './AgendamientosContext';
-import { toast } from 'sonner';
+import { useClientes } from './ClientesContext';
 // Lazy loading de paneles — solo se cargan cuando se activa la pestaña correspondiente
 const AsistenciaPanel = lazy(() => import('./AsistenciaPanel').then(m => ({ default: m.AsistenciaPanel })));
 const RendimientoModelosPanel = lazy(() => import('../../components/RendimientoModelosPanel').then(m => ({ default: m.RendimientoModelosPanel })));
 const ModelosArchivadasPanel = lazy(() => import('../../components/ModelosArchivadasPanel').then(m => ({ default: m.ModelosArchivadasPanel })));
-const HistorialClientesPanel = lazy(() => import('../../components/HistorialClientesPanel').then(m => ({ default: m.HistorialClientesPanel })));
 const LiquidacionPanel = lazy(() => import('../../components/LiquidacionPanel').then(m => ({ default: m.LiquidacionPanel })));
 const GestionAdelantosPanel = lazy(() => import('../../components/GestionAdelantosPanel').then(m => ({ default: m.GestionAdelantosPanel })));
 const HabitacionesPanel = lazy(() => import('../../components/HabitacionesPanel').then(m => ({ default: m.HabitacionesPanel })));
-const FinanzasPanel = lazy(() => import('../../components/FinanzasPanel').then(m => ({ default: m.FinanzasPanel })));
 const GastosOperativosPanel = lazy(() => import('../../components/GastosOperativosPanel').then(m => ({ default: m.GastosOperativosPanel })));
 const StreamConfigPanel = lazy(() => import('../../components/StreamConfigPanel').then(m => ({ default: m.StreamConfigPanel })));
 const DetalleModeloPanel = lazy(() => import('../../components/DetalleModeloPanel').then(m => ({ default: m.DetalleModeloPanel })));
@@ -54,7 +56,7 @@ const CrearModeloModal = lazy(() => import('../../components/CrearModeloModal').
 const BoutiquePanel = lazy(() => import('../../components/BoutiquePanel').then(m => ({ default: m.BoutiquePanel })));
 const SolicitudesEntradaPanel = lazy(() => import('../../components/SolicitudesEntradaPanel').then(m => ({ default: m.SolicitudesEntradaPanel })));
 const ServiciosPublicosPanel = lazy(() => import('../../components/ServiciosPublicosPanel').then(m => ({ default: m.ServiciosPublicosPanel })));
-const DiagnosticoPanel = lazy(() => import('../../components/admin/DiagnosticoPanel').then(m => ({ default: m.DiagnosticoPanel })));
+const DiagnosticoPanel = lazy(() => import('../../components/administrador/DiagnosticoPanel').then(m => ({ default: m.DiagnosticoPanel })));
 const ConfiguracionChatPanel = lazy(() => import('../../components/ConfiguracionChatPanel').then(m => ({ default: m.ConfiguracionChatPanel })));
 const ChatModeratorPanel = lazy(() => import('../../components/ChatModeratorPanel').then(m => ({ default: m.ChatModeratorPanel })));
 const GestionUsuariosPanel = lazy(() => import('../../components/GestionUsuariosPanel').then(m => ({ default: m.GestionUsuariosPanel })));
@@ -62,7 +64,7 @@ const GestionClientesAdmin = lazy(() => import('./GestionClientesAdmin').then(m 
 const NotificacionesPanel = lazy(() => import('./NotificacionesPanel').then(m => ({ default: m.NotificacionesPanel })));
 const AnalyticsPanel = lazy(() => import('./AnalyticsPanel').then(m => ({ default: m.AnalyticsPanel })));
 const GestionTestimoniosPanel = lazy(() => import('../../components/GestionTestimoniosPanel').then(m => ({ default: m.GestionTestimoniosPanel })));
-const AdminResumenPanel = lazy(() => import('../../components/admin/AdminResumenPanel').then(m => ({ default: m.AdminResumenPanel })));
+const AdministradorResumenPanel = lazy(() => import('../../components/administrador/AdministradorResumenPanel').then(m => ({ default: m.AdministradorResumenPanel })));
 const AgendamientosPanel = lazy(() => import('./AgendamientosPanel').then(m => ({ default: m.AgendamientosPanel })));
 const AgendamientosMetrics = lazy(() => import('./AgendamientosMetrics').then(m => ({ default: m.AgendamientosMetrics })));
 
@@ -88,6 +90,38 @@ export function AdminDashboard({ accessToken, userId, userEmail = '', onLogout }
   const [modeloEditar, setModeloEditar] = useState<Modelo | null>(null);
   const [mostrarCrearModelo, setMostrarCrearModelo] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const { recargarAgendamientos } = useAgendamientos();
+  const { cargarClientes } = useClientes();
+  const { recargarServicios } = useServicios();
+  const { cargarGastos, cargarServicios: cargarServiciosPublicos } = useGastos();
+  const { recargarProductos } = useInventory();
+
+  useEffect(() => {
+    recargarAgendamientos();
+    cargarClientes();
+    recargarServicios();
+    cargarGastos();
+    cargarServiciosPublicos();
+    recargarProductos();
+  }, []);
+
+  useEffect(() => {
+    // Verificar que la sesión sigue siendo válida
+    const verificarSesion = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session || session.user.id !== userId) {
+        console.warn('⚠️ Sesión inválida, cerrando...');
+        onLogout?.();
+      }
+    };
+    
+    verificarSesion();
+    
+    // Verificar cada 5 minutos
+    const interval = setInterval(verificarSesion, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [userId, onLogout]);
   // ✅ MANEJO DEFENSIVO DE CONTEXTOS
   try {
     var pagosCtx = usePagos();
@@ -97,11 +131,11 @@ export function AdminDashboard({ accessToken, userId, userEmail = '', onLogout }
     var gastosCtx = useGastos();
   } catch (error) {
     const isDev = process.env.NODE_ENV === 'development';
-    if (isDev) console.error('❌ ERROR AL CARGAR CONTEXTOS EN ADMIN DASHBOARD:', error);
+    if (isDev) console.error('❌ ERROR AL CARGAR CONTEXTOS EN ADMINISTRADOR DASHBOARD:', error);
     return (
       <div className="min-h-screen w-full flex items-center justify-center bg-[#0f1014]">
         <div className="text-center space-y-4">
-          <h1 className="text-2xl font-bold text-red-500">Error al cargar AdminDashboard</h1>
+          <h1 className="text-2xl font-bold text-red-500">Error al cargar AdministradorDashboard</h1>
           <p className="text-gray-400">{error instanceof Error ? error.message : 'Error desconocido'}</p>
           {onLogout && (
             <Button onClick={onLogout} className="mt-4">
@@ -115,10 +149,48 @@ export function AdminDashboard({ accessToken, userId, userEmail = '', onLogout }
 
   const { obtenerAdelantosPendientes } = pagosCtx;
   const { getAgendamientosPendientesAprobacion } = useAgendamientos();
-  const { modelos = [], modelosArchivadas = [] } = modelosCtx;
+  const { modelos = [], modelosArchivadas = [], actualizarModelo } = modelosCtx;
   const { servicios = [] } = serviciosCtx;
   const { inventario = [] } = inventoryCtx;
   const { gastosOperativos = [] } = gastosCtx || { gastosOperativos: [] };
+
+  // Barrera de seguridad: solo la administradora autorizada puede ver este panel
+  const EMAIL_ADMIN_VALIDO = 'noreidysotto@gmail.com';
+  if (userEmail !== EMAIL_ADMIN_VALIDO) {
+    return (
+      <div style={{
+        backgroundColor: '#0f1014',
+        color: '#e8e6e3',
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'column',
+        gap: '16px',
+      }}>
+        <h1 style={{ color: '#c9a961', fontSize: '1.5rem', fontWeight: 'bold' }}>
+          Acceso denegado
+        </h1>
+        <p style={{ color: '#e8e6e3' }}>No tienes permisos para ver este panel.</p>
+        {onLogout && (
+          <button
+            onClick={onLogout}
+            style={{
+              backgroundColor: '#c9a961',
+              color: '#0f1014',
+              padding: '12px 24px',
+              borderRadius: '8px',
+              fontWeight: 'bold',
+              border: 'none',
+              cursor: 'pointer',
+            }}
+          >
+            Cerrar Sesión
+          </button>
+        )}
+      </div>
+    );
+  }
 
   // Derivar estadísticas desde los servicios reales
   const hoy = new Date().toISOString().split('T')[0];
@@ -250,12 +322,16 @@ export function AdminDashboard({ accessToken, userId, userEmail = '', onLogout }
     .slice()
     .sort((a, b) => new Date(b.fechaCreacion || b.fecha).getTime() - new Date(a.fechaCreacion || a.fecha).getTime())
     .slice(0, 10)
-    .map(s => ({
-      id: s.id,
-      descripcion: `Servicio — ${s.modeloNombre} con ${s.clienteNombre}`,
-      tiempo: new Date(s.fechaCreacion || s.fecha).toLocaleString('es-CO'),
-      tipo: s.estado,
-    }));
+    .map(s => {
+      const fechaObj = new Date(s.fechaCreacion || s.fecha);
+      const tiempoStr = isNaN(fechaObj.getTime()) ? 'Fecha pendiente' : fechaObj.toLocaleString('es-CO');
+      return {
+        id: s.id,
+        descripcion: `Servicio — ${s.modeloNombre} con ${s.clienteNombre}`,
+        tiempo: tiempoStr,
+        tipo: s.estado,
+      };
+    });
 
   const financialSummary = [
     { periodo: 'Hoy', ingresos: ingresosHoy, egresos: gastosHoy, neto: ingresosHoy - gastosHoy },
@@ -269,14 +345,19 @@ export function AdminDashboard({ accessToken, userId, userEmail = '', onLogout }
   return (
     <div className="min-h-screen w-full bg-background" style={{ fontFamily: 'Montserrat, sans-serif' }}>
       {/* Header Premium Fijo */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-card/98 backdrop-blur-premium border-b border-primary/15 shadow-premium">
+      <header className="fixed top-0 left-0 right-0 z-50 bg-card/98 backdrop-blur-premium border-b border-primary/15 shadow-premium border-t-4 border-t-blue-500">
         <div className="flex items-center justify-between px-3 sm:px-6 py-3 max-w-7xl mx-auto">
           <div className="flex items-center gap-3 min-w-0 flex-1">
             <LogoIsotipo size="sm" />
             <div>
-              <h1 className="text-base sm:text-lg font-bold text-primary uppercase tracking-wide truncate" style={{ fontFamily: 'Playfair Display, serif' }}>
-                ADMIN DASHBOARD
-              </h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-base sm:text-lg font-bold text-primary uppercase tracking-wide truncate" style={{ fontFamily: 'Playfair Display, serif' }}>
+                  ADMINISTRADOR DASHBOARD
+                </h1>
+                <Badge className="hidden sm:flex bg-blue-500/10 text-blue-400 border-blue-500/30 px-2 py-0">
+                  🛡️ ADMIN
+                </Badge>
+              </div>
               <p className="text-xs text-muted-foreground hidden sm:block truncate max-w-[200px]">{userEmail}</p>
             </div>
           </div>
@@ -287,12 +368,14 @@ export function AdminDashboard({ accessToken, userId, userEmail = '', onLogout }
                 onClick={onLogout}
                 variant="ghost" 
                 size="sm"
-                className="hidden sm:flex border-primary/20 hover:bg-primary/10 text-red-400 hover:text-red-500"
+                className="flex border-primary/20 hover:bg-primary/10 text-red-400 hover:text-red-500 px-2 sm:px-3"
               >
-                <LogOut className="w-4 h-4 mr-2" />
-                Salir
+                <LogOut className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Salir</span>
               </Button>
             )}
+            
+            <NotificacionBell />
             
             <Button
               onClick={() => setMenuOpen(!menuOpen)}
@@ -308,8 +391,8 @@ export function AdminDashboard({ accessToken, userId, userEmail = '', onLogout }
         {/* Mobile Navigation / Dropdown */}
         {menuOpen && (
           <div className="bg-card/95 backdrop-blur-md border-t border-primary/10 shadow-lg lg:hidden">
-            <nav className="flex flex-col px-4 py-3 space-y-2 max-w-7xl mx-auto">
-              {modulos.slice(0, 8).map((modulo) => (
+            <nav className="flex flex-col px-4 py-3 space-y-1 max-w-7xl mx-auto max-h-[70vh] overflow-y-auto">
+              {modulos.map((modulo) => (
                 <Button 
                   key={modulo.id}
                   onClick={() => {
@@ -327,7 +410,7 @@ export function AdminDashboard({ accessToken, userId, userEmail = '', onLogout }
                 <>
                   <div className="h-px bg-border my-2" />
                   <Button 
-                    onClick={onLogout} 
+                    onClick={() => { setMenuOpen(false); onLogout?.(); }} 
                     variant="ghost" 
                     className="justify-start h-10 text-sm text-red-400 hover:text-red-500"
                   >
@@ -394,7 +477,7 @@ export function AdminDashboard({ accessToken, userId, userEmail = '', onLogout }
 
       {/* Panel de Asistencia */}
       <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Cargando Asistencia...</div>}>
-        <AsistenciaPanel userRole="admin" />
+        <AsistenciaPanel userRole="administrador" />
       </Suspense>
 
       {/* Selector de Módulo - Menú Desplegable */}
@@ -460,8 +543,8 @@ export function AdminDashboard({ accessToken, userId, userEmail = '', onLogout }
       <div className="space-y-4">
         {moduloActivo === 'general' && (
           <div className="space-y-6">
-            <IngresosWidget rol="admin" mostrarDetalle={true} />
-            <AdminResumenPanel 
+            <IngresosWidget rol="administrador" mostrarDetalle={true} />
+            <AdministradorResumenPanel 
               recentActivity={recentActivity}
               financialSummary={financialSummary}
             />
@@ -565,6 +648,25 @@ export function AdminDashboard({ accessToken, userId, userEmail = '', onLogout }
                             </p>
                           </div>
 
+                          <div className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg border border-border/50">
+                            <div>
+                              <p className="text-sm font-medium text-foreground">Disponibilidad</p>
+                              <p className="text-xs text-muted-foreground">
+                                {modelo.disponible ? 'Actualmente en servicio' : 'Fuera de servicio'}
+                              </p>
+                            </div>
+                            <Switch
+                              checked={modelo.disponible}
+                              onCheckedChange={async (checked) => {
+                                try {
+                                  await actualizarModelo(modelo.id, { disponible: checked });
+                                } catch (error) {
+                                  console.error('Error al cambiar disponibilidad:', error);
+                                }
+                              }}
+                            />
+                          </div>
+
                           <div className="flex items-center justify-between pt-2 border-t border-border/50">
                             <div>
                               <p className="text-xs text-muted-foreground">Servicios</p>
@@ -647,14 +749,14 @@ export function AdminDashboard({ accessToken, userId, userEmail = '', onLogout }
 
         {moduloActivo === 'finanzas' && (
           <div className="space-y-6">
-            <IngresosWidget rol="admin" mostrarDetalle={true} />
+            <IngresosWidget rol="administrador" mostrarDetalle={true} />
             <Tabs defaultValue="analisis">
               <TabsList className="mb-6">
                 <TabsTrigger value="analisis">Análisis Financiero</TabsTrigger>
                 <TabsTrigger value="gastos">Gastos Operativos</TabsTrigger>
               </TabsList>
               <TabsContent value="analisis">
-                <FinanzasPanel serviciosFinalizados={serviciosFinalizados} />
+                <BalanceDashboard />
               </TabsContent>
               <TabsContent value="gastos">
                 <GastosOperativosPanel userEmail={userEmail} />
@@ -720,12 +822,12 @@ export function AdminDashboard({ accessToken, userId, userEmail = '', onLogout }
 
         {moduloActivo === 'agendamientos' && (
           <div className="space-y-4">
-            <AgendamientosMetrics rol="admin" />
+            <AgendamientosMetrics rol="administrador" />
             <AgendamientosPanel rol="admin" userEmail={userEmail} />
           </div>
         )}
 
-        {moduloActivo === 'boutique' && <BoutiquePanel />}
+        {moduloActivo === 'boutique' && <BoutiquePanel accessToken={accessToken} userId={userId} />}
 
         {moduloActivo === 'streams' && (
           <StreamConfigPanel accessToken={accessToken} />
@@ -751,7 +853,7 @@ export function AdminDashboard({ accessToken, userId, userEmail = '', onLogout }
         )}
 
         {moduloActivo === 'programadores' && (
-          <GestionUsuariosPanel userRole="admin" />
+          <GestionUsuariosPanel userRole="administrador" />
         )}
 
         {moduloActivo === 'notificaciones' && (

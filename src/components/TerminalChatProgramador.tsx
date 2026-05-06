@@ -1,5 +1,5 @@
 import { toast } from 'sonner';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -47,9 +47,8 @@ interface TerminalChatProgramadorProps {
   userEmail: string;
 }
 
-export function TerminalChatProgramador({ userId, userEmail }: TerminalChatProgramadorProps) {
+export function TerminalChatProgramador({ userEmail }: TerminalChatProgramadorProps) {
   const clientesContext = useClientes();
-  const clientes = clientesContext?.clientes ?? [];
   const buscarPorTelefono = clientesContext?.buscarPorTelefono ?? (() => null);
   
   const [conversaciones, setConversaciones] = useState<Conversacion[]>([]);

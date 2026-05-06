@@ -1,11 +1,11 @@
-import { Calendar, CheckCircle, Clock, XCircle, AlertCircle, TrendingUp, DollarSign, ThumbsUp } from 'lucide-react';
+import { Calendar, CheckCircle, Clock, XCircle, TrendingUp, DollarSign, ThumbsUp } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
 import { useAgendamientos } from './AgendamientosContext';
 
 const COLOR_PRIMARY = '#c9a961';
 
 interface AgendamientosMetricsProps {
-  rol: 'owner' | 'admin' | 'supervisor' | 'recepcionista' | 'modelo';
+  rol: 'owner' | 'administrador' | 'programador' | 'modelo';
   modeloEmail?: string;
 }
 
@@ -29,10 +29,10 @@ export function AgendamientosMetrics({ rol, modeloEmail }: AgendamientosMetricsP
   const canceladosHoy  = hoyFuente.filter(a => a.estado === 'cancelado' || a.estado === 'no_show').length;
   const activosHoy     = hoyFuente.filter(a => a.estado === 'confirmado' || a.estado === 'aprobado').length;
 
-  // Métricas extendidas (admin/owner/supervisor)
-  const ingresosPotencialHoy = hoyFuente
-    .filter(a => a.estado !== 'cancelado' && a.estado !== 'no_show')
-    .reduce((s, a) => s + a.montoPago, 0);
+  // Métricas extendidas (administrador/owner)
+  // const ingresosPotencialHoy = hoyFuente
+  //   .filter(a => a.estado !== 'cancelado' && a.estado !== 'no_show')
+  //   .reduce((s, a) => s + a.montoPago, 0);
   const ingresosRealizadosHoy = hoyFuente
     .filter(a => a.estado === 'completado')
     .reduce((s, a) => s + a.montoPago, 0);
@@ -58,18 +58,7 @@ export function AgendamientosMetrics({ rol, modeloEmail }: AgendamientosMetricsP
     );
   }
 
-  if (rol === 'recepcionista') {
-    return (
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <MetricCard icon={<Calendar className="w-4 h-4" />} label="Total hoy" value={totalHoy} color="primary" />
-        <MetricCard icon={<Clock className="w-4 h-4" />} label="Activos" value={activosHoy} color="blue" />
-        <MetricCard icon={<CheckCircle className="w-4 h-4" />} label="Completados" value={completadosHoy} color="green" />
-        <MetricCard icon={<AlertCircle className="w-4 h-4" />} label="Pend. aprob." value={pendientesAprobacion.length} color="amber" />
-      </div>
-    );
-  }
-
-  // supervisor / admin / owner
+  // administrador / owner / programador
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
       <MetricCard icon={<Calendar className="w-4 h-4" />} label="Total hoy" value={totalHoy} color="primary" />

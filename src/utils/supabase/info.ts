@@ -2,9 +2,23 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-export const projectId = "kzdjravwcjummegxxrkd"
-export const publicAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt6ZGpyYXZ3Y2p1bW1lZ3h4cmtkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3NzY4ODIsImV4cCI6MjA4MzM1Mjg4Mn0.xC2QDsAzhYRRg8yakyRTChzHL_bleIT-u9mtKlNeBpc"
+// ✅ Cliente de Supabase configurado con variables de entorno y sessionStorage
+// ✅ Cliente de Supabase configurado con variables de entorno y fallback de seguridad
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://kzdjravwcjummegxxrkd.supabase.co';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt6ZGpyYXZ3Y2p1bW1lZ3h4cmtkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3NzY4ODIsImV4cCI6MjA4MzM1Mjg4Mn0.xC2QDsAzhYRRg8yakyRTChzHL_bleIT-u9mtKlNeBpc';
 
-// ✅ Cliente de Supabase
-const supabaseUrl = `https://${projectId}.supabase.co`;
-export const supabase = createClient(supabaseUrl, publicAnonKey);
+if (!import.meta.env.VITE_SUPABASE_URL) {
+  console.warn('⚠️ Nota: Usando fallback de URL de Supabase (Vite no leyó el .env)');
+}
+
+export const projectId = 'kzdjravwcjummegxxrkd';
+export const publicAnonKey = supabaseAnonKey;
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    storage: typeof window !== 'undefined' ? window.sessionStorage : undefined,
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true
+  }
+});

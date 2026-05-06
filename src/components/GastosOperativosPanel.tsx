@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { DollarSign, Plus, TrendingUp, Calendar, Filter, CheckCircle, XCircle, Clock, Eye, Trash2, Download } from 'lucide-react';
+import { DollarSign, Plus, TrendingUp, Filter, CheckCircle, XCircle, Clock, Eye, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { useGastos } from '../app/components/GastosContext';
 import { AgregarGastoModal } from './AgregarGastoModal';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 interface GastosOperativosPanelProps {
   userEmail: string;

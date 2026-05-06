@@ -10,7 +10,7 @@ interface IngresosWidgetProps {
 const IngresosWidget = ({
   rol,
   modeloEmail = null,
-  mostrarDetalle = false
+  mostrarDetalle: _mostrarDetalle = false
 }: IngresosWidgetProps) => {
   const [data, setData] = useState({
     hoy: 0,
@@ -71,7 +71,7 @@ const IngresosWidget = ({
     return () => { supabase.removeChannel(channel) }
   }, [rol, modeloEmail])
 
-  const fmt = (n: number) => '$' + Math.round(n).toLocaleString('es-CO')
+  const fmt = (n: number) => '$' + Math.round(n || 0).toLocaleString('es-CO')
 
   if (loading) return <div style={{ color: 'rgba(255,255,255,0.5)', padding: 16 }}>Cargando ingresos...</div>
 

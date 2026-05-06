@@ -183,7 +183,6 @@ export function DetalleCitaModal({ isOpen, onClose, cita }: DetalleCitaModalProp
           <Button 
             className="bg-primary hover:bg-primary/90"
             onClick={() => {
-              // Aquí podrías agregar funcionalidad para confirmar la cita
               onClose();
             }}
           >

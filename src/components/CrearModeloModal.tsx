@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from './ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -17,7 +17,7 @@ interface CrearModeloModalProps {
 }
 
 export function CrearModeloModal({ open, onClose }: CrearModeloModalProps) {
-  const { agregarModelo, recargarModelos } = useModelos();
+  const { recargarModelos } = useModelos();
   const [loading, setLoading] = useState(false);
   
   // Datos del perfil de la modelo
@@ -31,7 +31,7 @@ export function CrearModeloModal({ open, onClose }: CrearModeloModalProps) {
   const [altura, setAltura] = useState('');
   const [medidas, setMedidas] = useState('');
   const [sede, setSede] = useState('Sede Zona Norte');
-  const [fotoPerfil, setFotoPerfil] = useState('');
+  const [_fotoPerfil, _setFotoPerfil] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [activa, setActiva] = useState(true);
   const [disponible, setDisponible] = useState(true);
@@ -73,7 +73,7 @@ export function CrearModeloModal({ open, onClose }: CrearModeloModalProps) {
     setAltura('');
     setMedidas('');
     setSede('Sede Zona Norte');
-    setFotoPerfil('');
+    _setFotoPerfil('');
     setDescripcion('');
     setActiva(true);
     setDisponible(true);
@@ -209,7 +209,7 @@ export function CrearModeloModal({ open, onClose }: CrearModeloModalProps) {
     reader.readAsDataURL(archivo);
   };
 
-  // Convertir archivo a base64
+/*
   const convertirArchivoABase64 = (archivo: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -218,6 +218,7 @@ export function CrearModeloModal({ open, onClose }: CrearModeloModalProps) {
       reader.readAsDataURL(archivo);
     });
   };
+*/
 
   // Manejar submit del formulario
   const handleSubmit = async (e: React.FormEvent) => {
@@ -282,7 +283,7 @@ export function CrearModeloModal({ open, onClose }: CrearModeloModalProps) {
       if (archivoFoto) {
         try {
           const fileName = `${email.split('@')[0]}/perfil-${Date.now()}.${archivoFoto.name.split('.').pop()}`;
-          const { data: uploadData, error: uploadError } = await supabase.storage
+          const { error: uploadError } = await supabase.storage
             .from(bucketName)
             .upload(fileName, archivoFoto, {
               cacheControl: '3600',
@@ -309,7 +310,7 @@ export function CrearModeloModal({ open, onClose }: CrearModeloModalProps) {
           const archivo = archivosFotosAdicionales[i];
           try {
             const fileName = `${email.split('@')[0]}/adicional-${i + 1}-${Date.now()}.${archivo.name.split('.').pop()}`;
-            const { data: uploadData, error: uploadError } = await supabase.storage
+            const { error: uploadError } = await supabase.storage
               .from(bucketName)
               .upload(fileName, archivo, {
                 cacheControl: '3600',
@@ -335,7 +336,7 @@ export function CrearModeloModal({ open, onClose }: CrearModeloModalProps) {
       if (archivoDocumentoFrente) {
         try {
           const fileName = `${email.split('@')[0]}/doc-frente-${Date.now()}.${archivoDocumentoFrente.name.split('.').pop()}`;
-          const { data: uploadData, error: uploadError } = await supabase.storage
+          const { error: uploadError } = await supabase.storage
             .from(bucketName)
             .upload(fileName, archivoDocumentoFrente, {
               cacheControl: '3600',
@@ -359,7 +360,7 @@ export function CrearModeloModal({ open, onClose }: CrearModeloModalProps) {
       if (archivoDocumentoReverso) {
         try {
           const fileName = `${email.split('@')[0]}/doc-reverso-${Date.now()}.${archivoDocumentoReverso.name.split('.').pop()}`;
-          const { data: uploadData, error: uploadError } = await supabase.storage
+          const { error: uploadError } = await supabase.storage
             .from(bucketName)
             .upload(fileName, archivoDocumentoReverso, {
               cacheControl: '3600',
@@ -379,34 +380,43 @@ export function CrearModeloModal({ open, onClose }: CrearModeloModalProps) {
         }
       }
 
-      // Paso 2: Crear usuario en Auth con signUp
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: email,
-        password: password,
-        options: {
-          data: {
-            nombre: nombre,
-            role: 'modelo'
-          },
-          emailRedirectTo: undefined // No enviar email de confirmación
+      // Paso 2: Crear usuario vía Edge Function (evita desloguear al admin)
+      const { data: fnData, error: fnError } = await supabase.functions.invoke('server', {
+        method: 'POST',
+        headers: { 'x-invoke-path': '/make-server-9dadc017/administrador/crear-usuario' },
+        body: {
+          email: email,
+          password: password,
+          nombre: nombre,
+          role: 'modelo',
+          _path: '/make-server-9dadc017/administrador/crear-usuario'
         }
       });
 
-      if (authError) {
-        if (process.env.NODE_ENV === 'development') console.error('❌ Error creando usuario en Auth:', authError);
-        toast.error(`Error al crear usuario: ${authError.message}`);
+      const responseError = fnError || (fnData?.error ? new Error(fnData.error) : null);
+
+      if (responseError) {
+        if (process.env.NODE_ENV === 'development') console.error('❌ Error creando usuario en Auth:', responseError);
+        toast.error(`Error al crear usuario: ${responseError.message}`);
         setLoading(false);
         return;
       }
 
-      if (!authData.user) {
-        if (process.env.NODE_ENV === 'development') console.error('❌ No se obtuvo el usuario de Auth');
-        toast.error('Error al crear usuario en el sistema');
+      // Recuperar el ID del usuario recién creado
+      const { data: newUser, error: findError } = await supabase
+        .from('usuarios')
+        .select('id')
+        .eq('email', email)
+        .single();
+
+      if (findError || !newUser) {
+        if (process.env.NODE_ENV === 'development') console.error('❌ No se pudo encontrar el usuario recién creado');
+        toast.error('Error al recuperar los datos del usuario en el sistema');
         setLoading(false);
         return;
       }
 
-      const userId = authData.user.id;
+      const userId = newUser.id;
 
       // Paso 3: Insertar datos completos en tabla usuarios
 

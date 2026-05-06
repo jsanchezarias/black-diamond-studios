@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useAgendamientos } from './AgendamientosContext';
 import { toast } from 'sonner';
 
-export function useServiceAlarms(userEmail?: string, rol?: 'modelo' | 'supervisor' | 'admin') {
+export function useServiceAlarms(userEmail?: string, rol?: 'modelo' | 'administrador' | 'programador' | 'owner') {
   const context = useAgendamientos();
   // Safe check if context is undefined (not inside provider)
   const agendamientos = context?.agendamientos || [];

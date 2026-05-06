@@ -1,897 +1,862 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../../utils/supabase/info';
-import { notificarProgramadores } from './NotificacionesHelpers';
-import { toast } from 'sonner';
-import {
-  Calendar, User, LogOut, Plus, Loader2, Bell,
-  Clock, CheckCircle2, XCircle, AlertCircle, Sparkles,
-  ChevronRight, MapPin, Star, Phone, Mail, Edit2, Save, X
-} from 'lucide-react';
+import { ClienteNavbar } from './ClienteNavbar';
+import { useAgendamientos } from './AgendamientosContext';
 import { useModelos } from './ModelosContext';
-import { Logo } from './Logo';
+import { ClienteAgendarModal } from './ClienteAgendarModal';
+import { supabase } from '../../utils/supabase/info';
+import { toast } from 'sonner';
+import { Calendar, Sparkles, Lock, Mail, Phone, Loader2, Star, ArrowRight } from 'lucide-react';
 
+// ─── Props ────────────────────────────────────────────────────────────────────
 interface ClienteDashboardProps {
+  accessToken: string;
   userId: string;
   userEmail: string;
   onLogout: () => void;
 }
 
-type Tab = 'citas' | 'solicitar' | 'notificaciones' | 'perfil';
+type Tab = 'explorar' | 'mis-citas' | 'perfil';
 
-const ESTADO_CONFIG: Record<string, { label: string; color: string; bg: string; icon: typeof CheckCircle2 }> = {
-  pendiente:        { label: 'Pendiente',   color: 'text-amber-400',  bg: 'bg-amber-400/10 border-amber-400/30',  icon: AlertCircle },
-  solicitud_cliente:{ label: 'Pendiente',   color: 'text-amber-400',  bg: 'bg-amber-400/10 border-amber-400/30',  icon: AlertCircle },
-  aprobado:         { label: 'Aprobada',    color: 'text-blue-400',   bg: 'bg-blue-400/10 border-blue-400/30',    icon: CheckCircle2 },
-  confirmado:       { label: 'Confirmada',  color: 'text-green-400',  bg: 'bg-green-400/10 border-green-400/30',  icon: CheckCircle2 },
-  en_curso:         { label: 'En curso',    color: 'text-green-300',  bg: 'bg-green-400/10 border-green-400/30',  icon: Sparkles },
-  completado:       { label: 'Completada',  color: 'text-white/40',   bg: 'bg-white/5 border-white/10',           icon: CheckCircle2 },
-  cancelado:        { label: 'Cancelada',   color: 'text-red-400',    bg: 'bg-red-400/10 border-red-400/30',      icon: XCircle },
-  no_show:          { label: 'No asistió',  color: 'text-gray-500',   bg: 'bg-white/5 border-white/5',            icon: XCircle },
+// ─── Paleta de colores ────────────────────────────────────────────────────────
+const C = {
+  bg: '#0f1014',
+  card: '#16181c',
+  gold: '#c9a961',
+  goldHover: '#d4b86a',
+  goldSoft: 'rgba(201,169,97,0.1)',
+  text: '#e8e6e3',
+  muted: '#888',
+  border: '#2a2a2a',
+  borderGold: 'rgba(201,169,97,0.3)',
 };
 
-function formatearFechaES(fechaStr: string): string {
-  const [y, m, d] = fechaStr.split('-').map(Number);
-  const fecha = new Date(y, m - 1, d);
-  return fecha.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+// ─── Configuración de estados ─────────────────────────────────────────────────
+const ESTADO_CONFIG: Record<string, { label: string; bg: string; color: string; icon: string }> = {
+  pendiente:            { label: 'Pendiente',  bg: 'rgba(234,179,8,0.12)',   color: '#eab308', icon: '⏳' },
+  solicitud_cliente:    { label: 'Pendiente',  bg: 'rgba(234,179,8,0.12)',   color: '#eab308', icon: '⏳' },
+  aceptado_programador: { label: 'Aceptada',   bg: 'rgba(34,197,94,0.12)',   color: '#22c55e', icon: '✅' },
+  confirmado:           { label: 'Confirmada', bg: 'rgba(34,197,94,0.12)',   color: '#22c55e', icon: '✅' },
+  aprobado:             { label: 'Aprobada',   bg: 'rgba(59,130,246,0.12)',  color: '#60a5fa', icon: '✅' },
+  completado:           { label: 'Completada', bg: 'rgba(107,114,128,0.12)', color: '#9ca3af', icon: '☑️' },
+  finalizado:           { label: 'Completada', bg: 'rgba(107,114,128,0.12)', color: '#9ca3af', icon: '☑️' },
+  cancelado:            { label: 'Cancelada',  bg: 'rgba(239,68,68,0.12)',   color: '#ef4444', icon: '❌' },
+  rechazado:            { label: 'Rechazada',  bg: 'rgba(239,68,68,0.12)',   color: '#ef4444', icon: '🚫' },
+  no_show:              { label: 'No Show',    bg: 'rgba(239,68,68,0.12)',   color: '#ef4444', icon: '❌' },
+};
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function formatFecha(f: string) {
+  if (!f) return '';
+  try {
+    const [y, m, d] = f.split('T')[0].split('-');
+    return new Date(+y, +m - 1, +d).toLocaleDateString('es-CO', {
+      weekday: 'long', day: 'numeric', month: 'long',
+    });
+  } catch { return f; }
 }
 
-function formatearHora(hora: string): string {
-  if (!hora) return '';
-  const [h, min] = hora.split(':').map(Number);
-  const suffix = h >= 12 ? 'PM' : 'AM';
-  const h12 = h % 12 || 12;
-  return `${h12}:${String(min).padStart(2, '0')} ${suffix}`;
+function isLocked(fecha: string, hora: string): boolean {
+  try {
+    const [y, m, d] = fecha.split('-').map(Number);
+    const [hh, mm] = (hora || '00:00').split(':').map(Number);
+    const citaDate = new Date(y, m - 1, d, hh, mm);
+    return (citaDate.getTime() - Date.now()) / (1000 * 60 * 60) <= 12;
+  } catch { return false; }
 }
 
-function calcularCuentaRegresiva(fecha: string, hora: string): string {
-  const ahora = new Date();
-  const citaDate = new Date(`${fecha}T${hora || '00:00'}:00`);
-  const diff = citaDate.getTime() - ahora.getTime();
-  if (diff <= 0) return 'Ahora mismo';
-  const horas = Math.floor(diff / (1000 * 60 * 60));
-  const minutos = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-  if (horas >= 24) {
-    const dias = Math.floor(horas / 24);
-    return dias === 1 ? 'Mañana' : `En ${dias} días`;
-  }
-  if (horas > 0) return `Faltan ${horas}h ${minutos}min`;
-  return `Faltan ${minutos} minutos`;
-}
-
-const SERVICIOS_MODAL = [
-  { nombre: 'Rato',    duracion: '15 min',  duracion_minutos: 15,  precio: 130000 },
-  { nombre: '30 Min',  duracion: '30 min',  duracion_minutos: 30,  precio: 160000 },
-  { nombre: '1 Hora',  duracion: '1 hora',  duracion_minutos: 60,  precio: 190000 },
-  { nombre: '2 Horas', duracion: '2 horas', duracion_minutos: 120, precio: 360000 },
-  { nombre: '3 Horas', duracion: '3 horas', duracion_minutos: 180, precio: 520000 },
-  { nombre: '6 Horas', duracion: '6 horas', duracion_minutos: 360, precio: 1000000 },
-];
-
-function EstadoBadge({ estado }: { estado: string }) {
-  const cfg = ESTADO_CONFIG[estado] || { label: estado, color: 'text-white/50', bg: 'bg-white/5 border-white/10', icon: AlertCircle };
-  const Icon = cfg.icon;
+// ─── Skeleton card ────────────────────────────────────────────────────────────
+function SkeletonCard({ delay = 0 }: { delay?: number }) {
   return (
-    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border ${cfg.bg} ${cfg.color}`}>
-      <Icon className="w-3 h-3" />
-      {cfg.label}
-    </span>
+    <div 
+      className="rounded-2xl overflow-hidden flex flex-col h-auto sm:h-[600px] w-full animate-pulse"
+      style={{ 
+        background: C.card, 
+        border: `1px solid ${C.border}`,
+        animationDelay: `${delay}s`
+      }}
+    >
+      <div className="h-[240px] sm:h-[300px] md:h-[400px] bg-white/5" />
+      <div className="p-5 flex-1 flex flex-col">
+        <div className="h-4 w-3/4 bg-white/5 rounded mb-4" />
+        <div className="flex flex-wrap gap-2 mb-8">
+          <div className="h-5 w-16 bg-white/5 rounded-full" />
+          <div className="h-5 w-20 bg-white/5 rounded-full" />
+          <div className="h-5 w-14 bg-white/5 rounded-full" />
+        </div>
+        <div className="mt-auto pt-4 border-t border-white/5">
+          <div className="h-8 w-1/2 bg-white/5 rounded mb-4" />
+          <div className="h-12 w-full bg-white/5 rounded-xl" />
+        </div>
+      </div>
+    </div>
   );
 }
 
-function CitaCard({ cita, esHoy = false }: { cita: any; esHoy?: boolean }) {
+// ─── PremiumModelCard ─────────────────────────────────────────────────────────
+interface PremiumModelCardProps {
+  modelo: any;
+  index: number;
+  onAgendar: () => void;
+}
+
+function PremiumModelCard({ modelo, index, onAgendar }: PremiumModelCardProps) {
+  const [hovered, setHovered] = useState(false);
+  const [imgError, setImgError] = useState(false);
+  const delay = `${index * 0.1}s`;
+
+  const photoToShow = modelo.photo || (modelo.gallery && modelo.gallery[0]);
+  
+  const precios = (modelo.services || [])
+    .map((s: any) => {
+      if (!s.price) return 0;
+      const cleanPrice = String(s.price).replace(/[^0-9]/g, '');
+      return parseInt(cleanPrice) || 0;
+    })
+    .filter((p: number) => p > 0);
+  
+  const precioBase = precios.length > 0 
+    ? Math.min(...precios).toLocaleString('es-CO') 
+    : (modelo.services?.[0]?.price || null);
+
   return (
-    <div className={`rounded-xl border p-4 transition-all ${
-      esHoy
-        ? 'bg-amber-500/5 border-amber-500/30 shadow-[0_0_20px_rgba(245,158,11,0.08)]'
-        : 'bg-white/[0.03] border-white/10 hover:border-white/20'
-    }`}>
-      {esHoy && (
-        <div className="flex items-center gap-2 mb-3 pb-3 border-b border-amber-500/20">
-          <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-          <span className="text-xs font-semibold text-amber-400 uppercase tracking-wider">Cita de hoy</span>
-          <span className="ml-auto text-xs text-amber-400/70 font-medium">
-            {calcularCuentaRegresiva(cita.fecha, cita.hora)}
-          </span>
-        </div>
-      )}
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <p className="font-semibold text-white text-sm truncate">
-            {cita.modelo_nombre || 'Modelo por confirmar'}
-          </p>
-          <div className="mt-1.5 space-y-1">
-            <div className="flex items-center gap-1.5 text-xs text-white/50">
-              <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
-              <span className="capitalize">{formatearFechaES(cita.fecha)}</span>
+    <div
+      className="rounded-2xl overflow-hidden flex flex-col w-full min-h-[600px] h-full group"
+      style={{
+        background: C.card,
+        border: hovered ? `1px solid ${C.gold}` : `1px solid ${C.border}`,
+        boxShadow: hovered ? '0 10px 30px rgba(0,0,0,0.5), 0 0 20px rgba(201,169,97,0.1)' : 'none',
+        transition: 'all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1)',
+        animation: `bdFadeInUp 0.5s ease ${delay} both`,
+        position: 'relative',
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {/* 1. Foto Area - Responsiva */}
+      <div className="relative h-[240px] sm:h-[300px] md:h-[400px] w-full overflow-hidden flex-none">
+        {photoToShow && !imgError ? (
+          <img
+            src={photoToShow}
+            alt={modelo.name}
+            onError={() => setImgError(true)}
+            className="w-full h-full object-cover"
+            style={{
+              transform: hovered ? 'scale(1.05)' : 'scale(1)',
+              transition: 'transform 0.6s cubic-bezier(0.165, 0.84, 0.44, 1)',
+            }}
+          />
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center gap-3"
+            style={{ background: 'linear-gradient(135deg, #1a1c20 0%, #0f1014 100%)' }}>
+            <Sparkles className="w-8 h-8 opacity-20" style={{ color: C.gold }} />
+            <span className="text-[10px] uppercase tracking-widest opacity-30" style={{ color: C.text }}>Sin Imagen</span>
+          </div>
+        )}
+
+        {/* Gradiente sobre la foto para legibilidad del nombre */}
+        <div className="absolute inset-0 pointer-events-none" style={{
+          background: 'linear-gradient(to top, rgba(15,16,20,0.95) 0%, rgba(15,16,20,0.4) 30%, transparent 100%)',
+        }} />
+
+        {/* Nombre y Estado (Flotando sobre la foto) */}
+        <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5">
+          <div className="flex items-end justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <h3 className="truncate" style={{
+                fontFamily: "'Playfair Display', serif",
+                fontSize: '1.25rem', fontWeight: 700,
+                color: 'white', margin: 0, textShadow: '0 2px 10px rgba(0,0,0,0.8)',
+              }}>
+                {modelo.name}
+              </h3>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-[10px] font-medium opacity-80" style={{ color: C.gold }}>
+                  {modelo.location}
+                </span>
+                <span className="w-1 h-1 rounded-full bg-white/20" />
+                <span className="text-[10px] font-medium opacity-80" style={{ color: 'white' }}>
+                  {modelo.age} años
+                </span>
+              </div>
             </div>
-            {cita.hora && (
-              <div className="flex items-center gap-1.5 text-xs text-white/50">
-                <Clock className="w-3.5 h-3.5 flex-shrink-0" />
-                <span>{formatearHora(cita.hora)}</span>
-                {cita.duracion_minutos && (
-                  <span className="text-white/30">· {cita.duracion_minutos} min</span>
-                )}
+            
+            {modelo.available ? (
+              <div className="flex items-center gap-1.5 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[8px] sm:text-[9px] font-bold uppercase tracking-wider flex-shrink-0"
+                style={{ background: 'rgba(34,197,94,0.15)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.3)' }}>
+                <span className="w-1.5 h-1.5 rounded-full bg-green-400 shadow-[0_0_8px_#4ade80]"
+                  style={{ animation: 'bdPulse 2s infinite' }} />
+                Libre
               </div>
-            )}
-            {cita.tipo_servicio && (
-              <div className="flex items-center gap-1.5 text-xs text-white/50">
-                <Star className="w-3.5 h-3.5 flex-shrink-0" />
-                <span>{cita.tipo_servicio}</span>
-              </div>
-            )}
-            {cita.sede && (
-              <div className="flex items-center gap-1.5 text-xs text-white/50">
-                <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
-                <span>{cita.sede}</span>
+            ) : (
+              <div className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[8px] sm:text-[9px] font-bold uppercase tracking-wider flex-shrink-0"
+                style={{ background: 'rgba(255,255,255,0.05)', color: '#9ca3af', border: '1px solid rgba(255,255,255,0.1)' }}>
+                Ocupada
               </div>
             )}
           </div>
         </div>
-        <div className="flex flex-col items-end gap-2 flex-shrink-0">
-          <EstadoBadge estado={cita.estado} />
-          {cita.precio > 0 && (
-            <span className="text-xs text-white/40">
-              ${Number(cita.precio).toLocaleString('es-CO')}
+      </div>
+
+      {/* 2. Content Area */}
+      <div className="p-4 sm:p-5 flex flex-col flex-1" style={{ background: 'rgba(255,255,255,0.01)' }}>
+        {/* Sección de Tags (Especialidades/Servicios) - Scroll horizontal en móvil */}
+        <div className="mb-4 relative">
+          <div className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-1 pr-8">
+            {(modelo.services || []).length > 0 ? (
+              (modelo.services || []).map((s: any, i: number) => (
+                <span key={i} className="px-2.5 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-colors whitespace-nowrap flex-shrink-0"
+                  style={{ 
+                    background: 'rgba(201,169,97,0.1)', 
+                    color: C.gold, 
+                    border: '1px solid rgba(201,169,97,0.2)',
+                  }}>
+                  {s.name}
+                </span>
+              ))
+            ) : (
+              <span className="px-2 py-1 rounded-md text-[9px] font-semibold uppercase tracking-wider opacity-30" style={{ color: C.text }}>
+                Servicios premium
+              </span>
+            )}
+          </div>
+          {/* Indicador de scroll sutil */}
+          <div className="absolute right-0 top-0 bottom-1 w-8 bg-gradient-to-l from-[#16181c] to-transparent pointer-events-none sm:hidden" />
+        </div>
+
+        {/* Footer: Precio + Botón - SIEMPRE VISIBLE */}
+        <div className="mt-auto pt-4 border-t border-white/5 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col bg-white/10 p-2 px-3 rounded-xl border border-white/10 shadow-inner">
+              <span className="text-[10px] uppercase tracking-[0.2em] font-black mb-1" style={{ color: C.gold }}>
+                Desde
+              </span>
+              <div className="flex items-baseline gap-1">
+                <span className="text-sm font-bold" style={{ color: C.gold }}>$</span>
+                <span className="text-2xl font-black tracking-tighter" style={{ color: 'white' }}>
+                  {precioBase || 'Ver tarifas'}
+                </span>
+                <span className="text-[10px] font-bold ml-1" style={{ color: C.gold }}>COP</span>
+              </div>
+            </div>
+            
+            <div className="flex flex-col items-end gap-1">
+              <div className="flex items-center gap-1">
+                <span className="text-sm font-black text-white">5.0</span>
+                <Star className="w-4 h-4" style={{ fill: C.gold, color: C.gold }} />
+              </div>
+              <span className="text-[10px] uppercase tracking-widest font-bold text-white/40">Rating</span>
+            </div>
+          </div>
+
+          <button
+            onClick={onAgendar}
+            className="w-full py-4 rounded-xl font-black text-[11px] uppercase tracking-[0.15em] transition-all duration-300 flex items-center justify-center gap-2 group/btn shadow-lg"
+            style={{
+              background: `linear-gradient(135deg, ${C.gold} 0%, #a07c3a 100%)`,
+              color: '#0f1014',
+              transform: hovered ? 'translateY(-2px)' : 'none',
+              boxShadow: hovered ? `0 8px 25px rgba(201,169,97,0.4)` : '0 4px 15px rgba(0,0,0,0.3)',
+            }}
+          >
+            ◆ Agendar Experiencia
+            <ArrowRight className="w-4 h-4 transition-transform group-hover/btn:translate-x-1" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface CitaCardProps {
+  cita: any;
+  cfg: { label: string; bg: string; color: string; icon: string };
+  locked: boolean;
+  esActiva: boolean;
+  cancelando: boolean;
+  confirmCancel: boolean;
+  onModificar: () => void;
+  onCancelar: () => void;
+  onConfirmCancel: () => void;
+  onAbortCancel: () => void;
+}
+
+function CitaCard({
+  cita, cfg, locked, esActiva,
+  cancelando, confirmCancel,
+  onModificar, onCancelar, onConfirmCancel, onAbortCancel,
+}: CitaCardProps) {
+  return (
+    <div
+      className="rounded-2xl p-5 transition-all duration-200"
+      style={{ background: C.card, border: `1px solid ${C.border}`, animation: 'bdFadeInUp 0.3s ease' }}
+    >
+      <div className="flex items-start gap-4">
+        {/* Icono de cita */}
+        <div className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0"
+          style={{ background: 'rgba(201,169,97,0.08)', border: `1px solid ${C.borderGold}` }}>
+          <Calendar style={{ color: C.gold, width: 22, height: 22 }} />
+        </div>
+
+        {/* Información */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2 flex-wrap">
+            <h4 className="font-bold text-white truncate"
+              style={{ fontFamily: "'Playfair Display', serif", fontSize: '1rem' }}>
+              {cita.modeloNombre || cita.modelo_nombre || 'Modelo'}
+            </h4>
+            <span className="text-xs font-bold px-2.5 py-1 rounded-full flex-shrink-0 flex items-center gap-1"
+              style={{ background: cfg.bg, color: cfg.color }}>
+              {cfg.icon} {cfg.label}
             </span>
+          </div>
+
+          <div className="mt-2 space-y-1" style={{ fontSize: '0.8rem', color: C.muted }}>
+            <div className="flex items-center gap-2">
+              <span>📅</span>
+              <span>{formatFecha(cita.fecha)} · {cita.hora || '--:--'}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span>💆</span>
+              <span>{cita.tarifaNombre || cita.servicio || cita.tipoServicio || 'Servicio'}</span>
+            </div>
+            {(cita.montoPago > 0 || cita.monto_pago > 0) && (
+              <div className="flex items-center gap-2">
+                <span>💰</span>
+                <span style={{ color: C.gold, fontWeight: 600 }}>
+                  ${(cita.montoPago || cita.monto_pago || 0).toLocaleString('es-CO')} COP
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Acciones solo para citas activas */}
+      {esActiva && (
+        <div className="mt-4 pt-4" style={{ borderTop: `1px solid ${C.border}` }}>
+          {confirmCancel ? (
+            <div className="flex items-center gap-3">
+              <p className="text-xs flex-1" style={{ color: '#ef4444' }}>
+                ¿Confirmar cancelación?
+              </p>
+              <button
+                onClick={onAbortCancel}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:opacity-80"
+                style={{ border: `1px solid ${C.border}`, color: C.muted, background: 'transparent' }}
+              >
+                No
+              </button>
+              <button
+                onClick={onConfirmCancel}
+                disabled={cancelando}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all hover:opacity-80"
+                style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)' }}
+              >
+                {cancelando && <Loader2 className="w-3 h-3 animate-spin" />}
+                Sí, cancelar
+              </button>
+            </div>
+          ) : locked ? (
+            <div className="flex items-center gap-2 text-xs p-3 rounded-xl"
+              style={{ background: 'rgba(255,255,255,0.03)', color: C.muted, border: `1px solid ${C.border}` }}>
+              <Lock style={{ width: 13, height: 13, flexShrink: 0 }} />
+              <span>No modificable — faltan menos de 12 horas</span>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <button
+                onClick={onModificar}
+                className="flex-1 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all hover:opacity-80 active:scale-95"
+                style={{ border: `1px solid ${C.borderGold}`, color: C.gold, background: 'transparent' }}
+              >
+                ✏️ Modificar
+              </button>
+              <button
+                onClick={onCancelar}
+                className="flex-1 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all hover:opacity-80 active:scale-95"
+                style={{ border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', background: 'transparent' }}
+              >
+                ❌ Cancelar
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── PerfilTab ────────────────────────────────────────────────────────────────
+interface PerfilTabProps {
+  userEmail: string;
+  nombreMostrado: string;
+  perfilCliente: any;
+  misCitas: any[];
+  citasActivas: any[];
+}
+
+function PerfilTab({ userEmail, nombreMostrado, perfilCliente, misCitas, citasActivas }: PerfilTabProps) {
+  const nombre = perfilCliente?.nombre || nombreMostrado;
+  const inicial = nombre[0]?.toUpperCase() || 'C';
+  const telefono = perfilCliente?.telefono;
+  const miembroDesde = perfilCliente?.created_at
+    ? new Date(perfilCliente.created_at).toLocaleDateString('es-CO', { year: 'numeric', month: 'long' })
+    : null;
+  const citasCompletadas = misCitas.filter(a => ['completado', 'finalizado'].includes(a.estado)).length;
+
+  return (
+    <div className="max-w-lg mx-auto space-y-6" style={{ animation: 'bdFadeInUp 0.35s ease' }}>
+      {/* Card perfil */}
+      <div className="rounded-2xl p-8 text-center"
+        style={{ background: C.card, border: `1px solid ${C.border}` }}>
+        {/* Avatar con inicial */}
+        <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4"
+          style={{
+            background: 'linear-gradient(135deg, rgba(201,169,97,0.18), rgba(201,169,97,0.05))',
+            border: `2px solid ${C.borderGold}`,
+          }}>
+          <span style={{
+            fontFamily: "'Playfair Display', serif",
+            fontSize: '2rem', fontWeight: 700, color: C.gold,
+          }}>
+            {inicial}
+          </span>
+        </div>
+
+        <h3 style={{
+          fontFamily: "'Playfair Display', serif",
+          fontSize: '1.4rem', fontWeight: 700,
+          color: C.text, margin: '0 0 6px',
+        }}>
+          {nombre}
+        </h3>
+
+        <div className="flex flex-col items-center gap-2 mt-4" style={{ color: C.muted, fontSize: '0.875rem' }}>
+          <div className="flex items-center gap-2">
+            <Mail style={{ width: 13, height: 13 }} />
+            <span>{userEmail}</span>
+          </div>
+          {telefono && (
+            <div className="flex items-center gap-2">
+              <Phone style={{ width: 13, height: 13 }} />
+              <span>{telefono}</span>
+            </div>
           )}
         </div>
       </div>
-    </div>
-  );
-}
 
-export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboardProps) {
-  const [tab, setTab] = useState<Tab>('citas');
-  const [citasHoy, setCitasHoy] = useState<any[]>([]);
-  const [proximas, setProximas] = useState<any[]>([]);
-  const [historial, setHistorial] = useState<any[]>([]);
-  const [perfil, setPerfil] = useState<any>(null);
-  const [editandoPerfil, setEditandoPerfil] = useState(false);
-  const [formPerfil, setFormPerfil] = useState({ nombre: '', telefono: '', ciudad: '' });
-  const [cargando, setCargando] = useState(true);
-  const [notificaciones, setNotificaciones] = useState<Array<{ id: string; texto: string; leida: boolean; fecha: string }>>([]);
-
-  const { modelos } = useModelos();
-  const modelosActivos = modelos.filter((m: any) => m.activa);
-  const mañana = new Date(Date.now() + 86400000).toISOString().split('T')[0];
-  const [modalReserva, setModalReserva] = useState<any>(null);
-  const [modalServicio, setModalServicio] = useState<any>(null);
-  const [modalFecha, setModalFecha] = useState('');
-  const [modalHora, setModalHora] = useState('');
-  const [modalSede, setModalSede] = useState<'sede_norte' | 'domicilio'>('sede_norte');
-  const [modalDireccion, setModalDireccion] = useState('');
-  const [loadingReserva, setLoadingReserva] = useState(false);
-
-  const noLeidas = notificaciones.filter(n => !n.leida).length;
-
-  const procesarCitas = useCallback((data: any[]) => {
-    const hoy = new Date().toISOString().split('T')[0];
-    const terminados = ['completado', 'cancelado', 'no_show'];
-
-    setCitasHoy(
-      data.filter(a => a.fecha === hoy && !terminados.includes(a.estado))
-    );
-    setProximas(
-      data
-        .filter(a => a.fecha > hoy && !terminados.includes(a.estado))
-        .sort((a, b) =>
-          new Date(`${a.fecha}T${a.hora || '00:00'}`).getTime() -
-          new Date(`${b.fecha}T${b.hora || '00:00'}`).getTime()
-        )
-    );
-    setHistorial(
-      data
-        .filter(a => a.fecha < hoy || terminados.includes(a.estado))
-        .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
-    );
-  }, []);
-
-  const cargarCitas = useCallback(async () => {
-    const { data } = await supabase
-      .from('agendamientos')
-      .select('id, fecha, hora, modelo_nombre, tipo_servicio, precio, estado, duracion_minutos, notas, created_at')
-      .or(`cliente_email.eq.${userEmail},creado_por.eq.${userEmail}`)
-      .order('fecha', { ascending: false })
-      .limit(50);
-    procesarCitas(data || []);
-  }, [userEmail, procesarCitas]);
-
-  const cargarPerfil = useCallback(async () => {
-    const { data } = await supabase
-      .from('usuarios')
-      .select('nombre, email, telefono, ciudad')
-      .eq('id', userId)
-      .maybeSingle();
-    if (data) {
-      setPerfil(data);
-      setFormPerfil({ nombre: data.nombre || '', telefono: data.telefono || '', ciudad: data.ciudad || '' });
-    }
-  }, [userId]);
-
-  useEffect(() => {
-    const init = async () => {
-      setCargando(true);
-      await Promise.all([cargarCitas(), cargarPerfil()]);
-      setCargando(false);
-    };
-    init();
-  }, [cargarCitas, cargarPerfil]);
-
-  // Realtime: actualizar citas cuando el admin cambia el estado
-  useEffect(() => {
-    const channel = supabase
-      .channel(`cliente-citas-${userId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'agendamientos' },
-        async (payload: any) => {
-          const row = payload.new || payload.old;
-          if (
-            row?.cliente_email !== userEmail &&
-            row?.creado_por !== userEmail
-          ) return;
-
-          await cargarCitas();
-
-          if (payload.eventType === 'UPDATE') {
-            const { new: n, old: o } = payload;
-            if (o?.estado === 'pendiente' && n?.estado === 'aprobado') {
-              const fechaStr = n.fecha ? formatearFechaES(n.fecha) : '';
-              toast.success(`¡Tu cita fue aprobada para el ${fechaStr}!`);
-              agregarNotificacion(`Tu cita del ${fechaStr} fue aprobada ✅`);
-            } else if (n?.estado === 'cancelado' && o?.estado !== 'cancelado') {
-              toast.error('Tu cita fue cancelada. Contáctanos para más información.');
-              agregarNotificacion('Una de tus citas fue cancelada ❌');
-            } else if (n?.estado === 'confirmado' && o?.estado !== 'confirmado') {
-              const fechaStr = n.fecha ? formatearFechaES(n.fecha) : '';
-              toast.success(`¡Tu cita del ${fechaStr} fue confirmada!`);
-              agregarNotificacion(`Tu cita del ${fechaStr} fue confirmada ✅`);
-            }
-          }
-        }
-      )
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, [userId, userEmail, cargarCitas]);
-
-  const agregarNotificacion = (texto: string) => {
-    setNotificaciones(prev => [
-      { id: Date.now().toString(), texto, leida: false, fecha: new Date().toISOString() },
-      ...prev,
-    ]);
-  };
-
-  const marcarTodasLeidas = () => {
-    setNotificaciones(prev => prev.map(n => ({ ...n, leida: true })));
-  };
-
-  const guardarPerfil = async () => {
-    const { error } = await supabase
-      .from('usuarios')
-      .update({ nombre: formPerfil.nombre, telefono: formPerfil.telefono, ciudad: formPerfil.ciudad })
-      .eq('id', userId);
-    if (!error) {
-      toast.success('Perfil actualizado');
-      setEditandoPerfil(false);
-      cargarPerfil();
-    } else {
-      toast.error('Error al guardar');
-    }
-  };
-
-  const abrirModalReserva = (modelo: any) => {
-    setModalReserva(modelo);
-    setModalServicio(null);
-    setModalFecha('');
-    setModalHora('');
-    setModalSede('sede_norte');
-    setModalDireccion('');
-  };
-
-  const cerrarModal = () => { setModalReserva(null); };
-
-  const enviarReserva = async () => {
-    if (!modalServicio || !modalFecha || !modalHora) return;
-    if (modalSede === 'domicilio' && !modalDireccion.trim()) {
-      toast.error('Ingresa tu dirección para el domicilio');
-      return;
-    }
-    setLoadingReserva(true);
-    try {
-      const modeloIdValido = modalReserva.id && String(modalReserva.id).includes('-') ? modalReserva.id : null;
-      const clienteIdValido = userId && String(userId).includes('-') ? userId : null;
-
-      const insertData = {
-        cliente_id: clienteIdValido,
-        cliente_email: userEmail,
-        cliente_nombre: perfil?.nombre || userEmail,
-        cliente_telefono: perfil?.telefono || 'No registrado',
-        creado_por: userEmail,
-        creado_por_rol: 'cliente',
-        modelo_id: modeloIdValido,
-        modelo_email: modalReserva.email,
-        modelo_nombre: modalReserva.nombreArtistico || modalReserva.nombre || '',
-        tipo_servicio: modalServicio.nombre,
-        servicio: modalServicio.nombre,
-        fecha: modalFecha,
-        hora: modalHora,
-        duracion: modalServicio.duracion_minutos || 60,
-        duracion_minutos: modalServicio.duracion_minutos || 60,
-        precio: modalServicio.precio,
-        monto_pago: modalServicio.precio,
-        ubicacion: modalSede === 'sede_norte' ? 'sede' : 'domicilio',
-        habitacion: modalSede === 'sede_norte' ? 'Por asignar' : modalDireccion,
-        estado: 'pendiente',
-        estado_pago: 'pendiente',
-      };
-
-      console.log('INSERT DATA (ClienteDashboard):', insertData);
-
-      const { data: nuevoAg, error } = await supabase.from('agendamientos').insert(insertData).select().single();
-
-      if (error) throw error;
-
-      if (nuevoAg) {
-        notificarProgramadores({
-          clienteNombre: perfil?.nombre || userEmail,
-          modeloNombre: modalReserva.nombreArtistico || modalReserva.nombre || '',
-          fecha: modalFecha,
-          hora: modalHora,
-          tipoServicio: modalServicio.nombre,
-          agendamientoId: nuevoAg.id,
-          duracion: modalServicio.duracion_minutos,
-        }).catch(() => {});
-      }
-
-      toast.success('Reserva enviada. Te notificaremos cuando sea confirmada.');
-      cerrarModal();
-      setTab('citas');
-      await cargarCitas();
-    } catch (e: any) {
-      toast.error('Error al enviar la reserva: ' + e.message);
-    }
-    setLoadingReserva(false);
-  };
-
-  const totalCitas = citasHoy.length + proximas.length + historial.length;
-  const citasCompletadas = historial.filter(c => c.estado === 'completado').length;
-  const totalGastado = historial
-    .filter(c => c.estado === 'completado')
-    .reduce((acc, c) => acc + (Number(c.precio) || 0), 0);
-
-  const TABS = [
-    { key: 'citas' as Tab,          label: 'Mis Citas',        icon: Calendar },
-    { key: 'solicitar' as Tab,      label: 'Solicitar Cita',   icon: Plus },
-    { key: 'notificaciones' as Tab, label: 'Avisos',           icon: Bell, badge: noLeidas },
-    { key: 'perfil' as Tab,         label: 'Mi Perfil',        icon: User },
-  ];
-
-  return (
-    <div className="min-h-screen bg-[#0f1014] text-white">
-      {/* Header */}
-      <div className="border-b border-white/10 px-4 sm:px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Logo size="sm" variant="horizontal" />
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="text-right hidden sm:block">
-            <p className="text-sm font-medium text-amber-400 leading-none">{perfil?.nombre || userEmail}</p>
-            <p className="text-xs text-white/30 mt-0.5">{userEmail}</p>
-          </div>
-          <div className="w-8 h-8 rounded-full bg-amber-500/15 border border-amber-500/20 flex items-center justify-center">
-            <User className="w-4 h-4 text-amber-400" />
-          </div>
-          <button
-            onClick={onLogout}
-            className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white/70 transition-colors"
-          >
-            <LogOut className="w-4 h-4" />
-            <span className="hidden sm:inline">Salir</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex border-b border-white/10 overflow-x-auto scrollbar-none">
-        {TABS.map(({ key, label, icon: Icon, badge }) => (
-          <button
-            key={key}
-            onClick={() => { setTab(key); if (key === 'notificaciones') marcarTodasLeidas(); }}
-            className={`relative flex items-center gap-2 px-4 sm:px-5 py-3 text-sm font-medium border-b-2 transition-all whitespace-nowrap ${
-              tab === key
-                ? 'border-amber-400 text-amber-400'
-                : 'border-transparent text-white/40 hover:text-white/70'
-            }`}
-          >
-            <Icon className="w-4 h-4" />
-            <span>{label}</span>
-            {badge ? (
-              <span className="absolute top-2 right-2 sm:right-3 min-w-[16px] h-4 px-1 bg-amber-400 text-black text-[10px] font-bold rounded-full flex items-center justify-center">
-                {badge}
-              </span>
-            ) : null}
-          </button>
-        ))}
-      </div>
-
-      {/* Contenido */}
-      <div className="p-4 sm:p-6 max-w-2xl mx-auto">
-        {cargando ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-3">
-            <Loader2 className="w-7 h-7 text-amber-400 animate-spin" />
-            <p className="text-sm text-white/40">Cargando tu información...</p>
-          </div>
-        ) : tab === 'citas' ? (
-          <TabCitas
-            citasHoy={citasHoy}
-            proximas={proximas}
-            historial={historial}
-            onSolicitar={() => setTab('solicitar')}
-          />
-        ) : tab === 'solicitar' ? (
-          <TabSolicitar
-            modelosActivos={modelosActivos}
-            onAbrirModal={abrirModalReserva}
-          />
-        ) : tab === 'notificaciones' ? (
-          <TabNotificaciones notificaciones={notificaciones} />
-        ) : (
-          <TabPerfil
-            perfil={perfil}
-            editandoPerfil={editandoPerfil}
-            setEditandoPerfil={setEditandoPerfil}
-            formPerfil={formPerfil}
-            setFormPerfil={setFormPerfil}
-            onGuardar={guardarPerfil}
-            totalCitas={totalCitas}
-            citasCompletadas={citasCompletadas}
-            totalGastado={totalGastado}
-          />
-        )}
-      </div>
-
-      {/* ─── Modal de Reserva ─────────────────────────────────────────────── */}
-      {modalReserva && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(0,0,0,0.88)' }}
-          onClick={(e) => { if (e.target === e.currentTarget) cerrarModal(); }}
-        >
-          <div
-            className="w-full max-w-md rounded-2xl overflow-y-auto"
-            style={{ background: '#111', border: '0.5px solid rgba(255,215,0,0.25)', maxHeight: '92vh' }}
-          >
-            {/* Cabecera */}
-            <div className="flex items-center gap-3 p-5 border-b border-white/10">
-              {modalReserva.foto_url && (
-                <img
-                  src={modalReserva.foto_url}
-                  alt=""
-                  className="w-12 h-12 rounded-full object-cover flex-shrink-0"
-                  onError={(e: any) => { e.target.style.display = 'none'; }}
-                />
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="font-bold text-amber-400 truncate">
-                  {modalReserva.nombreArtistico || modalReserva.nombre}
-                </p>
-                <p className="text-xs text-white/40">Confirmar reserva</p>
-              </div>
-              <button onClick={cerrarModal} className="text-white/40 hover:text-white text-2xl leading-none ml-2">×</button>
-            </div>
-
-            <div className="p-5 space-y-5">
-              {/* Servicios */}
-              <div>
-                <p className="text-xs text-white/50 mb-3 font-medium uppercase tracking-wider">Selecciona el servicio</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {SERVICIOS_MODAL.map(s => (
-                    <div
-                      key={s.nombre}
-                      onClick={() => setModalServicio(s)}
-                      className="p-3 rounded-xl cursor-pointer transition-all"
-                      style={{
-                        border: modalServicio?.nombre === s.nombre ? '1.5px solid #FFD700' : '0.5px solid rgba(255,255,255,0.1)',
-                        background: modalServicio?.nombre === s.nombre ? 'rgba(255,215,0,0.1)' : 'rgba(255,255,255,0.03)',
-                      }}
-                    >
-                      <p className="font-semibold text-sm text-white">{s.nombre}</p>
-                      <p className="text-xs text-white/40 mt-0.5">⏱ {s.duracion}</p>
-                      <p className="text-sm font-bold mt-1.5" style={{ color: '#4CAF50' }}>
-                        ${s.precio.toLocaleString('es-CO')}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Sede */}
-              <div>
-                <p className="text-xs text-white/50 mb-3 font-medium uppercase tracking-wider">¿Dónde prefieres el servicio?</p>
-                <div className="flex gap-2">
-                  {[
-                    { key: 'sede_norte' as const, label: '🏢 Sede Norte' },
-                    { key: 'domicilio' as const, label: '🏠 A Domicilio' },
-                  ].map(({ key, label }) => (
-                    <button
-                      key={key}
-                      onClick={() => setModalSede(key)}
-                      className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-all"
-                      style={{
-                        border: modalSede === key ? '1.5px solid #FFD700' : '0.5px solid rgba(255,255,255,0.1)',
-                        background: modalSede === key ? 'rgba(255,215,0,0.1)' : 'rgba(255,255,255,0.03)',
-                      }}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-                {modalSede === 'domicilio' && (
-                  <input
-                    placeholder="Escribe tu dirección completa"
-                    value={modalDireccion}
-                    onChange={e => setModalDireccion(e.target.value)}
-                    className="w-full mt-2 px-3 py-2.5 rounded-xl text-sm text-white placeholder:text-white/20 focus:outline-none"
-                    style={{ background: 'rgba(255,255,255,0.05)', border: '0.5px solid rgba(255,255,255,0.1)' }}
-                  />
-                )}
-                {modalSede === 'sede_norte' && (
-                  <p className="mt-2 text-xs text-white/30 px-1">📍 Dirección exacta se comparte al confirmar la cita</p>
-                )}
-              </div>
-
-              {/* Fecha */}
-              <div>
-                <p className="text-xs text-white/50 mb-3 font-medium uppercase tracking-wider">Fecha del servicio</p>
-                <input
-                  type="date"
-                  value={modalFecha}
-                  min={mañana}
-                  onChange={e => setModalFecha(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl text-sm text-white focus:outline-none"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '0.5px solid rgba(255,255,255,0.1)' }}
-                />
-              </div>
-
-              {/* Hora */}
-              <div>
-                <p className="text-xs text-white/50 mb-3 font-medium uppercase tracking-wider">Hora preferida</p>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {['10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00'].map(h => (
-                    <button
-                      key={h}
-                      onClick={() => setModalHora(h)}
-                      className="py-2 rounded-lg text-xs transition-all"
-                      style={{
-                        border: modalHora === h ? '1.5px solid #FFD700' : '0.5px solid rgba(255,255,255,0.1)',
-                        background: modalHora === h ? 'rgba(255,215,0,0.15)' : 'rgba(255,255,255,0.03)',
-                        color: modalHora === h ? '#FFD700' : 'rgba(255,255,255,0.6)',
-                        fontWeight: modalHora === h ? 700 : 400,
-                      }}
-                    >
-                      {h}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Resumen */}
-              {modalServicio && modalFecha && modalHora && (
-                <div className="rounded-xl p-4" style={{ background: 'rgba(255,215,0,0.07)', border: '0.5px solid rgba(255,215,0,0.25)' }}>
-                  <p className="text-xs font-bold text-amber-400 mb-2.5 uppercase tracking-wider">📋 Resumen de tu reserva</p>
-                  <div className="space-y-1 text-sm text-white/75">
-                    <p>💃 <strong className="text-white">{modalReserva.nombreArtistico || modalReserva.nombre}</strong></p>
-                    <p>⏱ {modalServicio.nombre} — {modalServicio.duracion}</p>
-                    <p>📅 {formatearFechaES(modalFecha)}</p>
-                    <p>🕐 {formatearHora(modalHora)}</p>
-                    <p>📍 {modalSede === 'sede_norte' ? 'Sede Norte' : `A domicilio — ${modalDireccion}`}</p>
-                    <p className="pt-2 text-base font-bold" style={{ color: '#4CAF50' }}>
-                      💰 Total: ${modalServicio.precio.toLocaleString('es-CO')}
-                      {modalSede === 'domicilio' ? ' + desplazamiento' : ''}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Botón confirmar */}
-              <button
-                onClick={enviarReserva}
-                disabled={!modalServicio || !modalFecha || !modalHora || loadingReserva || (modalSede === 'domicilio' && !modalDireccion.trim())}
-                className="w-full py-3.5 rounded-xl text-sm font-bold text-black transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                style={{ background: 'linear-gradient(135deg, #B8860B, #FFD700)' }}
-              >
-                {loadingReserva ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> Enviando reserva...</>
-                ) : (
-                  '✅ Confirmar reserva'
-                )}
-              </button>
-              {(!modalServicio || !modalFecha || !modalHora) && (
-                <p className="text-center text-xs text-white/30">
-                  Selecciona servicio, fecha y hora para continuar
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Tab: Mis Citas ─────────────────────────────────────────────────────────
-
-function TabCitas({
-  citasHoy, proximas, historial, onSolicitar
-}: {
-  citasHoy: any[]; proximas: any[]; historial: any[]; onSolicitar: () => void;
-}) {
-  const total = citasHoy.length + proximas.length + historial.length;
-
-  if (total === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
-        <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mb-4">
-          <Calendar className="w-8 h-8 text-amber-400/60" />
-        </div>
-        <p className="text-white/60 font-medium mb-1">Aún no tienes citas agendadas</p>
-        <p className="text-sm text-white/30 mb-6">Solicita tu primera cita con nosotros</p>
-        <button
-          onClick={onSolicitar}
-          className="flex items-center gap-2 px-5 py-2.5 bg-amber-500 text-black text-sm font-semibold rounded-xl hover:bg-amber-400 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Solicitar mi primera cita
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      {citasHoy.length > 0 && (
-        <section>
-          <div className="flex items-center gap-2 mb-3">
-            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-            <h2 className="text-sm font-semibold text-amber-400 uppercase tracking-wider">Hoy</h2>
-          </div>
-          <div className="space-y-3">
-            {citasHoy.map(c => <CitaCard key={c.id} cita={c} esHoy />)}
-          </div>
-        </section>
-      )}
-
-      {proximas.length > 0 && (
-        <section>
-          <h2 className="text-sm font-semibold text-white/50 uppercase tracking-wider mb-3">
-            Próximas citas
-          </h2>
-          <div className="space-y-3">
-            {proximas.map(c => <CitaCard key={c.id} cita={c} />)}
-          </div>
-        </section>
-      )}
-
-      {historial.length > 0 && (
-        <section>
-          <h2 className="text-sm font-semibold text-white/30 uppercase tracking-wider mb-3">
-            Historial
-          </h2>
-          <div className="space-y-2">
-            {historial.map(c => (
-              <div key={c.id} className="bg-white/[0.02] border border-white/5 rounded-xl p-3 flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-sm text-white/60 truncate">{c.modelo_nombre || 'Modelo'}</p>
-                  <p className="text-xs text-white/30 capitalize">{formatearFechaES(c.fecha_servicio)} · {c.servicio_tipo}</p>
-                </div>
-                <EstadoBadge estado={c.estado} />
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-    </div>
-  );
-}
-
-// ─── Tab: Solicitar Cita ─────────────────────────────────────────────────────
-
-function TabSolicitar({
-  modelosActivos, onAbrirModal
-}: {
-  modelosActivos: any[];
-  onAbrirModal: (modelo: any) => void;
-}) {
-  if (modelosActivos.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
-        <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mb-4">
-          <Sparkles className="w-8 h-8 text-amber-400/60" />
-        </div>
-        <p className="text-white/60 font-medium">No hay modelos disponibles</p>
-        <p className="text-sm text-white/30 mt-1">Vuelve pronto, nuevas chicas se unen cada semana</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-5">
-      <div>
-        <h2 className="text-lg font-semibold text-white">Solicitar Cita</h2>
-        <p className="text-sm text-white/40 mt-0.5">Elige tu modelo y confirma la reserva.</p>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {modelosActivos.map((m: any) => (
-          <div
-            key={m.id}
-            className="rounded-2xl overflow-hidden"
-            style={{ background: '#161616', border: '0.5px solid rgba(255,255,255,0.08)' }}
-          >
-            {/* Foto */}
-            <div className="relative h-48 bg-white/5 overflow-hidden">
-              {m.foto_url ? (
-                <img
-                  src={m.foto_url}
-                  alt={m.nombreArtistico || m.nombre}
-                  className="w-full h-full object-cover"
-                  onError={(e: any) => { e.target.style.display = 'none'; }}
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <User className="w-12 h-12 text-white/10" />
-                </div>
-              )}
-              <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7) 30%, transparent)' }} />
-              <div className="absolute bottom-3 left-3">
-                <p className="font-bold text-white text-base leading-tight">{m.nombreArtistico || m.nombre}</p>
-                {m.edad && <p className="text-xs text-white/60">{m.edad} años</p>}
-              </div>
-            </div>
-
-            {/* Botón */}
-            <div className="p-3">
-              <button
-                onClick={() => onAbrirModal(m)}
-                className="w-full py-3 rounded-xl text-sm font-bold text-black transition-all active:scale-95"
-                style={{ background: 'linear-gradient(135deg, #B8860B, #FFD700)' }}
-              >
-                Confirmar reserva
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ─── Tab: Notificaciones ──────────────────────────────────────────────────────
-
-function TabNotificaciones({ notificaciones }: { notificaciones: Array<{ id: string; texto: string; leida: boolean; fecha: string }> }) {
-  if (notificaciones.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
-        <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-4">
-          <Bell className="w-7 h-7 text-white/20" />
-        </div>
-        <p className="text-white/40 text-sm">Sin notificaciones por ahora</p>
-        <p className="text-xs text-white/20 mt-1">Aquí verás los cambios en el estado de tus citas</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-      <h2 className="text-lg font-semibold text-white">Notificaciones</h2>
-      <div className="space-y-2">
-        {notificaciones.map(n => (
-          <div key={n.id} className={`flex items-start gap-3 p-3.5 rounded-xl border transition-all ${
-            n.leida ? 'bg-white/[0.02] border-white/5' : 'bg-amber-500/5 border-amber-500/20'
-          }`}>
-            <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${n.leida ? 'bg-white/20' : 'bg-amber-400'}`} />
-            <div>
-              <p className="text-sm text-white/80">{n.texto}</p>
-              <p className="text-xs text-white/30 mt-0.5">
-                {new Date(n.fecha).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
-              </p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ─── Tab: Mi Perfil ───────────────────────────────────────────────────────────
-
-function TabPerfil({
-  perfil, editandoPerfil, setEditandoPerfil, formPerfil, setFormPerfil, onGuardar, totalCitas, citasCompletadas, totalGastado
-}: {
-  perfil: any; editandoPerfil: boolean; setEditandoPerfil: (v: boolean) => void;
-  formPerfil: any; setFormPerfil: any; onGuardar: () => void;
-  totalCitas: number; citasCompletadas: number; totalGastado: number;
-}) {
-  const inputClass = "w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors";
-
-  return (
-    <div className="space-y-6 max-w-md">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-white">Mi Perfil</h2>
-        {!editandoPerfil && (
-          <button
-            onClick={() => setEditandoPerfil(true)}
-            className="flex items-center gap-1.5 text-xs text-amber-400/80 hover:text-amber-400 transition-colors"
-          >
-            <Edit2 className="w-3.5 h-3.5" /> Editar
-          </button>
-        )}
-      </div>
-
-      {/* Stats */}
+      {/* Estadísticas */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: 'Citas totales', value: totalCitas },
+          { label: 'Total Citas', value: misCitas.length },
           { label: 'Completadas', value: citasCompletadas },
-          { label: 'Total gastado', value: `$${totalGastado.toLocaleString('es-CO')}` },
-        ].map(({ label, value }) => (
-          <div key={label} className="bg-white/[0.03] border border-white/8 rounded-xl p-3 text-center flex flex-col justify-center items-center">
-            <p className="text-lg font-bold text-amber-400 truncate max-w-full">{value}</p>
-            <p className="text-[10px] text-white/40 mt-0.5">{label}</p>
+          { label: 'Pendientes', value: citasActivas.length },
+        ].map(stat => (
+          <div key={stat.label} className="rounded-xl p-4 text-center"
+            style={{ background: C.card, border: `1px solid ${C.border}` }}>
+            <div style={{
+              fontSize: '1.6rem', fontWeight: 700, color: C.gold,
+              fontFamily: "'Playfair Display', serif",
+            }}>
+              {stat.value}
+            </div>
+            <div style={{ fontSize: '0.7rem', color: C.muted, marginTop: 4, letterSpacing: '0.03em' }}>
+              {stat.label}
+            </div>
           </div>
         ))}
       </div>
 
-      {editandoPerfil ? (
-        <div className="space-y-4">
-          {[
-            { key: 'nombre', label: 'Nombre completo', type: 'text', icon: User },
-            { key: 'telefono', label: 'Teléfono', type: 'tel', icon: Phone },
-            { key: 'ciudad', label: 'Ciudad', type: 'text', icon: MapPin },
-          ].map(({ key, label, type }) => (
-            <div key={key} className="space-y-1.5">
-              <label className="text-xs font-medium text-white/60">{label}</label>
-              <input
-                type={type}
-                value={(formPerfil as any)[key]}
-                onChange={e => setFormPerfil((p: any) => ({ ...p, [key]: e.target.value }))}
-                className={inputClass}
-              />
-            </div>
+      {miembroDesde && (
+        <p className="text-center text-sm" style={{ color: C.muted }}>
+          Miembro desde {miembroDesde}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ─── ClienteDashboard (componente principal) ──────────────────────────────────
+export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboardProps) {
+  const [activeTab, setActiveTab] = useState<Tab>('explorar');
+  const [modalData, setModalData] = useState<{ modelo: any; modeloEmail: string } | null>(null);
+  const [cancelando, setCancelando] = useState<string | null>(null);
+  const [confirmCancel, setConfirmCancel] = useState<string | null>(null);
+  const [perfilCliente, setPerfilCliente] = useState<any | null>(null);
+  const [loadingPerfil, setLoadingPerfil] = useState(false);
+
+  const { agendamientos = [] } = useAgendamientos() || {};
+  const { modelos = [], loading: cargandoModelos = false } = (useModelos() || {}) as any;
+
+  // ── Cargar perfil cuando el tab se activa ────────────────────────────────
+  useEffect(() => {
+    if (activeTab !== 'perfil' || !userId) return;
+    setLoadingPerfil(true);
+    supabase
+      .from('clientes')
+      .select('nombre, email, telefono, created_at, nombre_usuario')
+      .or(`user_id.eq.${userId},email.eq.${userEmail}`)
+      .maybeSingle()
+      .then(({ data }) => {
+        setPerfilCliente(data);
+        setLoadingPerfil(false);
+      });
+  }, [activeTab, userId, userEmail]);
+
+  // ── Mis citas ─────────────────────────────────────────────────────────────
+  const misCitas = Array.isArray(agendamientos)
+    ? agendamientos.filter((a: any) =>
+        a?.cliente_id === userId ||
+        a?.clienteId === userId ||
+        a?.cliente_email === userEmail ||
+        a?.clienteEmail === userEmail
+      )
+    : [];
+
+  const citasActivas = misCitas.filter(a =>
+    ['pendiente', 'solicitud_cliente', 'aceptado_programador', 'confirmado', 'aprobado'].includes(a?.estado)
+  );
+
+  const todasMisCitas = [...misCitas].sort((a, b) => {
+    const fa = (a.fecha || '') + 'T' + (a.hora || '00:00');
+    const fb = (b.fecha || '') + 'T' + (b.hora || '00:00');
+    return fb.localeCompare(fa);
+  });
+
+  // ── Convertir modelo para tarjeta premium ────────────────────────────────
+  const convertirModelo = (m: any) => ({
+    id: String(m.id),
+    name: m.nombreArtistico || m.nombre || 'Sin nombre',
+    age: m.edad || 0,
+    photo: m.fotoPerfil || '',
+    gallery: [m.fotoPerfil, ...(m.fotosAdicionales || [])].filter(Boolean),
+    rating: m.calificacion || 5.0,
+    height: m.altura || '165 cm',
+    measurements: m.medidas || '90-60-90',
+    languages: m.idiomas || ['Español'],
+    location: m.sede || 'Sede Norte',
+    available: !!(m.activa && m.disponible),
+    description: m.descripcion || 'Modelo profesional',
+    services: m.serviciosDisponibles || m.services || m.servicios || [],
+    specialties: m.especialidades || m.specialties || [],
+    domicilio: m.domicilio !== undefined ? m.domicilio : true,
+    _email: m.email,
+  });
+
+  const modelosActivos = Array.isArray(modelos)
+    ? modelos.filter((m: any) => m?.activa).map(convertirModelo)
+    : [];
+
+  // ── Abrir modal ───────────────────────────────────────────────────────────
+  const abrirModal = useCallback((modelConverted: any) => {
+    const original = (modelos as any[]).find(m =>
+      String(m.id) === String(modelConverted.id) || m.email === modelConverted._email
+    );
+    setModalData({
+      modelo: modelConverted,
+      modeloEmail: original?.email || modelConverted._email || '',
+    });
+  }, [modelos]);
+
+  // ── Cancelar cita ─────────────────────────────────────────────────────────
+  const cancelarCita = async (citaId: string) => {
+    setCancelando(citaId);
+    const { error } = await supabase
+      .from('agendamientos')
+      .update({
+        estado: 'cancelado',
+        motivo_cancelacion: 'Cancelado por el cliente',
+        cancelado_por: userEmail,
+        fecha_cancelacion: new Date().toISOString(),
+      })
+      .eq('id', citaId);
+
+    if (error) {
+      toast.error('No se pudo cancelar la cita');
+    } else {
+      toast.success('✦ Cita cancelada correctamente');
+    }
+    setCancelando(null);
+    setConfirmCancel(null);
+  };
+
+  // ── Nombre para mostrar ───────────────────────────────────────────────────
+  const nombreMostrado = (() => {
+    try {
+      const s = localStorage.getItem('blackDiamondUser');
+      if (s) {
+        const p = JSON.parse(s);
+        return p.nombre || p.email?.split('@')[0] || userEmail.split('@')[0];
+      }
+    } catch { /* ignore */ }
+    return userEmail.split('@')[0];
+  })();
+
+  // ─── Render ───────────────────────────────────────────────────────────────
+  return (
+    <div className="min-h-screen pb-20"
+      style={{ background: C.bg, color: C.text, fontFamily: "'Inter', sans-serif" }}>
+
+      {/* CSS keyframes inyectados inline para no depender de globals */}
+      <style>{`
+        @keyframes bdShimmer {
+          0%   { background-position: -200% 0; }
+          100% { background-position: 200% 0; }
+        }
+        @keyframes bdPulse {
+          0%, 100% { opacity: 1; }
+          50%       { opacity: 0.4; }
+        }
+        @keyframes bdFadeInUp {
+          from { opacity: 0; transform: translateY(14px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+      `}</style>
+
+      {/* ── Navbar ─────────────────────────────────────────────────────────── */}
+      <ClienteNavbar
+        currentUser={{ id: userId, nombre: nombreMostrado, email: userEmail }}
+        onLogout={onLogout}
+      />
+
+      <main className="mx-auto px-4 sm:px-6" style={{ paddingTop: 80, maxWidth: 1200 }}>
+
+        {/* ── Header del dashboard ────────────────────────────────────────── */}
+        <div className="pt-8 pb-6">
+          <p className="mb-1" style={{
+            fontFamily: "'Playfair Display', serif",
+            fontSize: '0.7rem', letterSpacing: '0.22em',
+            textTransform: 'uppercase', color: C.gold,
+          }}>
+            ◆ Black Diamond Studios
+          </p>
+          <h1 style={{
+            fontFamily: "'Playfair Display', serif",
+            fontSize: 'clamp(1.6rem, 4vw, 2.4rem)',
+            fontWeight: 700, color: C.text,
+            lineHeight: 1.2, margin: '4px 0 6px',
+          }}>
+            Bienvenido,{' '}
+            <em style={{ color: C.gold, fontStyle: 'italic' }}>{nombreMostrado}</em>
+          </h1>
+          <p style={{ color: C.muted, fontSize: '0.875rem', fontStyle: 'italic' }}>
+            "Experiencias que marcan la diferencia"
+          </p>
+        </div>
+
+        {/* ── Tabs ───────────────────────────────────────────────────────── */}
+        <div className="flex gap-0 overflow-x-auto pb-0 mb-8"
+          style={{ borderBottom: `1px solid ${C.border}` }}>
+          {([
+            { id: 'explorar',   label: 'Explorar',  icon: '✦',  badge: 0 },
+            { id: 'mis-citas',  label: 'Mis Citas', icon: '📅', badge: citasActivas.length },
+            { id: 'perfil',     label: 'Mi Perfil', icon: '👤', badge: 0 },
+          ] as const).map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className="relative flex items-center gap-2 px-5 py-3 text-sm font-medium whitespace-nowrap transition-all duration-200"
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: activeTab === tab.id ? C.gold : C.muted,
+                cursor: 'pointer',
+                fontFamily: "'Inter', sans-serif",
+              }}
+            >
+              <span>{tab.icon}</span>
+              <span>{tab.label}</span>
+              {tab.badge > 0 && (
+                <span
+                  className="flex items-center justify-center rounded-full"
+                  style={{
+                    background: '#ef4444', color: 'white',
+                    width: 18, height: 18, fontSize: '0.6rem', fontWeight: 700,
+                  }}
+                >
+                  {tab.badge}
+                </span>
+              )}
+              {/* Línea activa */}
+              {activeTab === tab.id && (
+                <span
+                  className="absolute bottom-0 left-0 right-0 rounded-t-full"
+                  style={{ height: 2, background: C.gold }}
+                />
+              )}
+            </button>
           ))}
-          <div className="flex gap-2 pt-1">
-            <button
-              onClick={onGuardar}
-              className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 text-black text-sm font-semibold rounded-xl hover:bg-amber-400 transition-colors"
-            >
-              <Save className="w-4 h-4" /> Guardar
-            </button>
-            <button
-              onClick={() => setEditandoPerfil(false)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-white/8 text-sm rounded-xl hover:bg-white/12 transition-colors"
-            >
-              <X className="w-4 h-4" /> Cancelar
-            </button>
+        </div>
+
+        {/* TAB: EXPLORAR */}
+        {activeTab === 'explorar' && (
+          <div style={{ animation: 'bdFadeInUp 0.3s ease' }}>
+            <div className="mb-8">
+              <h2 style={{
+                fontFamily: "'Playfair Display', serif",
+                fontSize: '1.75rem', fontWeight: 700,
+                color: C.text, marginBottom: 4,
+              }}>
+                Nuestras Acompañantes
+              </h2>
+              <p style={{ color: C.muted, fontSize: '0.875rem' }}>
+                Selecciona y agenda tu experiencia con nuestras profesionales
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+              {cargandoModelos ? (
+                Array.from({ length: 6 }).map((_, i) => (
+                  <SkeletonCard key={i} />
+                ))
+              ) : modelosActivos.length === 0 ? (
+                <div className="col-span-full text-center py-16">
+                  <div style={{ fontSize: '2.5rem', marginBottom: 12, color: C.gold, opacity: 0.4 }}>◆</div>
+                  <p style={{ color: C.muted }}>No hay acompañantes disponibles en este momento</p>
+                </div>
+              ) : (
+                modelosActivos.map((modelo, idx) => (
+                  <PremiumModelCard
+                    key={modelo.id}
+                    modelo={modelo}
+                    index={idx}
+                    onAgendar={() => abrirModal(modelo)}
+                  />
+                ))
+              )}
+            </div>
           </div>
-        </div>
-      ) : (
-        <div className="space-y-0 divide-y divide-white/5">
-          {[
-            { label: 'Nombre', value: perfil?.nombre, icon: User },
-            { label: 'Email', value: perfil?.email, icon: Mail },
-            { label: 'Teléfono', value: perfil?.telefono || '—', icon: Phone },
-            { label: 'Ciudad', value: perfil?.ciudad || '—', icon: MapPin },
-          ].map(({ label, value, icon: Icon }) => (
-            <div key={label} className="flex items-center justify-between py-3 gap-3">
-              <div className="flex items-center gap-2.5">
-                <Icon className="w-4 h-4 text-white/20 flex-shrink-0" />
-                <span className="text-sm text-white/40">{label}</span>
-              </div>
-              <span className="text-sm text-white/80 text-right truncate max-w-[180px]">{value}</span>
+        )}
+
+        {/* TAB: MIS CITAS */}
+        {activeTab === 'mis-citas' && (
+          <div style={{ animation: 'bdFadeInUp 0.3s ease' }}>
+            <div className="mb-8">
+              <h2 style={{
+                fontFamily: "'Playfair Display', serif",
+                fontSize: '1.75rem', fontWeight: 700,
+                color: C.text, marginBottom: 4,
+              }}>
+                Mis Citas
+              </h2>
+              <p style={{ color: C.muted, fontSize: '0.875rem' }}>
+                Historial completo y próximos agendamientos
+              </p>
             </div>
-          ))}
-        </div>
+
+            {todasMisCitas.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center">
+                <div className="w-20 h-20 rounded-full flex items-center justify-center mb-6"
+                  style={{ background: C.goldSoft, border: `1px solid ${C.borderGold}` }}>
+                  <span style={{ fontSize: '2rem' }}>◆</span>
+                </div>
+                <h3 style={{
+                  fontFamily: "'Playfair Display', serif",
+                  fontSize: '1.25rem', color: C.text, marginBottom: 8,
+                }}>
+                  No tienes citas aún
+                </h3>
+                <p style={{ color: C.muted, fontSize: '0.875rem', marginBottom: 24 }}>
+                  Explora nuestras acompañantes y agenda tu primera experiencia
+                </p>
+                <button
+                  onClick={() => setActiveTab('explorar')}
+                  className="px-6 py-3 rounded-xl font-semibold text-sm transition-all hover:scale-105 active:scale-95"
+                  style={{
+                    background: `linear-gradient(135deg, ${C.gold}, #a07c3a)`,
+                    color: '#0f1014',
+                  }}
+                >
+                  ◆ Explorar ahora
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {todasMisCitas.map(cita => {
+                  const cfg = ESTADO_CONFIG[cita.estado] || {
+                    label: cita.estado, bg: 'rgba(255,255,255,0.06)',
+                    color: '#9ca3af', icon: '•',
+                  };
+                  const locked = isLocked(cita.fecha, cita.hora);
+                  const esActiva = ['pendiente', 'solicitud_cliente', 'aceptado_programador', 'confirmado', 'aprobado'].includes(cita.estado);
+                  const cAny = cita as any;
+                  const modeloParaModal = modelosActivos.find(m =>
+                    m._email === cAny.modeloEmail || m._email === cAny.modelo_email ||
+                    m.name === (cAny.modeloNombre || cAny.modelo_nombre)
+                  );
+
+                  return (
+                    <CitaCard
+                      key={cita.id}
+                      cita={cita}
+                      cfg={cfg}
+                      locked={locked}
+                      esActiva={esActiva}
+                      cancelando={cancelando === cita.id}
+                      confirmCancel={confirmCancel === cita.id}
+                      onModificar={() => {
+                        if (modeloParaModal) abrirModal(modeloParaModal);
+                        else toast.error('No se encontró la modelo para modificar la cita');
+                      }}
+                      onCancelar={() => setConfirmCancel(cita.id)}
+                      onConfirmCancel={() => cancelarCita(cita.id)}
+                      onAbortCancel={() => setConfirmCancel(null)}
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB: MI PERFIL */}
+        {activeTab === 'perfil' && (
+          <div style={{ animation: 'bdFadeInUp 0.3s ease' }}>
+            <div className="mb-8">
+              <h2 style={{
+                fontFamily: "'Playfair Display', serif",
+                fontSize: '1.75rem', fontWeight: 700,
+                color: C.text, marginBottom: 4,
+              }}>
+                Mi Perfil
+              </h2>
+            </div>
+
+            {loadingPerfil ? (
+              <div className="flex justify-center py-16">
+                <Loader2 className="w-8 h-8 animate-spin" style={{ color: C.gold }} />
+              </div>
+            ) : (
+              <PerfilTab
+                userEmail={userEmail}
+                nombreMostrado={nombreMostrado}
+                perfilCliente={perfilCliente}
+                misCitas={misCitas}
+                citasActivas={citasActivas}
+              />
+            )}
+          </div>
+        )}
+
+      </main>
+
+      {/* Modal de agendamiento */}
+      {modalData && (
+        <ClienteAgendarModal
+          modelo={modalData.modelo}
+          modeloEmail={modalData.modeloEmail}
+          clienteId={userId}
+          clienteEmail={userEmail}
+          onClose={() => setModalData(null)}
+          onSuccess={() => setModalData(null)}
+        />
       )}
     </div>
   );

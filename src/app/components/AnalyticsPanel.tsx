@@ -1,13 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAnalytics, FiltrosAnalytics } from './AnalyticsContext';
-import { 
-  exportarReporteHTML, 
-  exportarReporteFinanciero,
-  exportarTopModelos,
-  exportarTopClientes,
-  exportarMetricasGenerales,
-  imprimirReporte
-} from './AnalyticsExportHelper';
+import { exportarReporteHTML } from './AnalyticsExportHelper';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
@@ -27,8 +20,6 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Minus,
-  FileText,
-  Printer
 } from 'lucide-react';
 import { 
   LineChart, 
@@ -37,9 +28,8 @@ import {
   Bar, 
   XAxis, 
   YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  Legend, 
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer,
   PieChart as RechartsPieChart,
   Pie,
@@ -50,19 +40,24 @@ import {
 import { toast } from 'sonner';
 
 interface AnalyticsPanelProps {
-  rol?: 'owner' | 'admin' | 'programador' | 'modelo';
+  rol?: 'owner' | 'administrador' | 'programador' | 'modelo';
 }
 
-export function AnalyticsPanel({ rol = 'owner' }: AnalyticsPanelProps) {
+export function AnalyticsPanel({ rol: _rol = 'owner' }: AnalyticsPanelProps) {
   const {
     obtenerMetricasGenerales,
     obtenerTopModelos,
     obtenerTopClientes,
     obtenerReporteFinanciero,
     obtenerDatosGrafica,
-    compararPeriodos,
-    cargando
+    // compararPeriodos,
+    cargando,
+    cargarVentas
   } = useAnalytics();
+
+  useEffect(() => {
+    cargarVentas();
+  }, []);
 
   // ==================== ESTADO ====================
   
@@ -132,24 +127,22 @@ export function AnalyticsPanel({ rol = 'owner' }: AnalyticsPanelProps) {
     }));
   }, [obtenerDatosGrafica, filtrosActuales]);
 
-  const datosGraficaComparativa = useMemo(() => {
-    const datos = obtenerDatosGrafica(['ingresos', 'servicios'], filtrosActuales);
-    return datos.etiquetas.map((fecha, i) => ({
-      fecha: new Date(fecha).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' }),
-      ingresos: datos.series[0]?.datos[i] || 0,
-      servicios: (datos.series[1]?.datos[i] || 0) * 50000, // Escalar para visualización
-    }));
-  }, [obtenerDatosGrafica, filtrosActuales]);
+  // const datosGraficaComparativa = useMemo(() => {
+  //   const datos = obtenerDatosGrafica(['ingresos', 'servicios'], filtrosActuales);
+  //   return datos.etiquetas.map((fecha, i) => ({
+  //     fecha: new Date(fecha).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' }),
+  //     ingresos: datos.series[0]?.datos[i] || 0,
+  //     servicios: (datos.series[1]?.datos[i] || 0) * 50000, // Escalar para visualización
+  //   }));
+  // }, [obtenerDatosGrafica, filtrosActuales]);
 
   // ==================== UTILIDADES ====================
 
   const formatearMoneda = (monto: number): string => {
-    if (monto >= 1000000) {
-      return `$${(monto / 1000000).toFixed(1)}M`;
-    } else if (monto >= 1000) {
-      return `$${(monto / 1000).toFixed(0)}k`;
-    }
-    return `$${monto.toLocaleString('es-CO')}`;
+    const m = monto ?? 0;
+    if (m >= 1000000) return `$${(m / 1000000).toFixed(1)}M`;
+    if (m >= 1000) return `$${(m / 1000).toFixed(0)}k`;
+    return `$${m.toLocaleString('es-CO')}`;
   };
 
   const formatearPorcentaje = (porcentaje: number): string => {

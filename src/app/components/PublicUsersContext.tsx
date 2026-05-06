@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
 import { flushSync } from 'react-dom';
-import { supabase, projectId, publicAnonKey } from '../../utils/supabase/info'; // ✅ Corregido: ruta correcta
+import { supabase, projectId, publicAnonKey } from '../../utils/supabase/info';
 
 // ============================================
 // CONTEXTO PARA USUARIOS PÚBLICOS DEL CHAT
@@ -480,7 +480,6 @@ export function PublicUsersProvider({ children }: { children: ReactNode }) {
           `${supabaseUrl}/rest/v1/clientes?id=eq.${currentUserRef.id}`,
           new Blob([JSON.stringify({
             sesion_activa: false,
-            sesion_token: null,
             sesion_expires_at: null
           })], { type: 'application/json' })
         );
@@ -489,7 +488,7 @@ export function PublicUsersProvider({ children }: { children: ReactNode }) {
 
     // Eventos para detectar cuando el usuario abandona la página
     window.addEventListener('beforeunload', handleBeforeUnload);
-    window.addEventListener('unload', handleBeforeUnload);
+    window.addEventListener('pagehide', handleBeforeUnload);
 
     return () => {
       mounted = false;
@@ -497,7 +496,7 @@ export function PublicUsersProvider({ children }: { children: ReactNode }) {
       supabase.removeChannel(mensajesChannel);
       clearInterval(interval);
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      window.removeEventListener('unload', handleBeforeUnload);
+      window.removeEventListener('pagehide', handleBeforeUnload);
     };
   }, []); // 🔥 Sin dependencias para evitar loops
 
@@ -542,27 +541,33 @@ export function PublicUsersProvider({ children }: { children: ReactNode }) {
     isLoggingOutRef.current = true;
 
     const userId = user.id; // Guardar ID antes de limpiar estado
-    // ✅ PASO 1: Limpiar estado local INMEDIATAMENTE CON flushSync
     
-    // Limpiar PRIMERO el ref
-    currentUserRef.current = null;
-    
-    // 🆕 Usar flushSync para forzar actualización sincrónica del estado
-    flushSync(() => {
+    try {
+      // ✅ PASO 1: Limpiar estado local INMEDIATAMENTE CON flushSync
+      // Limpiar PRIMERO el ref
+      currentUserRef.current = null;
+      
+      // 🆕 Usar flushSync para forzar actualización sincrónica del estado
+      flushSync(() => {
+        setCurrentUser(null);
+        setOnlineUsers(0);
+        setMessages([{
+          id: '1',
+          username: 'Sistema',
+          message: '¡Bienvenidos al chat de Black Diamond! 💬 Regístrate para conversar',
+          timestamp: new Date(),
+          color: '#d4af37',
+          role: 'system'
+        }]);
+      });
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') console.error('❌ Error en flushSync durante logout:', error);
+      // Fallback: intentar actualizar estado sin flushSync
       setCurrentUser(null);
-      setOnlineUsers(0);
-      setMessages([{
-        id: '1',
-        username: 'Sistema',
-        message: '¡Bienvenidos al chat de Black Diamond! 💬 Regístrate para conversar',
-        timestamp: new Date(),
-        color: '#d4af37',
-        role: 'system'
-      }]);
-    });
-    
-    // 🆕 El estado ya está actualizado SINCRÓNICAMENTE, resetear bandera
-    isLoggingOutRef.current = false;
+    } finally {
+      // 🆕 Resetear bandera independientemente del resultado
+      isLoggingOutRef.current = false;
+    }
 
     // ✅ PASO 2: Actualizar BD en background (NO BLOQUEAR)
     // Usar Promise.allSettled para ejecutar ambas operaciones sin esperar
@@ -580,7 +585,6 @@ export function PublicUsersProvider({ children }: { children: ReactNode }) {
           },
           body: JSON.stringify({
             sesion_activa: false,
-            sesion_token: null,
             sesion_expires_at: new Date(Date.now() - 1000).toISOString(),
             sesion_ultimo_acceso: new Date(Date.now() - 1000).toISOString()
           })

@@ -1,8 +1,9 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { supabase } from '../utils/supabase/info';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { Input } from './ui/input';
+// import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -11,12 +12,12 @@ import {
   DollarSign, 
   TrendingUp, 
   TrendingDown, 
-  Calendar,
+//  Calendar,
   FileText,
   Check,
-  X,
-  Clock,
-  ShoppingCart,
+//  X,
+//  Clock,
+//  ShoppingCart,
   AlertCircle,
   CreditCard,
   Receipt,
@@ -38,12 +39,37 @@ export function LiquidacionPanel({ userEmail }: LiquidacionPanelProps) {
   const { compras } = useCarrito();
   const { multas } = useMultas();
   const { registrarPago, obtenerPagosModelo, obtenerTotalAdelantosAprobados, loading: pagosLoading } = usePagos();
-  const isLoading = modelosLoading || serviciosLoading || pagosLoading;
+  const [deudasBoutique, setDeudasBoutique] = useState<any[]>([]);
+  const [loadingDeudas, setLoadingDeudas] = useState(false);
+  const isLoading = modelosLoading || serviciosLoading || pagosLoading || loadingDeudas;
 
   const [modeloSeleccionado, setModeloSeleccionado] = useState<string>('');
   const [mostrarModalPago, setMostrarModalPago] = useState(false);
   const [metodoPago, setMetodoPago] = useState('Efectivo');
   const [notas, setNotas] = useState('');
+
+  // Cargar deudas de boutique pendientes
+  useEffect(() => {
+    const cargarDeudas = async () => {
+      setLoadingDeudas(true);
+      try {
+        const { data, error } = await supabase
+          .from('ventas_boutique')
+          .select('*')
+          .eq('estado', 'aceptado')
+          .eq('liquidado', false);
+        
+        if (error) throw error;
+        setDeudasBoutique(data || []);
+      } catch (err) {
+        console.error('Error cargando deudas boutique:', err);
+      } finally {
+        setLoadingDeudas(false);
+      }
+    };
+
+    cargarDeudas();
+  }, []);
 
   // Calcular liquidación de una modelo usando el modelo actual de datos
   const calcularLiquidacion = (modeloEmail: string): LiquidacionDetalle => {
@@ -78,6 +104,10 @@ export function LiquidacionPanel({ userEmail }: LiquidacionPanelProps) {
     // Todas las compras de boutique se restan (no hay campo duranteServicio en modelo actual)
     const valorComprasBoutique = comprasModelo.reduce((total, c) => total + c.total, 0);
 
+    // DEUDAS BOUTIQUE (ventas_boutique aceptadas no liquidadas)
+    const deudasModelo = deudasBoutique.filter(d => d.modelo_id === modelo?.id);
+    const valorDeudasBoutique = deudasModelo.reduce((total, d) => total + d.total, 0);
+
     // Multas pendientes (se restan)
     const multasModelo = multas.filter(
       (m) =>
@@ -92,7 +122,7 @@ export function LiquidacionPanel({ userEmail }: LiquidacionPanelProps) {
 
     // Calcular totales
     const subtotal = liquidacionServicios + liquidacionAdicionales;
-    const deducciones = valorComprasBoutique + valorMultas + valorAdelantos;
+    const deducciones = valorComprasBoutique + valorDeudasBoutique + valorMultas + valorAdelantos;
     const totalAPagar = Math.max(0, subtotal - deducciones);
 
     return {
@@ -117,8 +147,8 @@ export function LiquidacionPanel({ userEmail }: LiquidacionPanelProps) {
         liquidacion: 0,
       },
       comprasFueraServicio: {
-        cantidad: comprasModelo.length,
-        valorTotal: valorComprasBoutique,
+        cantidad: comprasModelo.length + deudasModelo.length,
+        valorTotal: valorComprasBoutique + valorDeudasBoutique,
       },
       multas: {
         cantidad: multasModelo.length,
@@ -138,15 +168,16 @@ export function LiquidacionPanel({ userEmail }: LiquidacionPanelProps) {
   // Calcular liquidaciones de todas las modelos
   const liquidaciones = useMemo(() => {
     return modelos.map((modelo) => calcularLiquidacion(modelo.email));
-  }, [modelos, servicios, compras, multas]);
+  }, [modelos, servicios, compras, multas, deudasBoutique]);
 
   const liquidacionActual = modeloSeleccionado
     ? calcularLiquidacion(modeloSeleccionado)
     : null;
 
-  const handleProcesarPago = () => {
+  const handleProcesarPago = async () => {
     if (!liquidacionActual || !modeloSeleccionado) return;
 
+    // 1. Registrar el pago en el contexto/base de datos
     registrarPago(
       modeloSeleccionado,
       liquidacionActual.modeloNombre,
@@ -155,6 +186,29 @@ export function LiquidacionPanel({ userEmail }: LiquidacionPanelProps) {
       metodoPago,
       notas
     );
+
+    // 2. Marcar deudas de boutique como LIQUIDADAS en Supabase
+    const modelo = modelos.find(m => m.email === modeloSeleccionado);
+    if (modelo) {
+      try {
+        const { error } = await supabase
+          .from('ventas_boutique')
+          .update({ 
+            liquidado: true,
+            liquidacion_id: crypto.randomUUID() // O el ID del pago si estuviera disponible
+          })
+          .eq('modelo_id', modelo.id)
+          .eq('estado', 'aceptado')
+          .eq('liquidado', false);
+        
+        if (error) throw error;
+        
+        // Actualizar estado local para reflejar el cambio
+        setDeudasBoutique(prev => prev.filter(d => d.modelo_id !== modelo.id));
+      } catch (err) {
+        console.error('Error al liquidar deudas boutique:', err);
+      }
+    }
 
     setMostrarModalPago(false);
     setModeloSeleccionado('');

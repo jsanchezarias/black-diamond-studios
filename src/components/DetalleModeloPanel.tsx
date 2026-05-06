@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, User, Mail, Phone, MapPin, CreditCard, Calendar, TrendingUp, DollarSign, Clock, Star, Edit, AlertTriangle, ShoppingBag, BarChart3, FileText, CheckCircle, Archive } from 'lucide-react';
+import { X, User, Mail, Phone, MapPin, CreditCard, DollarSign, Clock, Edit, AlertTriangle, BarChart3, FileText, CheckCircle, Archive } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -30,8 +30,8 @@ interface DetalleModeloPanelProps {
 
 export function DetalleModeloPanel({ modelo, onClose, onEdit }: DetalleModeloPanelProps) {
   const { servicios, serviciosFinalizados } = useServicios();
-  const { multas, obtenerTotalMultasPendientes } = useMultas();
-  const { adelantos, obtenerAdelantosPendientes } = usePagos();
+  const { multas, obtenerTotalMultasPendientes: _obtenerTotalMultasPendientes } = useMultas();
+  const { adelantos, obtenerAdelantosPendientes: _obtenerAdelantosPendientes } = usePagos();
   const { archivarModelo } = useModelos();
   const [mostrarArchivarDialog, setMostrarArchivarDialog] = useState(false);
   const [motivoArchivado, setMotivoArchivado] = useState('');

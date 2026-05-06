@@ -118,7 +118,7 @@ export async function notificarProgramadores(params: {
     const { data: programadores, error } = await supabase
       .from('usuarios')
       .select('id, email')
-      .in('role', ['programador', 'admin', 'owner', 'recepcionista']);
+      .in('role', ['programador', 'administrador', 'owner']);
 
     if (error || !programadores?.length) return;
 

@@ -20,6 +20,7 @@ export function AgregarGastoModal({ isOpen, onClose, userEmail }: AgregarGastoMo
   const [descripcion, setDescripcion] = useState('');
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
   const [comprobante, setComprobante] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   if (!isOpen) return null;
 
@@ -35,7 +36,7 @@ export function AgregarGastoModal({ isOpen, onClose, userEmail }: AgregarGastoMo
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!concepto.trim() || !monto || parseFloat(monto) <= 0) {
@@ -43,29 +44,36 @@ export function AgregarGastoModal({ isOpen, onClose, userEmail }: AgregarGastoMo
       return;
     }
 
-    agregarGasto({
-      fecha: new Date(fecha),
-      concepto: concepto.trim(),
-      categoria,
-      monto: parseFloat(monto),
-      descripcion: descripcion.trim(),
-      comprobante: comprobante || undefined,
-      responsable: userEmail,
-      estado: 'pendiente',
-    });
+    try {
+      setSubmitting(true);
+      await agregarGasto({
+        fecha: new Date(fecha),
+        concepto: concepto.trim(),
+        categoria,
+        monto: parseFloat(monto),
+        descripcion: descripcion.trim(),
+        comprobante: comprobante || undefined,
+        responsable: userEmail,
+        estado: 'pendiente',
+      });
 
-    toast.success('Gasto registrado correctamente', {
-      description: 'El gasto está pendiente de aprobación',
-    });
+      toast.success('Gasto registrado correctamente', {
+        description: 'El gasto está pendiente de aprobación',
+      });
 
-    // Reset
-    setConcepto('');
-    setCategoria('otros');
-    setMonto('');
-    setDescripcion('');
-    setFecha(new Date().toISOString().split('T')[0]);
-    setComprobante(null);
-    onClose();
+      // Reset
+      setConcepto('');
+      setCategoria('otros');
+      setMonto('');
+      setDescripcion('');
+      setFecha(new Date().toISOString().split('T')[0]);
+      setComprobante(null);
+      onClose();
+    } catch (err: any) {
+      toast.error('Error al guardar', { description: err.message });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const categorias = [
@@ -265,9 +273,9 @@ export function AgregarGastoModal({ isOpen, onClose, userEmail }: AgregarGastoMo
               >
                 Cancelar
               </Button>
-              <Button type="submit" className="flex-1 bg-primary text-primary-foreground">
+              <Button type="submit" className="flex-1 bg-primary text-primary-foreground" disabled={submitting}>
                 <DollarSign className="w-4 h-4 mr-2" />
-                Registrar Gasto
+                {submitting ? 'Guardando...' : 'Registrar Gasto'}
               </Button>
             </div>
           </form>

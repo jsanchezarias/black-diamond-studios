@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import {
   Calendar, Clock, CheckCircle, XCircle, AlertCircle,
   User, Phone, ThumbsUp, ThumbsDown, Filter,
-  RefreshCw, Plus, Star, X, Loader2, Users, MapPin,
-  Archive, Trash2, RotateCcw, Square, CheckSquare,
+  RefreshCw, Plus, Star, X, Users, MapPin,
+  Archive, Trash2, RotateCcw, Square, CheckSquare, Loader2,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
@@ -19,12 +19,17 @@ import { toast } from 'sonner';
 const COLOR_PRIMARY = '#c9a961';
 
 export const ESTADO_CONFIG: Record<Agendamiento['estado'], { label: string; color: string; icon: React.ReactNode }> = {
-  pendiente:  { label: 'Pendiente',  color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30', icon: <Clock className="w-3 h-3" /> },
-  confirmado: { label: 'Confirmado', color: 'bg-blue-500/20 text-blue-400 border-blue-500/30',       icon: <CheckCircle className="w-3 h-3" /> },
-  aprobado:   { label: 'Aprobado',   color: 'bg-blue-500/20 text-blue-400 border-blue-500/30',       icon: <CheckCircle className="w-3 h-3" /> },
-  completado: { label: 'Completado', color: 'bg-green-500/20 text-green-400 border-green-500/30',    icon: <CheckCircle className="w-3 h-3" /> },
-  cancelado:  { label: 'Cancelado',  color: 'bg-red-500/20 text-red-400 border-red-500/30',          icon: <XCircle className="w-3 h-3" /> },
-  no_show:    { label: 'No Show',    color: 'bg-gray-500/20 text-gray-400 border-gray-500/30',       icon: <AlertCircle className="w-3 h-3" /> },
+  pendiente:            { label: 'Pendiente',   color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30', icon: <Clock className="w-3 h-3" /> },
+  solicitud_cliente:    { label: 'Solicitud',   color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30', icon: <Clock className="w-3 h-3" /> },
+  aceptado_programador: { label: 'Aceptado',    color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',       icon: <CheckCircle className="w-3 h-3" /> },
+  confirmado:           { label: 'Confirmado',  color: 'bg-blue-500/20 text-blue-400 border-blue-500/30',       icon: <CheckCircle className="w-3 h-3" /> },
+  aprobado:             { label: 'Aprobado',    color: 'bg-blue-500/20 text-blue-400 border-blue-500/30',       icon: <CheckCircle className="w-3 h-3" /> },
+  en_curso:             { label: 'En Curso',    color: 'bg-purple-500/20 text-purple-400 border-purple-500/30', icon: <Star className="w-3 h-3" /> },
+  activo:               { label: 'Activo',      color: 'bg-purple-500/20 text-purple-400 border-purple-500/30', icon: <Star className="w-3 h-3" /> },
+  completado:           { label: 'Completado',  color: 'bg-green-500/20 text-green-400 border-green-500/30',    icon: <CheckCircle className="w-3 h-3" /> },
+  finalizado:           { label: 'Finalizado',  color: 'bg-green-500/20 text-green-400 border-green-500/30',    icon: <CheckCircle className="w-3 h-3" /> },
+  cancelado:            { label: 'Cancelado',   color: 'bg-red-500/20 text-red-400 border-red-500/30',          icon: <XCircle className="w-3 h-3" /> },
+  no_show:              { label: 'No Show',     color: 'bg-gray-500/20 text-gray-400 border-gray-500/30',       icon: <AlertCircle className="w-3 h-3" /> },
 };
 
 // ── Props ─────────────────────────────────────────────────────────────────────
@@ -107,6 +112,11 @@ function AgendamientoRow({
             {cfg.icon}
             {cfg.label}
           </Badge>
+          {ag.creadoPorRol === 'modelo' && (
+            <Badge className="text-[10px] font-bold border-none" style={{ background: 'linear-gradient(135deg, #B8860B, #FFD700)', color: 'black' }}>
+              ⚡ Directo
+            </Badge>
+          )}
         </div>
         <div className="flex items-center gap-3 mt-0.5 flex-wrap">
           <span className="text-xs text-gray-400 flex items-center gap-1">
@@ -171,7 +181,7 @@ function AgendamientoRow({
           </Button>
         )}
         {/* Eliminar */}
-        {onEliminar && esAdmin && (
+        {onEliminar && rol === 'admin' && (
           <Button size="sm" onClick={() => onEliminar(ag)}
             className="h-7 px-2 text-xs bg-red-900/20 text-red-400 border border-red-900/30 hover:bg-red-900/30">
             <Trash2 className="w-3 h-3" />
@@ -785,7 +795,6 @@ export function AgendamientosPanel({ rol, userEmail = '', modeloEmail }: Agendam
     marcarComoCompletado,
     marcarComoNoShow,
     recargarAgendamientos,
-    getAgendamientosHoy,
     getAgendamientosPendientesAprobacion,
   } = useAgendamientos();
 
@@ -801,7 +810,7 @@ export function AgendamientosPanel({ rol, userEmail = '', modeloEmail }: Agendam
   const [archivados, setArchivados] = useState<any[]>([]);
   const [cargandoArchivados, setCargandoArchivados] = useState(false);
   const [modalArchivado, setModalArchivado] = useState<Agendamiento | null>(null);
-  const [modalEliminacion, setModalEliminacion] = useState<Agendamiento | null>(null);
+  const [modalEliminacion, setModalEliminacion] = useState<{ag: Agendamiento, tieneRelacionados: boolean} | null>(null);
   const [seleccionados, setSeleccionados] = useState<string[]>([]);
 
   const esAdmin = rol === 'admin' || rol === 'owner';
@@ -840,16 +849,75 @@ export function AgendamientosPanel({ rol, userEmail = '', modeloEmail }: Agendam
     await recargarAgendamientos();
   };
 
-  const ejecutarEliminacion = async () => {
+  const handleConfirmarEliminar = async (ag: Agendamiento) => {
+    // Verificar si tiene relacionados
+    const [ {count: notifs}, {count: multas}, {count: pagos} ] = await Promise.all([
+      supabase.from('notificaciones').select('id', { count: 'exact', head: true }).or(`agendamiento_id.eq.${ag.id},referencia_id.eq.${ag.id}`),
+      supabase.from('multas').select('id', { count: 'exact', head: true }).eq('agendamiento_id', ag.id),
+      supabase.from('pagos').select('id', { count: 'exact', head: true }).eq('agendamiento_id', ag.id)
+    ]);
+    const tieneRelacionados = (notifs || 0) > 0 || (multas || 0) > 0 || (pagos || 0) > 0;
+    setModalEliminacion({ ag, tieneRelacionados });
+  };
+
+  const eliminarAgendamientoCompleto = async () => {
     if (!modalEliminacion) return;
-    const { error } = await supabase.from('agendamientos').delete().eq('id', modalEliminacion.id);
-    if (error) { toast.error('Error al eliminar'); return; }
-    toast.success('Agendamiento eliminado permanentemente');
-    setModalEliminacion(null);
-    if (mostrarArchivados) {
-      setArchivados(prev => prev.filter(a => a.id !== modalEliminacion.id));
-    } else {
-      await recargarAgendamientos();
+    const id = modalEliminacion.ag.id;
+    try {
+      const ahora = new Date().toISOString();
+
+      // PASO 1 — Soft delete notificaciones por agendamiento_id
+      const { error: errNoti1 } = await supabase
+        .from('notificaciones')
+        .update({ eliminado: true })
+        .eq('agendamiento_id', id);
+      if (errNoti1) console.warn('⚠️ notificaciones(agendamiento_id):', errNoti1.message);
+
+      // PASO 1b — Soft delete notificaciones por referencia_id
+      const { error: errNoti2 } = await supabase
+        .from('notificaciones')
+        .update({ eliminado: true })
+        .eq('referencia_id', id);
+      if (errNoti2) console.warn('⚠️ notificaciones(referencia_id):', errNoti2.message);
+
+      // PASO 2 — Soft delete multas
+      const { error: errMultas } = await supabase
+        .from('multas')
+        .update({ eliminado: true })
+        .eq('agendamiento_id', id);
+      if (errMultas) console.warn('⚠️ multas:', errMultas.message);
+
+      // PASO 3 — Soft delete pagos
+      const { error: errPagos } = await supabase
+        .from('pagos')
+        .update({ eliminado: true, eliminado_en: ahora })
+        .eq('agendamiento_id', id);
+      if (errPagos) console.warn('⚠️ pagos:', errPagos.message);
+
+      // PASO 4 — Soft delete el agendamiento
+      const { error } = await supabase
+        .from('agendamientos')
+        .update({ eliminado: true, eliminado_en: ahora })
+        .eq('id', id);
+
+      if (error) {
+        console.error('❌ agendamiento delete error:', error.code, error.message);
+        throw error;
+      }
+
+      // PASO 5 — Actualizar estado local
+      setModalEliminacion(null);
+      if (mostrarArchivados) {
+        setArchivados(prev => prev.filter(a => a.id !== id));
+      } else {
+        await recargarAgendamientos();
+      }
+
+      toast.success('Agendamiento eliminado correctamente');
+
+    } catch (error) {
+      console.error('Error eliminando agendamiento:', error);
+      toast.error('Error al eliminar el agendamiento');
     }
   };
 
@@ -881,10 +949,26 @@ export function AgendamientosPanel({ rol, userEmail = '', modeloEmail }: Agendam
 
   const eliminarSeleccionados = async () => {
     if (!seleccionados.length) return;
-    await supabase.from('agendamientos').delete().in('id', seleccionados);
-    toast.success(`${seleccionados.length} agendamiento(s) eliminados`);
-    setSeleccionados([]);
-    await recargarAgendamientos();
+    const ahora = new Date().toISOString();
+    try {
+      await supabase.from('notificaciones').update({ eliminado: true }).in('agendamiento_id', seleccionados);
+      await supabase.from('notificaciones').update({ eliminado: true }).in('referencia_id', seleccionados);
+      await supabase.from('multas').update({ eliminado: true }).in('agendamiento_id', seleccionados);
+      await supabase.from('pagos').update({ eliminado: true, eliminado_en: ahora }).in('agendamiento_id', seleccionados);
+
+      const { error } = await supabase
+        .from('agendamientos')
+        .update({ eliminado: true, eliminado_en: ahora })
+        .in('id', seleccionados);
+      if (error) throw error;
+
+      toast.success(`${seleccionados.length} agendamiento(s) eliminados`);
+      setSeleccionados([]);
+      await recargarAgendamientos();
+    } catch (error) {
+      console.error('Error al eliminar seleccionados:', error);
+      toast.error('Error al eliminar agendamientos');
+    }
   };
 
   // ── Selección y Ordenamiento ─────────────────────────────────────
@@ -1086,10 +1170,12 @@ export function AgendamientosPanel({ rol, userEmail = '', modeloEmail }: Agendam
             className="h-7 px-2 text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20">
             <Archive className="w-3 h-3 mr-1" />Archivar todos
           </Button>
-          <Button size="sm" onClick={eliminarSeleccionados}
-            className="h-7 px-2 text-xs bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20">
-            <Trash2 className="w-3 h-3 mr-1" />Eliminar todos
-          </Button>
+          {rol === 'admin' && (
+            <Button size="sm" onClick={eliminarSeleccionados}
+              className="h-7 px-2 text-xs bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20">
+              <Trash2 className="w-3 h-3 mr-1" />Eliminar todos
+            </Button>
+          )}
           <button onClick={() => setSeleccionados([])}
             className="ml-auto text-xs text-white/40 hover:text-white/70">
             Cancelar
@@ -1141,7 +1227,7 @@ export function AgendamientosPanel({ rol, userEmail = '', modeloEmail }: Agendam
                       <AgendamientoRow ag={agNorm} rol={rol} userEmail={userEmail}
                         onAprobar={() => {}} onRechazar={() => {}} onCompletar={() => {}} onNoShow={() => {}} onCancelar={() => {}}
                         onRestaurar={restaurarAgendamiento}
-                        onEliminar={setModalEliminacion}
+                        onEliminar={handleConfirmarEliminar}
                       />
                     </div>
                   );
@@ -1182,7 +1268,7 @@ export function AgendamientosPanel({ rol, userEmail = '', modeloEmail }: Agendam
                 {hoyList.map(ag => (
                   <AgendamientoRow key={ag.id} ag={ag} rol={rol} userEmail={userEmail}
                     onAprobar={handleAprobar} onRechazar={handleRechazar} onCompletar={handleCompletar} onNoShow={handleNoShow} onCancelar={handleCancelar}
-                    onArchivar={setModalArchivado} onEliminar={setModalEliminacion}
+                    onArchivar={setModalArchivado} onEliminar={handleConfirmarEliminar}
                     seleccionado={seleccionados.includes(ag.id)} onToggleSelect={toggleSeleccionado}
                   />
                 ))}
@@ -1212,7 +1298,7 @@ export function AgendamientosPanel({ rol, userEmail = '', modeloEmail }: Agendam
                       {ags.map(ag => (
                         <AgendamientoRow key={ag.id} ag={ag} rol={rol} userEmail={userEmail}
                           onAprobar={handleAprobar} onRechazar={handleRechazar} onCompletar={handleCompletar} onNoShow={handleNoShow} onCancelar={handleCancelar}
-                          onArchivar={setModalArchivado} onEliminar={setModalEliminacion}
+                          onArchivar={setModalArchivado} onEliminar={handleConfirmarEliminar}
                           seleccionado={seleccionados.includes(ag.id)} onToggleSelect={toggleSeleccionado}
                         />
                       ))}
@@ -1239,7 +1325,7 @@ export function AgendamientosPanel({ rol, userEmail = '', modeloEmail }: Agendam
                   <div key={ag.id} className="opacity-80 grayscale-[30%]">
                     <AgendamientoRow ag={ag} rol={rol} userEmail={userEmail}
                       onAprobar={handleAprobar} onRechazar={handleRechazar} onCompletar={handleCompletar} onNoShow={handleNoShow} onCancelar={handleCancelar}
-                      onArchivar={setModalArchivado} onEliminar={setModalEliminacion}
+                        onArchivar={setModalArchivado} onEliminar={handleConfirmarEliminar}
                       seleccionado={seleccionados.includes(ag.id)} onToggleSelect={toggleSeleccionado}
                     />
                   </div>
@@ -1296,21 +1382,61 @@ export function AgendamientosPanel({ rol, userEmail = '', modeloEmail }: Agendam
         </div>
       )}
 
-      {/* Modal: Confirmar Eliminar */}
+      {/* Modal: Confirmar Eliminar Inteligente */}
       {modalEliminacion && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[#111] border border-red-500/20 rounded-xl p-6 max-w-sm w-full">
-            <div className="text-3xl text-center mb-3">🗑️</div>
-            <h3 className="text-center font-semibold text-red-400 mb-1">¿Eliminar permanentemente?</h3>
-            <p className="text-center text-sm text-gray-400 mb-1">
-              {(modalEliminacion as any).clienteNombre || (modalEliminacion as any).cliente_nombre} — {formatearFecha((modalEliminacion as any).fecha || (modalEliminacion as any).fecha_servicio)}
-            </p>
-            <p className="text-center text-xs text-red-400/70 mb-5">
+            <div className="flex justify-center mb-4"><AlertCircle className="w-12 h-12 text-red-500" /></div>
+            <h3 className="text-center font-bold text-red-500 text-lg mb-4">⚠️ Eliminar agendamiento</h3>
+            
+            <div className="bg-white/5 rounded-lg p-3 mb-4 space-y-1.5 text-sm border border-white/10">
+              <div className="flex gap-2 text-gray-300">
+                <span className="font-semibold w-16 text-gray-400">Cliente:</span> 
+                <span className="truncate">{(modalEliminacion.ag as any).clienteNombre || (modalEliminacion.ag as any).cliente_nombre || '—'}</span>
+              </div>
+              <div className="flex gap-2 text-gray-300">
+                <span className="font-semibold w-16 text-gray-400">Modelo:</span> 
+                <span className="truncate">{(modalEliminacion.ag as any).modeloNombre || (modalEliminacion.ag as any).modelo_nombre || '—'}</span>
+              </div>
+              <div className="flex gap-2 text-gray-300">
+                <span className="font-semibold w-16 text-gray-400">Fecha:</span> 
+                <span>{formatearFecha((modalEliminacion.ag as any).fecha || (modalEliminacion.ag as any).fecha_servicio)}</span>
+              </div>
+              <div className="flex gap-2 text-gray-300">
+                <span className="font-semibold w-16 text-gray-400">Estado:</span> 
+                <span className="capitalize">{modalEliminacion.ag.estado}</span>
+              </div>
+            </div>
+
+            {modalEliminacion.tieneRelacionados && (
+              <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 mb-4">
+                <p className="text-xs text-red-400 font-bold mb-2">Se eliminarán también:</p>
+                <ul className="text-xs text-red-400/80 list-disc pl-4 space-y-1">
+                  <li>Pagos asociados</li>
+                  <li>Multas asociadas</li>
+                  <li>Notificaciones asociadas</li>
+                </ul>
+              </div>
+            )}
+
+            <p className="text-center text-xs font-semibold text-red-500/90 mb-5">
               ⚠️ Esta acción no se puede deshacer.
             </p>
+
             <div className="flex gap-2">
-              <Button variant="outline" className="flex-1 border-white/10 text-gray-400" onClick={() => setModalEliminacion(null)}>Cancelar</Button>
-              <Button className="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold" onClick={ejecutarEliminacion}>Sí, eliminar</Button>
+              <Button 
+                variant="outline" 
+                className="flex-1 border-gray-600 text-gray-300 hover:bg-gray-800" 
+                onClick={() => setModalEliminacion(null)}
+              >
+                Cancelar
+              </Button>
+              <Button 
+                className="flex-[1.5] bg-[#dc2626] hover:bg-[#b91c1c] text-white font-bold" 
+                onClick={eliminarAgendamientoCompleto}
+              >
+                🗑️ Eliminar todo
+              </Button>
             </div>
           </div>
         </div>
@@ -1319,8 +1445,8 @@ export function AgendamientosPanel({ rol, userEmail = '', modeloEmail }: Agendam
       {/* Modales */}
       {mostrarNuevoAgendamiento && (
         <NuevoAgendamientoModal
-          userEmail={userEmail}
           onClose={() => setMostrarNuevoAgendamiento(false)}
+          userEmail={userEmail}
           onCreado={handleRecargar}
         />
       )}

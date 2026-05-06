@@ -99,6 +99,7 @@ interface ClientesContextType {
     promedioGasto: number;
   };
   isLoading: boolean;
+  cargarClientes: () => Promise<void>;
 }
 
 // Convierte fila de Supabase (snake_case) al tipo Cliente (camelCase)
@@ -174,7 +175,22 @@ export function ClientesProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    cargarClientes();
+    const channel = supabase
+      .channel('clientes-rt')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'clientes' }, (payload) => {
+        setClientes(prev => [dbRowToCliente(payload.new), ...prev]);
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'clientes' }, (payload) => {
+        setClientes(prev => prev.map(c => c.id === payload.new.id ? dbRowToCliente(payload.new) : c));
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'clientes' }, (payload) => {
+        setClientes(prev => prev.filter(c => c.id !== payload.old.id));
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const cargarClientes = async () => {
@@ -412,6 +428,7 @@ export function ClientesProvider({ children }: { children: ReactNode }) {
         obtenerNotasServiciosPrevios,
         obtenerEstadisticasCliente,
         isLoading,
+        cargarClientes,
       }}
     >
       {children}
@@ -438,6 +455,7 @@ export function useClientes() {
       obtenerNotasServiciosPrevios: () => [],
       obtenerEstadisticasCliente: () => ({ totalServicios: 0, totalGastado: 0, promedioGasto: 0 }),
       isLoading: false,
+      cargarClientes: async () => {},
     };
   }
   return context;

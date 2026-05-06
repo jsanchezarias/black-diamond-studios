@@ -1,0 +1,142 @@
+[
+  {
+    "id": "ca668d3e-cbbb-4c77-9ded-684a6094bc6f",
+    "sender_id": "42fe025b-a60a-4f6c-a0d2-c81fa3edc0be",
+    "receiver_id": null,
+    "message": "Hola",
+    "is_read": true,
+    "role": "user",
+    "color": "#ffffff",
+    "created_at": "2026-04-25T05:59:38.562538+00:00"
+  },
+  {
+    "id": "f5ec0990-792c-42bd-a87d-2894aaa10edd",
+    "sender_id": "42fe025b-a60a-4f6c-a0d2-c81fa3edc0be",
+    "receiver_id": null,
+    "message": "Quiero un servicio",
+    "is_read": true,
+    "role": "user",
+    "color": "#ffffff",
+    "created_at": "2026-04-25T05:59:59.740625+00:00"
+  },
+  {
+    "id": "9bcdb9ab-bbf0-41a8-8fce-aeb8e19662b6",
+    "sender_id": "89dd0358-c48e-4d54-a392-2b9b026f0a91",
+    "receiver_id": null,
+    "message": "¡Hola! Quiero solicitar un servicio:\\n\\n👩 *Modelo:* Natalia\\n📋 *Servicio:* 3 Horas\\n⏱️ *Duración:* 3 horas\\n📍 *Ubicación:* En Sede\\n💰 *Tarifa:* $520.000\\n\\n*Mensaje adicional:* Hola como estas",
+    "is_read": true,
+    "role": "user",
+    "color": "#ffffff",
+    "created_at": "2026-04-28T06:53:35.258889+00:00"
+  },
+  {
+    "id": "e10ddfff-060d-438f-b8a7-6777a258cfb7",
+    "sender_id": "89dd0358-c48e-4d54-a392-2b9b026f0a91",
+    "receiver_id": "312025b1-f146-4227-93ac-fdbf0191cf73",
+    "message": "¡Hola! Quiero solicitar un servicio:\\n\\n👩 *Modelo:* Sofia\\n📋 *Servicio:* Rato\\n⏱️ *Duración:* 15 minutos\\n📍 *Ubicación:* En Sede\\n💰 *Tarifa:* $130.000\\n\\n*Mensaje adicional:* un raticoo",
+    "is_read": true,
+    "role": "user",
+    "color": "#ffffff",
+    "created_at": "2026-04-28T07:12:23.363856+00:00"
+  },
+  {
+    "id": "34bf96ba-b79f-4f9b-a7b4-188028fd2d1b",
+    "sender_id": "312025b1-f146-4227-93ac-fdbf0191cf73",
+    "receiver_id": "42fe025b-a60a-4f6c-a0d2-c81fa3edc0be",
+    "message": "Hola",
+    "is_read": false,
+    "role": "programador",
+    "color": "#d4af37",
+    "created_at": "2026-04-28T07:57:38.204082+00:00"
+  },
+  {
+    "id": "721c5bf7-b921-4db5-a338-b3a9116e7519",
+    "sender_id": "312025b1-f146-4227-93ac-fdbf0191cf73",
+    "receiver_id": "42fe025b-a60a-4f6c-a0d2-c81fa3edc0be",
+    "message": "ya vienes?",
+    "is_read": false,
+    "role": "programador",
+    "color": "#d4af37",
+    "created_at": "2026-04-28T07:57:44.377086+00:00"
+  },
+  {
+    "id": "2c5055d3-632c-4117-82dd-c289e5e93f12",
+    "sender_id": "42fe025b-a60a-4f6c-a0d2-c81fa3edc0be",
+    "receiver_id": null,
+    "message": "hello",
+    "is_read": true,
+    "role": "user",
+    "color": "#ffffff",
+    "created_at": "2026-04-28T07:59:10.429187+00:00"
+  },
+  {
+    "id": "5553771d-52d4-4574-8d12-03f6bc6090cb",
+    "sender_id": "42fe025b-a60a-4f6c-a0d2-c81fa3edc0be",
+    "receiver_id": null,
+    "message": "my friend",
+    "is_read": true,
+    "role": "user",
+    "color": "#ffffff",
+    "created_at": "2026-04-28T07:59:14.660425+00:00"
+  },
+  {
+    "id": "7f9e8baa-fa1d-40ff-97e3-b5594e2e0ca8",
+    "sender_id": "42fe025b-a60a-4f6c-a0d2-c81fa3edc0be",
+    "receiver_id": null,
+    "message": "my lonelyfriend how do you do",
+    "is_read": true,
+    "role": "user",
+    "color": "#ffffff",
+    "created_at": "2026-04-28T07:59:32.299607+00:00"
+  },
+  {
+    "id": "f0c66917-2898-4d0c-bff2-6a7e3a43951f",
+    "sender_id": "42fe025b-a60a-4f6c-a0d2-c81fa3edc0be",
+    "receiver_id": null,
+    "message": "¡Hola! Quiero solicitar un servicio:\\n\\n👩 *Modelo:* Xiomara\\n📋 *Servicio:* 1 Hora\\n⏱️ *Duración:* 1 hora\\n📍 *Ubicación:* En Sede\\n💰 *Tarifa:* $160.000\\n\\n*Mensaje adicional:* Puede tener lenceria negra para el servicio",
+    "is_read": true,
+    "role": "user",
+    "color": "#ffffff",
+    "created_at": "2026-04-28T08:01:43.639183+00:00"
+  },
+  {
+    "id": "a49d3eea-f125-41bd-844a-95833dd6bbcc",
+    "sender_id": "42fe025b-a60a-4f6c-a0d2-c81fa3edc0be",
+    "receiver_id": null,
+    "message": "¡Hola! Quiero solicitar un servicio:\\n\\n👩 *Modelo:* Sofia\\n📋 *Servicio:* 2 Horas\\n⏱️ *Duración:* 2 horas\\n📍 *Ubicación:* A Domicilio\\n💰 *Tarifa:* $480.000\\n\\n*Mensaje adicional:* que venga bien vestida",
+    "is_read": false,
+    "role": "user",
+    "color": "#ffffff",
+    "created_at": "2026-04-28T08:13:45.531178+00:00"
+  },
+  {
+    "id": "60cd977f-6e11-4af2-8bd3-0f58101f40c2",
+    "sender_id": "42fe025b-a60a-4f6c-a0d2-c81fa3edc0be",
+    "receiver_id": null,
+    "message": "¡Hola! Quiero solicitar un servicio:\\n\\n👩 *Modelo:* Luci\\n📋 *Servicio:* 24 Horas\\n⏱️ *Duración:* 24 horas\\n📍 *Ubicación:* En Sede\\n💰 *Tarifa:* $2.300.000\\n\\n*Mensaje adicional:* Ninguno",
+    "is_read": false,
+    "role": "user",
+    "color": "#ffffff",
+    "created_at": "2026-04-28T08:21:44.111144+00:00"
+  },
+  {
+    "id": "9bbcdf56-af7b-432e-a49f-f981b7091899",
+    "sender_id": "42fe025b-a60a-4f6c-a0d2-c81fa3edc0be",
+    "receiver_id": null,
+    "message": "¡Hola! Quiero solicitar un servicio:\\n\\n👩 *Modelo:* Sofia\\n📋 *Servicio:* 8 Horas\\n⏱️ *Duración:* 8 horas\\n📍 *Ubicación:* A Domicilio\\n💰 *Tarifa:* $1.500.000\\n\\n*Mensaje adicional:* Ninguno",
+    "is_read": false,
+    "role": "user",
+    "color": "#ffffff",
+    "created_at": "2026-04-28T08:27:49.858037+00:00"
+  },
+  {
+    "id": "59b593df-ecbf-4f77-8df8-e51861f99569",
+    "sender_id": "42fe025b-a60a-4f6c-a0d2-c81fa3edc0be",
+    "receiver_id": null,
+    "message": "¡Hola! Quiero solicitar un servicio:\\n\\n👩 *Modelo:* Sofia\\n📋 *Servicio:* 1 Hora\\n⏱️ *Duración:* 1 hora\\n📍 *Ubicación:* A Domicilio\\n💰 *Tarifa:* $250.000\\n\\n*Mensaje adicional:* SIN CUQUITOS POR FAVOR",
+    "is_read": false,
+    "role": "user",
+    "color": "#ffffff",
+    "created_at": "2026-04-28T08:48:47.93962+00:00"
+  }
+]

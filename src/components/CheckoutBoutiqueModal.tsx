@@ -92,7 +92,7 @@ export function CheckoutBoutiqueModal({
     // Subir a Supabase
     setSubiendoComprobante(true);
     try {
-      const url = await uploadComprobante(file, 'comprobantes-boutique');
+      const url = await uploadComprobante(file);
       setUrlComprobante(url);
       toast.success('Comprobante subido correctamente');
     } catch (error) {
@@ -186,12 +186,12 @@ export function CheckoutBoutiqueModal({
                     <div>
                       <p className="text-sm font-medium text-white">{item.nombre}</p>
                       <p className="text-xs text-muted-foreground">
-                        {item.cantidad} × ${item.precio.toLocaleString('es-CO')}
+                        {item.cantidad} × ${(item.precio || 0).toLocaleString('es-CO')}
                       </p>
                     </div>
                   </div>
                   <p className="font-semibold text-white">
-                    ${(item.precio * item.cantidad).toLocaleString('es-CO')}
+                    ${((item.precio || 0) * item.cantidad).toLocaleString('es-CO')}
                   </p>
                 </div>
               ))}
@@ -202,7 +202,7 @@ export function CheckoutBoutiqueModal({
           <div className="flex items-center justify-between p-4 bg-primary/10 border border-primary/30 rounded-lg">
             <span className="font-semibold text-white">Total a Pagar</span>
             <span className="text-2xl font-bold text-primary">
-              ${total.toLocaleString('es-CO')}
+              ${(total || 0).toLocaleString('es-CO')}
             </span>
           </div>
 
@@ -268,7 +268,7 @@ export function CheckoutBoutiqueModal({
                     <div className="text-sm text-yellow-200">
                       <p className="font-medium mb-1">Importante</p>
                       <p className="text-yellow-200/80">
-                        Asegúrate de subir un comprobante claro que muestre el monto de ${total.toLocaleString('es-CO')} 
+                        Asegúrate de subir un comprobante claro que muestre el monto de ${(total || 0).toLocaleString('es-CO')} 
                         y la fecha/hora de la transacción.
                       </p>
                     </div>

@@ -1,4 +1,5 @@
-import { useState, lazy, Suspense } from 'react';
+import { useState, lazy, Suspense, useEffect } from 'react';
+import { supabase } from '../../utils/supabase/info';
 import IngresosWidget from '../../components/IngresosWidget';
 import { 
   BarChart3, 
@@ -23,6 +24,8 @@ import {
   X,
   LogOut
 } from 'lucide-react';
+import { NotificacionBell } from './NotificacionBell';
+import { BalanceDashboard } from './BalanceDashboard';
 import { LogoIsotipo } from './LogoIsotipo';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
@@ -30,6 +33,7 @@ import { Button } from '../../components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { useModelos, Modelo } from './ModelosContext';
 import { useServicios } from './ServiciosContext';
+// import { FinanzasPanel } from './FinanzasPanel';
 import { usePagos } from './PagosContext';
 import { useInventory } from './InventoryContext';
 import { useGastos } from './GastosContext';
@@ -41,7 +45,7 @@ const HistorialClientesPanel = lazy(() => import('../../components/HistorialClie
 const LiquidacionPanel = lazy(() => import('../../components/LiquidacionPanel').then(m => ({ default: m.LiquidacionPanel })));
 const GestionAdelantosPanel = lazy(() => import('../../components/GestionAdelantosPanel').then(m => ({ default: m.GestionAdelantosPanel })));
 const HabitacionesPanel = lazy(() => import('../../components/HabitacionesPanel').then(m => ({ default: m.HabitacionesPanel })));
-const FinanzasPanel = lazy(() => import('../../components/FinanzasPanel').then(m => ({ default: m.FinanzasPanel })));
+// const FinanzasPanel = lazy(() => import('./FinanzasPanel').then(m => ({ default: m.FinanzasPanel })));
 const GestionUsuariosPanel = lazy(() => import('../../components/GestionUsuariosPanel').then(m => ({ default: m.GestionUsuariosPanel })));
 const BoutiquePanel = lazy(() => import('../../components/BoutiquePanel').then(m => ({ default: m.BoutiquePanel })));
 const SolicitudesEntradaPanel = lazy(() => import('../../components/SolicitudesEntradaPanel').then(m => ({ default: m.SolicitudesEntradaPanel })));
@@ -50,7 +54,7 @@ const DetalleModeloPanel = lazy(() => import('../../components/DetalleModeloPane
 const EditarModeloModal = lazy(() => import('./EditarModeloModal').then(m => ({ default: m.EditarModeloModal })));
 const NotificacionesPanel = lazy(() => import('./NotificacionesPanel').then(m => ({ default: m.NotificacionesPanel })));
 const AnalyticsPanel = lazy(() => import('./AnalyticsPanel').then(m => ({ default: m.AnalyticsPanel })));
-const AdminResumenPanel = lazy(() => import('../../components/admin/AdminResumenPanel').then(m => ({ default: m.AdminResumenPanel })));
+const AdministradorResumenPanel = lazy(() => import('../../components/administrador/AdministradorResumenPanel').then(m => ({ default: m.AdministradorResumenPanel })));
 const AgendamientosPanel = lazy(() => import('./AgendamientosPanel').then(m => ({ default: m.AgendamientosPanel })));
 const AgendamientosMetrics = lazy(() => import('./AgendamientosMetrics').then(m => ({ default: m.AgendamientosMetrics })));
 
@@ -75,6 +79,34 @@ export function OwnerDashboard({ accessToken, userId, userEmail = '', onLogout }
   const [modeloDetalle, setModeloDetalle] = useState<Modelo | null>(null);
   const [modeloEditar, setModeloEditar] = useState<Modelo | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const { recargarServicios } = useServicios();
+  const { cargarGastos, cargarServicios: cargarServiciosPublicos } = useGastos();
+  const { recargarProductos } = useInventory();
+
+  useEffect(() => {
+    recargarServicios();
+    cargarGastos();
+    cargarServiciosPublicos();
+    recargarProductos();
+  }, []);
+
+  useEffect(() => {
+    // Verificar que la sesión sigue siendo válida
+    const verificarSesion = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session || session.user.id !== userId) {
+        console.warn('⚠️ Sesión inválida, cerrando...');
+        onLogout?.();
+      }
+    };
+    
+    verificarSesion();
+    
+    // Verificar cada 5 minutos
+    const interval = setInterval(verificarSesion, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [userId, onLogout]);
 
   // ✅ MANEJO DEFENSIVO DE CONTEXTOS
   try {
@@ -234,14 +266,19 @@ export function OwnerDashboard({ accessToken, userId, userEmail = '', onLogout }
   return (
     <div className="min-h-screen w-full bg-background" style={{ fontFamily: 'Montserrat, sans-serif' }}>
       {/* Header Premium Fijo */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-card/98 backdrop-blur-premium border-b border-primary/15 shadow-premium">
+      <header className="fixed top-0 left-0 right-0 z-50 bg-card/98 backdrop-blur-premium border-b border-primary/15 shadow-premium border-t-4 border-t-purple-500">
         <div className="flex items-center justify-between px-3 sm:px-6 py-3 max-w-7xl mx-auto">
           <div className="flex items-center gap-3 min-w-0 flex-1">
             <LogoIsotipo size="sm" />
             <div>
-              <h1 className="text-base sm:text-lg font-bold text-primary uppercase tracking-wide truncate" style={{ fontFamily: 'Playfair Display, serif' }}>
-                OWNER DASHBOARD
-              </h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-base sm:text-lg font-bold text-primary uppercase tracking-wide truncate" style={{ fontFamily: 'Playfair Display, serif' }}>
+                  OWNER DASHBOARD
+                </h1>
+                <Badge className="hidden sm:flex bg-purple-500/10 text-purple-400 border-purple-500/30 px-2 py-0">
+                  👑 PROPIETARIO
+                </Badge>
+              </div>
               <p className="text-xs text-muted-foreground hidden sm:block truncate max-w-[200px]">{userEmail}</p>
             </div>
           </div>
@@ -252,12 +289,14 @@ export function OwnerDashboard({ accessToken, userId, userEmail = '', onLogout }
                 onClick={onLogout}
                 variant="ghost" 
                 size="sm"
-                className="hidden sm:flex border-primary/20 hover:bg-primary/10 text-red-400 hover:text-red-500"
+                className="flex border-primary/20 hover:bg-primary/10 text-red-400 hover:text-red-500 px-2 sm:px-3"
               >
-                <LogOut className="w-4 h-4 mr-2" />
-                Salir
+                <LogOut className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Salir</span>
               </Button>
             )}
+            
+            <NotificacionBell />
             
             <Button
               onClick={() => setMenuOpen(!menuOpen)}
@@ -273,8 +312,8 @@ export function OwnerDashboard({ accessToken, userId, userEmail = '', onLogout }
         {/* Mobile Navigation Dropdown */}
         {menuOpen && (
           <div className="bg-card/95 backdrop-blur-md border-t border-primary/10 shadow-lg lg:hidden">
-            <nav className="flex flex-col px-4 py-3 space-y-2 max-w-7xl mx-auto">
-              {modulos.slice(0, 8).map((modulo) => (
+            <nav className="flex flex-col px-4 py-3 space-y-1 max-w-7xl mx-auto max-h-[70vh] overflow-y-auto">
+              {modulos.map((modulo) => (
                 <Button 
                   key={modulo.id}
                   onClick={() => {
@@ -292,7 +331,7 @@ export function OwnerDashboard({ accessToken, userId, userEmail = '', onLogout }
                 <>
                   <div className="h-px bg-border my-2" />
                   <Button 
-                    onClick={onLogout} 
+                    onClick={() => { setMenuOpen(false); onLogout?.(); }} 
                     variant="ghost" 
                     className="justify-start h-10 text-sm text-red-400 hover:text-red-500"
                   >
@@ -310,7 +349,7 @@ export function OwnerDashboard({ accessToken, userId, userEmail = '', onLogout }
 
       {/* Overview Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-primary/30 bg-gradient-to-br from-primary/10 to-transparent">
+        <Card className="border-primary/30 bg-gradient-to-br from-purple-500/10 to-transparent">
           <CardHeader className="pb-3">
             <CardDescription className="flex items-center gap-2">
               <Users className="w-4 h-4" />
@@ -322,7 +361,7 @@ export function OwnerDashboard({ accessToken, userId, userEmail = '', onLogout }
           </CardHeader>
         </Card>
 
-        <Card className="border-primary/30 bg-gradient-to-br from-primary/10 to-transparent">
+        <Card className="border-primary/30 bg-gradient-to-br from-purple-500/10 to-transparent">
           <CardHeader className="pb-3">
             <CardDescription className="flex items-center gap-2">
               <Activity className="w-4 h-4" />
@@ -332,7 +371,7 @@ export function OwnerDashboard({ accessToken, userId, userEmail = '', onLogout }
           </CardHeader>
         </Card>
 
-        <Card className="border-primary/30 bg-gradient-to-br from-primary/10 to-transparent">
+        <Card className="border-primary/30 bg-gradient-to-br from-purple-500/10 to-transparent">
           <CardHeader className="pb-3">
             <CardDescription className="flex items-center gap-2">
               <DollarSign className="w-4 h-4" />
@@ -344,7 +383,7 @@ export function OwnerDashboard({ accessToken, userId, userEmail = '', onLogout }
           </CardHeader>
         </Card>
 
-        <Card className="border-primary/30 bg-gradient-to-br from-primary/10 to-transparent">
+        <Card className="border-primary/30 bg-gradient-to-br from-purple-500/10 to-transparent">
           <CardHeader className="pb-3">
             <CardDescription className="flex items-center gap-2">
               <TrendingUp className="w-4 h-4" />
@@ -421,7 +460,7 @@ export function OwnerDashboard({ accessToken, userId, userEmail = '', onLogout }
         {moduloActivo === 'general' && (
           <div className="space-y-6">
             <IngresosWidget rol="owner" mostrarDetalle={false} />
-            <AdminResumenPanel 
+            <AdministradorResumenPanel 
               recentActivity={recentActivity}
               financialSummary={financialSummary}
             />
@@ -591,7 +630,7 @@ export function OwnerDashboard({ accessToken, userId, userEmail = '', onLogout }
         )}
 
         {moduloActivo === 'finanzas' && (
-          <FinanzasPanel serviciosFinalizados={serviciosFinalizados} />
+          <BalanceDashboard />
         )}
 
         {moduloActivo === 'operaciones' && (

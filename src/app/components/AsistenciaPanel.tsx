@@ -1,337 +1,170 @@
 import { useState } from 'react';
-import { Clock, CheckCircle, AlertCircle, Calendar, Download, Loader2, ChevronUp, ChevronDown, LogIn, LogOut, Users, TrendingUp, ChevronLeft, ChevronRight, FileDown, User } from 'lucide-react';
+import {
+  Clock, Calendar, ChevronUp, ChevronDown, LogIn, LogOut, Users, TrendingUp,
+  ChevronLeft, ChevronRight, FileDown, User, CheckCircle, XCircle, Camera,
+  AlertCircle,
+} from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { useAsistencia } from './AsistenciaContext';
-import { useModelos } from './ModelosContext';
-import { Logo } from './Logo';
+import { useMultas } from './MultasContext';
+import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
+const GOLD = '#c9a961';
+const BG   = '#16181c';
+const BDR  = '#2a2a2a';
+
 interface AsistenciaPanelProps {
-  userRole: 'owner' | 'admin' | 'programador' | 'modelo';
+  userRole: 'owner' | 'administrador' | 'programador' | 'modelo';
   userEmail?: string;
 }
 
 export function AsistenciaPanel({ userRole, userEmail }: AsistenciaPanelProps) {
-  const { registros, obtenerRegistrosDelDia, obtenerEstadisticas, obtenerRegistrosPorModelo } = useAsistencia();
-  const { modelos } = useModelos();
-  const [expandido, setExpandido] = useState(true);
-  const [vistaActual, setVistaActual] = useState<'diaria' | 'semanal' | 'mensual'>('diaria');
-  const [fechaSeleccionada, setFechaSeleccionada] = useState(new Date());
+  const {
+    registros,
+    solicitudesEntrada,
+    obtenerEstadisticas,
+    obtenerRegistrosPorModelo,
+    obtenerSolicitudesPendientes,
+    aprobarSolicitudEntrada,
+    rechazarSolicitudEntrada,
+  } = useAsistencia();
 
-  // Funciones para navegación de fechas
-  const avanzarPeriodo = () => {
-    const nuevaFecha = new Date(fechaSeleccionada);
-    if (vistaActual === 'diaria') {
-      nuevaFecha.setDate(nuevaFecha.getDate() + 1);
-    } else if (vistaActual === 'semanal') {
-      nuevaFecha.setDate(nuevaFecha.getDate() + 7);
-    } else {
-      nuevaFecha.setMonth(nuevaFecha.getMonth() + 1);
+  const { multas } = useMultas();
+
+  const [expandido, setExpandido]       = useState(false);
+  const [vistaActual, setVistaActual]   = useState<'diaria' | 'semanal' | 'mensual'>('diaria');
+  const [fechaSel, setFechaSel]         = useState(new Date());
+  const [rechazarModal, setRechazarModal] = useState<{ id: string; nombre: string } | null>(null);
+  const [motivoRechazo, setMotivoRechazo] = useState('');
+  const [procesando, setProcesando]     = useState<string | null>(null);
+
+  const solicitudesPendientes = obtenerSolicitudesPendientes();
+
+  /* ── period navigation ── */
+  const navPeriodo = (dir: 1 | -1) => {
+    const f = new Date(fechaSel);
+    if (vistaActual === 'diaria')   f.setDate(f.getDate() + dir);
+    else if (vistaActual === 'semanal') f.setDate(f.getDate() + dir * 7);
+    else f.setMonth(f.getMonth() + dir);
+    setFechaSel(f);
+  };
+
+  const textoPeriodo = () => {
+    if (vistaActual === 'diaria')
+      return fechaSel.toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    if (vistaActual === 'semanal') {
+      const ini = new Date(fechaSel);
+      ini.setDate(ini.getDate() - ini.getDay());
+      const fin = new Date(ini); fin.setDate(fin.getDate() + 6);
+      return `${ini.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })} – ${fin.toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}`;
     }
-    setFechaSeleccionada(nuevaFecha);
+    return fechaSel.toLocaleDateString('es-CO', { year: 'numeric', month: 'long' });
   };
 
-  const retrocederPeriodo = () => {
-    const nuevaFecha = new Date(fechaSeleccionada);
-    if (vistaActual === 'diaria') {
-      nuevaFecha.setDate(nuevaFecha.getDate() - 1);
-    } else if (vistaActual === 'semanal') {
-      nuevaFecha.setDate(nuevaFecha.getDate() - 7);
-    } else {
-      nuevaFecha.setMonth(nuevaFecha.getMonth() - 1);
-    }
-    setFechaSeleccionada(nuevaFecha);
-  };
-
-  const irAHoy = () => {
-    setFechaSeleccionada(new Date());
-  };
-
-  // Obtener registros según el periodo
-  const obtenerRegistrosPorPeriodo = () => {
+  /* ── period records ── */
+  const registrosPeriodo = (() => {
     if (vistaActual === 'diaria') {
       return registros.filter(r => {
-        const fechaRegistro = new Date(r.fecha);
-        return (
-          fechaRegistro.getDate() === fechaSeleccionada.getDate() &&
-          fechaRegistro.getMonth() === fechaSeleccionada.getMonth() &&
-          fechaRegistro.getFullYear() === fechaSeleccionada.getFullYear()
-        );
-      });
-    } else if (vistaActual === 'semanal') {
-      const inicioSemana = new Date(fechaSeleccionada);
-      inicioSemana.setDate(inicioSemana.getDate() - inicioSemana.getDay());
-      inicioSemana.setHours(0, 0, 0, 0);
-      
-      const finSemana = new Date(inicioSemana);
-      finSemana.setDate(finSemana.getDate() + 6);
-      finSemana.setHours(23, 59, 59, 999);
-
-      return registros.filter(r => {
-        const fechaRegistro = new Date(r.fecha);
-        return fechaRegistro >= inicioSemana && fechaRegistro <= finSemana;
-      });
-    } else {
-      return registros.filter(r => {
-        const fechaRegistro = new Date(r.fecha);
-        return (
-          fechaRegistro.getMonth() === fechaSeleccionada.getMonth() &&
-          fechaRegistro.getFullYear() === fechaSeleccionada.getFullYear()
-        );
+        const f = new Date(r.fecha);
+        return f.getDate() === fechaSel.getDate()
+          && f.getMonth() === fechaSel.getMonth()
+          && f.getFullYear() === fechaSel.getFullYear();
       });
     }
-  };
+    if (vistaActual === 'semanal') {
+      const ini = new Date(fechaSel); ini.setDate(ini.getDate() - ini.getDay()); ini.setHours(0,0,0,0);
+      const fin = new Date(ini); fin.setDate(fin.getDate() + 6); fin.setHours(23,59,59,999);
+      return registros.filter(r => { const f = new Date(r.fecha); return f >= ini && f <= fin; });
+    }
+    return registros.filter(r => {
+      const f = new Date(r.fecha);
+      return f.getMonth() === fechaSel.getMonth() && f.getFullYear() === fechaSel.getFullYear();
+    });
+  })();
 
-  const registrosPeriodo = obtenerRegistrosPorPeriodo();
   const modelosEnTurno = registrosPeriodo.filter(r => r.estado === 'En Turno');
 
-  // Calcular estadísticas del periodo
-  const calcularEstadisticasPeriodo = () => {
-    const registrosFinalizados = registrosPeriodo.filter(r => r.estado === 'Finalizado');
-    const totalHoras = registrosFinalizados.reduce((sum, r) => sum + (r.horasTrabajadas || 0), 0);
-    
-    // Agrupar por modelo
-    const porModelo = registrosFinalizados.reduce((acc, r) => {
-      if (!acc[r.modeloEmail]) {
-        acc[r.modeloEmail] = {
-          nombre: r.modeloNombre,
-          dias: 0,
-          horas: 0,
-        };
-      }
+  const stats = (() => {
+    const fin = registrosPeriodo.filter(r => r.estado === 'Finalizado');
+    const totalHoras = fin.reduce((s, r) => s + (r.horasTrabajadas ?? 0), 0);
+    const porModelo = fin.reduce((acc, r) => {
+      if (!acc[r.modeloEmail]) acc[r.modeloEmail] = { nombre: r.modeloNombre, dias: 0, horas: 0 };
       acc[r.modeloEmail].dias++;
-      acc[r.modeloEmail].horas += r.horasTrabajadas || 0;
+      acc[r.modeloEmail].horas += r.horasTrabajadas ?? 0;
       return acc;
     }, {} as Record<string, { nombre: string; dias: number; horas: number }>);
+    return { totalRegistros: registrosPeriodo.length, registrosFinalizados: fin.length, totalHoras, modelosActivas: Object.keys(porModelo).length, porModelo };
+  })();
 
-    return {
-      totalRegistros: registrosPeriodo.length,
-      registrosFinalizados: registrosFinalizados.length,
-      totalHoras,
-      modelosActivas: Object.keys(porModelo).length,
-      porModelo,
-    };
+  /* ── approve / reject ── */
+  const handleAprobar = async (id: string, nombre: string) => {
+    setProcesando(id);
+    try {
+      await aprobarSolicitudEntrada(id, 'admin');
+      toast.success(`Entrada de ${nombre} aprobada`);
+    } catch (e: any) {
+      toast.error('Error al aprobar: ' + e.message);
+    } finally { setProcesando(null); }
   };
 
-  const estadisticas = calcularEstadisticasPeriodo();
+  const handleRechazar = async () => {
+    if (!rechazarModal || !motivoRechazo.trim()) return;
+    setProcesando(rechazarModal.id);
+    try {
+      await rechazarSolicitudEntrada(rechazarModal.id, 'admin', motivoRechazo.trim());
+      toast.success(`Solicitud de ${rechazarModal.nombre} rechazada`);
+      setRechazarModal(null); setMotivoRechazo('');
+    } catch (e: any) {
+      toast.error('Error al rechazar: ' + e.message);
+    } finally { setProcesando(null); }
+  };
 
-  // Función para exportar a PDF
+  /* ── export PDF ── */
   const exportarPDF = () => {
     const doc = new jsPDF();
-    
-    // Configuración de colores
-    const primaryColor: [number, number, number] = [212, 175, 55]; // Dorado #d4af37
-    const darkColor: [number, number, number] = [10, 10, 15]; // Oscuro #0a0a0f
-    const textColor: [number, number, number] = [200, 200, 200]; // Texto claro
-    
-    // Encabezado con branding mejorado
-    doc.setFillColor(...darkColor);
-    doc.rect(0, 0, 210, 50, 'F');
-    
-    // Título principal con tipografía elegante
-    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.setFontSize(28);
-    doc.setFont('helvetica', 'bold');
-    doc.text('BLACK DIAMOND STUDIOS', 105, 18, { align: 'center' });
-    
-    // Línea decorativa dorada
-    doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.setLineWidth(0.5);
-    doc.line(60, 23, 150, 23);
-    
-    // Subtítulo
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'normal');
-    doc.text('Reporte de Asistencia', 105, 32, { align: 'center' });
-    
-    doc.setFontSize(11);
-    doc.setTextColor(200, 200, 200);
-    doc.text(obtenerTextoPeriodo(), 105, 40, { align: 'center' });
-    
-    // Pequeño diamante decorativo (simulado con caracteres)
-    doc.setFontSize(8);
-    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.text('◆', 105, 46, { align: 'center' });
-    
-    // Información del periodo
-    let yPos = 60;
-    doc.setTextColor(textColor[0], textColor[1], textColor[2]);
-    doc.setFontSize(9);
-    doc.text(`Generado: ${new Date().toLocaleString('es-CO')}`, 14, yPos);
-    yPos += 5;
-    doc.text(`Vista: ${vistaActual.charAt(0).toUpperCase() + vistaActual.slice(1)}`, 14, yPos);
-    
-    // Estadísticas generales
-    yPos += 15;
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...primaryColor);
-    doc.text('Estadísticas del Periodo', 14, yPos);
-    
-    yPos += 10;
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(textColor[0], textColor[1], textColor[2]);
-    
-    const stats = [
-      ['Modelos Activas', estadisticas.modelosActivas.toString()],
-      ['Total Registros', estadisticas.totalRegistros.toString()],
-      ['Registros Finalizados', estadisticas.registrosFinalizados.toString()],
-      ['Total Horas Trabajadas', estadisticas.totalHoras.toFixed(1) + 'h'],
-    ];
-    
-    autoTable(doc, {
-      startY: yPos,
-      head: [['Métrica', 'Valor']],
-      body: stats,
-      theme: 'grid',
-      headStyles: {
-        fillColor: primaryColor,
-        textColor: darkColor,
-        fontStyle: 'bold',
-        fontSize: 11,
-      },
-      alternateRowStyles: {
-        fillColor: [245, 245, 245],
-      },
-      styles: {
-        fontSize: 10,
-      },
-      margin: { left: 14, right: 14 },
+    const gold: [number,number,number] = [212,175,55];
+    const dark: [number,number,number] = [10,10,15];
+    doc.setFillColor(...dark); doc.rect(0,0,210,50,'F');
+    doc.setTextColor(...gold); doc.setFontSize(28); doc.setFont('helvetica','bold');
+    doc.text('BLACK DIAMOND STUDIOS',105,18,{align:'center'});
+    doc.setDrawColor(...gold); doc.setLineWidth(0.5); doc.line(60,23,150,23);
+    doc.setFontSize(16); doc.setFont('helvetica','normal');
+    doc.text('Reporte de Asistencia',105,32,{align:'center'});
+    doc.setFontSize(11); doc.setTextColor(200,200,200);
+    doc.text(textoPeriodo(),105,40,{align:'center'});
+    let y = 60;
+    doc.setTextColor(200,200,200); doc.setFontSize(9);
+    doc.text(`Generado: ${new Date().toLocaleString('es-CO')}`,14,y); y+=15;
+    autoTable(doc,{
+      startY:y,
+      head:[['Métrica','Valor']],
+      body:[
+        ['Modelos Activas',stats.modelosActivas.toString()],
+        ['Total Registros',stats.totalRegistros.toString()],
+        ['Registros Finalizados',stats.registrosFinalizados.toString()],
+        ['Total Horas',stats.totalHoras.toFixed(1)+'h'],
+      ],
+      theme:'grid',
+      headStyles:{fillColor:gold,textColor:dark,fontStyle:'bold',fontSize:11},
+      alternateRowStyles:{fillColor:[245,245,245]},
+      styles:{fontSize:10},
+      margin:{left:14,right:14},
     });
-    
-    // Resumen por modelo
-    yPos = (doc as any).lastAutoTable.finalY + 15;
-    
-    if (Object.keys(estadisticas.porModelo).length > 0) {
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(...primaryColor);
-      doc.text('Resumen por Modelo', 14, yPos);
-      
-      yPos += 10;
-      
-      const modeloData = Object.entries(estadisticas.porModelo)
-        .sort((a, b) => b[1].horas - a[1].horas)
-        .map(([email, data]) => [
-          data.nombre,
-          data.dias.toString(),
-          data.horas.toFixed(1) + 'h',
-          (data.horas / data.dias).toFixed(1) + 'h',
-        ]);
-      
-      autoTable(doc, {
-        startY: yPos,
-        head: [['Modelo', 'Días', 'Total Horas', 'Promedio/Día']],
-        body: modeloData,
-        theme: 'grid',
-        headStyles: {
-          fillColor: primaryColor,
-          textColor: darkColor,
-          fontStyle: 'bold',
-        },
-        alternateRowStyles: {
-          fillColor: [245, 245, 245],
-        },
-        margin: { left: 14, right: 14 },
-      });
-    }
-    
-    // Registros detallados (solo para vista diaria)
-    if (vistaActual === 'diaria' && registrosPeriodo.filter(r => r.estado === 'Finalizado').length > 0) {
-      yPos = (doc as any).lastAutoTable.finalY + 15;
-      
-      // Verificar si necesitamos una nueva página
-      if (yPos > 240) {
-        doc.addPage();
-        yPos = 20;
-      }
-      
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(...primaryColor);
-      doc.text('Registros Detallados', 14, yPos);
-      
-      yPos += 10;
-      
-      const registrosData = registrosPeriodo
-        .filter(r => r.estado === 'Finalizado')
-        .map((registro) => [
-          registro.modeloNombre,
-          registro.horaLlegada.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }),
-          registro.horaSalida?.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) || '-',
-          registro.horasTrabajadas?.toFixed(1) + 'h' || '-',
-        ]);
-      
-      autoTable(doc, {
-        startY: yPos,
-        head: [['Modelo', 'Hora Llegada', 'Hora Salida', 'Horas Trabajadas']],
-        body: registrosData,
-        theme: 'grid',
-        headStyles: {
-          fillColor: primaryColor,
-          textColor: darkColor,
-          fontStyle: 'bold',
-        },
-        alternateRowStyles: {
-          fillColor: [245, 245, 245],
-        },
-        margin: { left: 14, right: 14 },
-      });
-    }
-    
-    // Pie de página en todas las páginas
-    const pageCount = doc.getNumberOfPages();
-    for (let i = 1; i <= pageCount; i++) {
-      doc.setPage(i);
-      doc.setFontSize(8);
-      doc.setTextColor(150, 150, 150);
-      doc.text(
-        `Página ${i} de ${pageCount}`,
-        doc.internal.pageSize.width / 2,
-        doc.internal.pageSize.height - 10,
-        { align: 'center' }
-      );
-    }
-    
-    // Guardar el PDF
-    const nombreArchivo = `asistencia_${vistaActual}_${fechaSeleccionada.toLocaleDateString('es-CO').replace(/\//g, '-')}.pdf`;
-    doc.save(nombreArchivo);
+    doc.save(`asistencia_${vistaActual}_${fechaSel.toLocaleDateString('es-CO').replace(/\//g,'-')}.pdf`);
   };
 
-  // Obtener texto del periodo
-  const obtenerTextoPeriodo = () => {
-    if (vistaActual === 'diaria') {
-      return fechaSeleccionada.toLocaleDateString('es-CO', { 
-        weekday: 'long', 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
-      });
-    } else if (vistaActual === 'semanal') {
-      const inicioSemana = new Date(fechaSeleccionada);
-      inicioSemana.setDate(inicioSemana.getDate() - inicioSemana.getDay());
-      
-      const finSemana = new Date(inicioSemana);
-      finSemana.setDate(finSemana.getDate() + 6);
-
-      return `${inicioSemana.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })} - ${finSemana.toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}`;
-    } else {
-      return fechaSeleccionada.toLocaleDateString('es-CO', { 
-        year: 'numeric', 
-        month: 'long' 
-      });
-    }
-  };
-
-  // Vista para modelo individual
+  /* ══════════════════════════════════════════════════════
+     Vista MODELO
+  ══════════════════════════════════════════════════════ */
   if (userRole === 'modelo' && userEmail) {
     const misRegistros = obtenerRegistrosPorModelo(userEmail);
-    const stats = obtenerEstadisticas(userEmail);
+    const misStats     = obtenerEstadisticas(userEmail);
     const registroActual = misRegistros.find(r => r.estado === 'En Turno');
 
     return (
@@ -340,29 +173,22 @@ export function AsistenciaPanel({ userRole, userEmail }: AsistenciaPanelProps) {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2 text-primary">
-                <Clock className="w-5 h-5" />
-                Mi Asistencia
+                <Clock className="w-5 h-5" /> Mi Asistencia
               </CardTitle>
               <CardDescription>Registro de entrada y salida</CardDescription>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setExpandido(!expandido)}
-            >
+            <Button variant="ghost" size="sm" onClick={() => setExpandido(!expandido)}>
               {expandido ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </Button>
           </div>
         </CardHeader>
         {expandido && (
           <CardContent className="space-y-4">
-            {/* Estado Actual */}
             {registroActual && (
               <div className="p-4 bg-green-950/30 border-2 border-green-500/30 rounded-lg">
                 <div className="flex items-center justify-between mb-2">
                   <Badge className="bg-green-500/80 text-white">
-                    <LogIn className="w-3 h-3 mr-1" />
-                    En Turno
+                    <LogIn className="w-3 h-3 mr-1" /> En Turno
                   </Badge>
                   <span className="text-sm text-muted-foreground">Hoy</span>
                 </div>
@@ -370,80 +196,60 @@ export function AsistenciaPanel({ userRole, userEmail }: AsistenciaPanelProps) {
                   <div>
                     <span className="text-muted-foreground">Llegada:</span>
                     <p className="font-bold text-green-400">
-                      {registroActual.horaLlegada.toLocaleTimeString('es-CO', { 
-                        hour: '2-digit', 
-                        minute: '2-digit' 
-                      })}
+                      {registroActual.horaLlegada.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'})}
                     </p>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Tiempo:</span>
                     <p className="font-bold text-primary">
-                      {Math.floor((new Date().getTime() - registroActual.horaLlegada.getTime()) / (1000 * 60 * 60))}h{' '}
-                      {Math.floor(((new Date().getTime() - registroActual.horaLlegada.getTime()) % (1000 * 60 * 60)) / (1000 * 60))}m
+                      {Math.floor((Date.now()-registroActual.horaLlegada.getTime())/3600000)}h{' '}
+                      {Math.floor(((Date.now()-registroActual.horaLlegada.getTime())%3600000)/60000)}m
                     </p>
                   </div>
                 </div>
               </div>
             )}
-
-            {/* Estadísticas */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="p-3 bg-secondary rounded-lg border border-border">
-                <p className="text-xs text-muted-foreground mb-1">Días Trabajados</p>
-                <p className="text-xl font-bold text-primary">{stats.totalDias}</p>
-              </div>
-              <div className="p-3 bg-secondary rounded-lg border border-border">
-                <p className="text-xs text-muted-foreground mb-1">Total Horas</p>
-                <p className="text-xl font-bold text-primary">{stats.totalHoras.toFixed(1)}h</p>
-              </div>
-              <div className="p-3 bg-secondary rounded-lg border border-border">
-                <p className="text-xs text-muted-foreground mb-1">Promedio/Día</p>
-                <p className="text-xl font-bold text-primary">{stats.promedioHorasPorDia.toFixed(1)}h</p>
-              </div>
-              <div className="p-3 bg-secondary rounded-lg border border-border">
-                <p className="text-xs text-muted-foreground mb-1">Este Mes</p>
-                <p className="text-xl font-bold text-primary">{stats.diasEsteMes}</p>
-              </div>
+              {[
+                { label: 'Días Trabajados', val: misStats.totalDias },
+                { label: 'Total Horas',     val: misStats.totalHoras.toFixed(1)+'h' },
+                { label: 'Promedio/Día',    val: misStats.promedioHorasPorDia.toFixed(1)+'h' },
+                { label: 'Este Mes',        val: misStats.diasEsteMes },
+              ].map(({ label, val }) => (
+                <div key={label} className="p-3 bg-secondary rounded-lg border border-border">
+                  <p className="text-xs text-muted-foreground mb-1">{label}</p>
+                  <p className="text-xl font-bold text-primary">{val}</p>
+                </div>
+              ))}
             </div>
-
-            {/* Historial Reciente */}
             <div>
               <h4 className="text-sm font-semibold mb-3">Historial Reciente</h4>
               <div className="space-y-2 max-h-64 overflow-y-auto">
-                {misRegistros.slice(0, 5).map((registro) => (
-                  <div
-                    key={registro.id}
-                    className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg border border-border/50"
-                  >
+                {misRegistros.slice(0,5).map(r => (
+                  <div key={r.id} className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg border border-border/50">
                     <div className="flex items-center gap-3">
                       <div className="text-center">
-                        <div className="text-lg font-bold text-primary">
-                          {new Date(registro.fecha).getDate()}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {new Date(registro.fecha).toLocaleDateString('es', { month: 'short' })}
-                        </div>
+                        <div className="text-lg font-bold text-primary">{new Date(r.fecha).getDate()}</div>
+                        <div className="text-xs text-muted-foreground">{new Date(r.fecha).toLocaleDateString('es',{month:'short'})}</div>
                       </div>
                       <div className="text-sm">
                         <div className="flex items-center gap-2 mb-1">
                           <LogIn className="w-3 h-3 text-green-500" />
-                          <span>{registro.horaLlegada.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}</span>
+                          <span>{r.horaLlegada.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'})}</span>
                         </div>
-                        {registro.horaSalida && (
+                        {r.horaSalida && (
                           <div className="flex items-center gap-2">
                             <LogOut className="w-3 h-3 text-red-500" />
-                            <span>{registro.horaSalida.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}</span>
+                            <span>{r.horaSalida.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'})}</span>
                           </div>
                         )}
                       </div>
                     </div>
                     <div className="text-right">
-                      {registro.horasTrabajadas ? (
-                        <p className="font-bold text-primary">{registro.horasTrabajadas.toFixed(1)}h</p>
-                      ) : (
-                        <Badge variant="outline" className="border-green-500/50 text-green-400">Activo</Badge>
-                      )}
+                      {r.horasTrabajadas
+                        ? <p className="font-bold text-primary">{r.horasTrabajadas.toFixed(1)}h</p>
+                        : <Badge variant="outline" className="border-green-500/50 text-green-400">Activo</Badge>
+                      }
                     </div>
                   </div>
                 ))}
@@ -455,304 +261,481 @@ export function AsistenciaPanel({ userRole, userEmail }: AsistenciaPanelProps) {
     );
   }
 
-  // Vista para admin, programador y owner CON VISTAS DIARIA/SEMANAL/MENSUAL
+  /* ══════════════════════════════════════════════════════
+     Vista ADMIN / OWNER / PROGRAMADOR
+  ══════════════════════════════════════════════════════ */
   return (
-    <Card className="border-primary/30 bg-gradient-to-br from-card to-card/50">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-primary">
-              <Users className="w-5 h-5" />
-              Control de Asistencia
-            </CardTitle>
-            <CardDescription>Registro completo de llegadas y salidas</CardDescription>
+    <>
+      {/* ── Modal rechazo ── */}
+      <Dialog open={!!rechazarModal} onOpenChange={() => { setRechazarModal(null); setMotivoRechazo(''); }}>
+        <DialogContent className="max-w-sm" style={{ background: BG, border: `1px solid #7f1d1d` }}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-400">
+              <XCircle className="w-5 h-5" /> Rechazar entrada
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              ¿Por qué rechazas la entrada de{' '}
+              <span className="font-semibold text-white">{rechazarModal?.nombre}</span>?
+            </p>
+            <textarea
+              className="w-full rounded-md px-3 py-2 text-sm resize-none focus:outline-none"
+              style={{ background: '#0d0f12', border: `1px solid ${BDR}`, color: '#fff' }}
+              rows={3}
+              placeholder="Motivo del rechazo..."
+              value={motivoRechazo}
+              onChange={e => setMotivoRechazo(e.target.value)}
+            />
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => { setRechazarModal(null); setMotivoRechazo(''); }}
+              >
+                Cancelar
+              </Button>
+              <Button
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                disabled={!motivoRechazo.trim() || !!procesando}
+                onClick={handleRechazar}
+              >
+                Rechazar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Panel principal ── */}
+      <div style={{ background: BG, border: `1px solid ${BDR}`, borderRadius: '0.75rem', overflow: 'hidden' }}>
+
+        {/* Cabecera siempre visible */}
+        <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Users className="w-4 h-4 flex-shrink-0" style={{ color: GOLD }} />
+            <span className="font-semibold text-sm" style={{ color: GOLD }}>Control de Asistencia</span>
+            {solicitudesPendientes.length > 0 ? (
+              <Badge className="bg-yellow-500 text-black font-bold text-xs">
+                {solicitudesPendientes.length} pendiente{solicitudesPendientes.length > 1 ? 's' : ''}
+              </Badge>
+            ) : (
+              <span className="text-xs text-green-400 flex items-center gap-1">
+                <CheckCircle className="w-3 h-3" /> Sin solicitudes pendientes
+              </span>
+            )}
           </div>
           <Button
             variant="ghost"
             size="sm"
+            className="h-7 w-7 p-0"
+            style={{ color: GOLD }}
             onClick={() => setExpandido(!expandido)}
           >
             {expandido ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </Button>
         </div>
-      </CardHeader>
-      {expandido && (
-        <CardContent className="space-y-4">
-          {/* Tabs para Diaria/Semanal/Mensual */}
-          <Tabs value={vistaActual} onValueChange={(v) => setVistaActual(v as any)}>
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="diaria">Diaria</TabsTrigger>
-              <TabsTrigger value="semanal">Semanal</TabsTrigger>
-              <TabsTrigger value="mensual">Mensual</TabsTrigger>
-            </TabsList>
 
-            {/* Navegación de Periodo */}
-            <div className="flex items-center justify-between mt-4 p-3 bg-secondary/50 rounded-lg border border-border">
-              <Button variant="outline" size="sm" onClick={retrocederPeriodo}>
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
-              <div className="text-center flex-1">
-                <p className="font-semibold text-primary">{obtenerTextoPeriodo()}</p>
-              </div>
-              <Button variant="outline" size="sm" onClick={avanzarPeriodo}>
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-            </div>
-
-            <div className="flex justify-center gap-2">
-              <Button variant="ghost" size="sm" onClick={irAHoy}>
-                <Calendar className="w-3 h-3 mr-1" />
-                Ir a Hoy
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={exportarPDF}
-                className="border-primary/30 hover:bg-primary/20 hover:text-primary"
+        {/* Solicitudes pendientes — siempre visibles cuando existen */}
+        {solicitudesPendientes.length > 0 && (
+          <div className="px-4 pb-3 space-y-2" style={{ borderTop: `1px solid ${BDR}` }}>
+            <p className="text-xs font-semibold flex items-center gap-1 pt-3" style={{ color: GOLD }}>
+              <Camera className="w-3 h-3" /> Solicitudes de entrada
+            </p>
+            {solicitudesPendientes.map(sol => (
+              <div
+                key={sol.id}
+                className="flex items-center gap-3 p-3 rounded-lg"
+                style={{ background: 'rgba(201,169,97,0.07)', border: `1px solid rgba(201,169,97,0.25)` }}
               >
-                <FileDown className="w-3 h-3 mr-1" />
-                Exportar PDF
-              </Button>
-            </div>
+                {/* Foto */}
+                {sol.selfieUrl ? (
+                  <img
+                    src={sol.selfieUrl}
+                    alt={sol.modeloNombre}
+                    className="w-14 h-14 rounded-full object-cover flex-shrink-0"
+                    style={{ border: `2px solid ${GOLD}` }}
+                  />
+                ) : (
+                  <div
+                    className="w-14 h-14 rounded-full flex-shrink-0 flex items-center justify-center"
+                    style={{ border: `2px solid ${GOLD}`, background: 'rgba(201,169,97,0.1)' }}
+                  >
+                    <User className="w-6 h-6" style={{ color: GOLD }} />
+                  </div>
+                )}
 
-            {/* Estadísticas del Periodo */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="p-4 bg-green-950/30 border-2 border-green-500/30 rounded-lg">
-                <div className="flex items-center gap-2 mb-2">
-                  <Users className="w-4 h-4 text-green-500" />
-                  <span className="text-xs text-muted-foreground">Modelos Activas</span>
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-white text-sm truncate">{sol.modeloNombre}</p>
+                  <p className="text-xs" style={{ color: 'rgba(255,255,255,0.45)' }}>
+                    {sol.fecha.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
+                    {' · '}
+                    {sol.fecha.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })}
+                  </p>
                 </div>
-                <p className="text-3xl font-bold text-green-400">{estadisticas.modelosActivas}</p>
-              </div>
-              <div className="p-4 bg-secondary rounded-lg border border-border">
-                <div className="flex items-center gap-2 mb-2">
-                  <Calendar className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">Registros</span>
-                </div>
-                <p className="text-3xl font-bold text-primary">{estadisticas.totalRegistros}</p>
-              </div>
-              <div className="p-4 bg-secondary rounded-lg border border-border">
-                <div className="flex items-center gap-2 mb-2">
-                  <Clock className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">Total Horas</span>
-                </div>
-                <p className="text-3xl font-bold text-primary">{estadisticas.totalHoras.toFixed(1)}h</p>
-              </div>
-              <div className="p-4 bg-secondary rounded-lg border border-border">
-                <div className="flex items-center gap-2 mb-2">
-                  <TrendingUp className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">Finalizados</span>
-                </div>
-                <p className="text-3xl font-bold text-primary">{estadisticas.registrosFinalizados}</p>
-              </div>
-            </div>
 
-            <TabsContent value="diaria" className="space-y-4 mt-4">
-              {/* Modelos en Turno */}
-              {modelosEnTurno.length > 0 && (
-                <div>
-                  <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                    <Badge className="bg-green-500/80 text-white">
-                      <User className="w-3 h-3 mr-1" />
-                      Activas Ahora ({modelosEnTurno.length})
-                    </Badge>
-                  </h4>
-                  <div className="space-y-2">
-                    {modelosEnTurno.map((registro) => {
-                      const tiempoTranscurrido = new Date().getTime() - registro.horaLlegada.getTime();
-                      const horas = Math.floor(tiempoTranscurrido / (1000 * 60 * 60));
-                      const minutos = Math.floor((tiempoTranscurrido % (1000 * 60 * 60)) / (1000 * 60));
+                {/* Acciones */}
+                <div className="flex gap-2 flex-shrink-0">
+                  <Button
+                    size="sm"
+                    className="bg-green-600 hover:bg-green-700 text-white h-8 px-3 text-xs gap-1"
+                    disabled={procesando === sol.id}
+                    onClick={() => handleAprobar(sol.id, sol.modeloNombre)}
+                  >
+                    <CheckCircle className="w-3 h-3" /> Aprobar
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="bg-red-600 hover:bg-red-700 text-white h-8 px-3 text-xs gap-1"
+                    disabled={procesando === sol.id}
+                    onClick={() => setRechazarModal({ id: sol.id, nombre: sol.modeloNombre })}
+                  >
+                    <XCircle className="w-3 h-3" /> Rechazar
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
-                      return (
-                        <div
-                          key={registro.id}
-                          className="flex items-center justify-between p-4 bg-green-950/20 rounded-lg border-2 border-green-500/30"
-                        >
-                          <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-full bg-green-500/20 border-2 border-green-500 flex items-center justify-center">
-                              <span className="text-lg font-bold text-green-400">
-                                {registro.modeloNombre.charAt(0)}
-                              </span>
+        {/* Contenido expandible — histórico y estadísticas */}
+        {expandido && (
+          <div className="px-4 pb-4 space-y-4" style={{ borderTop: `1px solid ${BDR}` }}>
+            <Tabs value={vistaActual} onValueChange={v => setVistaActual(v as any)}>
+              <div className="flex items-center justify-between gap-2 pt-3">
+                <TabsList className="grid grid-cols-4 flex-1">
+                  <TabsTrigger value="diaria">Diaria</TabsTrigger>
+                  <TabsTrigger value="semanal">Semanal</TabsTrigger>
+                  <TabsTrigger value="mensual">Mensual</TabsTrigger>
+                  <TabsTrigger value="multas">Multas</TabsTrigger>
+                </TabsList>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={exportarPDF}
+                  className="border-primary/30 hover:bg-primary/20 hover:text-primary shrink-0"
+                >
+                  <FileDown className="w-3 h-3 mr-1" /> PDF
+                </Button>
+              </div>
+
+              {/* Navegación de período */}
+              <div
+                className="flex items-center justify-between p-2 rounded-lg"
+                style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${BDR}` }}
+              >
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => navPeriodo(-1)}>
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <div className="flex items-center gap-2">
+                  <p className="font-medium text-sm text-center" style={{ color: GOLD }}>{textoPeriodo()}</p>
+                  <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setFechaSel(new Date())}>
+                    Hoy
+                  </Button>
+                </div>
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => navPeriodo(1)}>
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+
+              {/* Estadísticas mini */}
+              <div className="grid grid-cols-4 gap-2">
+                {[
+                  { icon: <Users className="w-3 h-3" />, label: 'Activas',     val: stats.modelosActivas,              color: '#22c55e' },
+                  { icon: <Calendar className="w-3 h-3" />, label: 'Registros', val: stats.totalRegistros,              color: GOLD },
+                  { icon: <AlertCircle className="w-3 h-3" />, label: 'Multas', val: multas.filter(m => m.estado === 'activa').length, color: '#ef4444' },
+                  { icon: <TrendingUp className="w-3 h-3" />, label: 'Finalizados', val: stats.registrosFinalizados,    color: GOLD },
+                ].map(({ icon, label, val, color }) => (
+                  <div key={label} className="p-2 rounded-lg text-center" style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${BDR}` }}>
+                    <div className="flex items-center justify-center gap-1 mb-1" style={{ color }}>
+                      {icon}
+                      <span className="text-xs">{label}</span>
+                    </div>
+                    <p className="text-lg font-bold" style={{ color }}>{val}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* ── TAB DIARIA ── */}
+              <TabsContent value="diaria" className="space-y-3 mt-0">
+                {modelosEnTurno.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold mb-2 flex items-center gap-1 text-green-400">
+                      <Badge className="bg-green-500/80 text-white text-xs">
+                        Activas ahora · {modelosEnTurno.length}
+                      </Badge>
+                    </p>
+                    <div className="space-y-2">
+                      {modelosEnTurno.map(r => {
+                        const start = r.horaLlegada;
+                        const elapsed = Date.now() - start.getTime();
+                        const horas   = Math.floor(elapsed / 3600000);
+                        const mins    = Math.floor((elapsed % 3600000) / 60000);
+                        const totalReqSecs = 8 * 3600;
+                        const elapsedSecs = Math.floor(elapsed / 1000);
+                        const progreso = Math.min(100, (elapsedSecs / totalReqSecs) * 100);
+                        
+                        const solSelfie = solicitudesEntrada.find(s => s.id === r.solicitudEntradaId);
+                        const foto = solSelfie?.selfieUrl ?? r.selfieUrl;
+
+                        return (
+                          <div
+                            key={r.id}
+                            className="p-4 rounded-xl space-y-3"
+                            style={{ background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.15)' }}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                {foto ? (
+                                  <img
+                                    src={foto}
+                                    alt={r.modeloNombre}
+                                    className="w-12 h-12 rounded-full object-cover flex-shrink-0"
+                                    style={{ border: `2px solid ${GOLD}` }}
+                                  />
+                                ) : (
+                                  <div
+                                    className="w-12 h-12 rounded-full flex-shrink-0 flex items-center justify-center"
+                                    style={{ border: `2px solid ${GOLD}`, background: 'rgba(201,169,97,0.1)' }}
+                                  >
+                                    <span className="text-sm font-bold" style={{ color: GOLD }}>{r.modeloNombre.charAt(0)}</span>
+                                  </div>
+                                )}
+                                <div>
+                                  <p className="font-bold text-white leading-tight">{r.modeloNombre}</p>
+                                  <p className="text-[10px] uppercase tracking-wider font-bold" style={{ color: GOLD }}>
+                                    Turno Estándar 8h
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-lg font-black text-white tabular-nums leading-none">
+                                  {horas}h {mins}m
+                                </p>
+                                <p className="text-[10px] text-muted-foreground uppercase">Tiempo Transcurrido</p>
+                              </div>
                             </div>
-                            <div>
-                              <p className="font-semibold">{registro.modeloNombre}</p>
-                              <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                <div className="flex items-center gap-1">
+
+                            <div className="space-y-1.5">
+                              <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                                <span>Progreso</span>
+                                <span style={{ color: progreso >= 100 ? '#22c55e' : GOLD }}>{Math.floor(progreso)}%</span>
+                              </div>
+                              <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                                <div 
+                                  className="h-full transition-all duration-1000" 
+                                  style={{ 
+                                    width: `${progreso}%`, 
+                                    background: progreso >= 100 ? '#22c55e' : GOLD,
+                                    boxShadow: `0 0 10px ${progreso >= 100 ? 'rgba(34,197,94,0.4)' : 'rgba(201,168,76,0.4)'}`
+                                  }} 
+                                />
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
                                   <LogIn className="w-3 h-3 text-green-500" />
-                                  <span>{registro.horaLlegada.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}</span>
+                                  Entrada: {start.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'})}
                                 </div>
-                                <div className="flex items-center gap-1">
-                                  <Clock className="w-3 h-3 text-primary" />
-                                  <span>{horas}h {minutos}m</span>
-                                </div>
+                                {progreso < 100 && (
+                                  <Badge variant="outline" className="text-[9px] border-yellow-500/30 text-yellow-500">
+                                    Multa si sale ahora
+                                  </Badge>
+                                )}
                               </div>
                             </div>
                           </div>
-                          <Badge className="bg-green-500/80 text-white">
-                            Activa
-                          </Badge>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Registros Finalizados */}
-              {registrosPeriodo.filter(r => r.estado === 'Finalizado').length > 0 && (
-                <div>
-                  <h4 className="text-sm font-semibold mb-3">Registros Finalizados</h4>
-                  <div className="space-y-2 max-h-80 overflow-y-auto">
-                    {registrosPeriodo
-                      .filter(r => r.estado === 'Finalizado')
-                      .map((registro) => (
+                {registrosPeriodo.filter(r => r.estado === 'Finalizado').length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold mb-2" style={{ color: 'rgba(255,255,255,0.5)' }}>Finalizados</p>
+                    <div className="space-y-1 max-h-56 overflow-y-auto">
+                      {registrosPeriodo.filter(r => r.estado === 'Finalizado').map(r => (
                         <div
-                          key={registro.id}
-                          className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg border border-border/50"
+                          key={r.id}
+                          className="flex items-center justify-between px-3 py-2 rounded-lg"
+                          style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${BDR}` }}
                         >
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center">
-                              <span className="text-sm font-bold text-primary">
-                                {registro.modeloNombre.charAt(0)}
-                              </span>
-                            </div>
+                          <div className="flex items-center gap-2">
+                            {r.selfieUrl ? (
+                              <img
+                                src={r.selfieUrl}
+                                alt={r.modeloNombre}
+                                className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                                style={{ border: `1.5px solid ${GOLD}` }}
+                              />
+                            ) : (
+                              <div
+                                className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center"
+                                style={{ border: `1.5px solid ${BDR}`, background: 'rgba(255,255,255,0.06)' }}
+                              >
+                                <span className="text-xs font-bold" style={{ color: GOLD }}>{r.modeloNombre.charAt(0)}</span>
+                              </div>
+                            )}
                             <div>
-                              <p className="font-medium text-sm">{registro.modeloNombre}</p>
-                              <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                                <div className="flex items-center gap-1">
-                                  <LogIn className="w-3 h-3 text-green-500" />
-                                  {registro.horaLlegada.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <LogOut className="w-3 h-3 text-red-500" />
-                                  {registro.horaSalida?.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
-                                </div>
+                              <p className="text-sm font-medium text-white">{r.modeloNombre}</p>
+                              <div className="flex items-center gap-2 text-xs" style={{ color: 'rgba(255,255,255,0.45)' }}>
+                                <span className="flex items-center gap-1"><LogIn className="w-3 h-3 text-green-500" />{r.horaLlegada.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'})}</span>
+                                {r.horaSalida && <span className="flex items-center gap-1"><LogOut className="w-3 h-3 text-red-400" />{r.horaSalida.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'})}</span>}
                               </div>
                             </div>
                           </div>
-                          <div className="text-right">
-                            <p className="font-bold text-primary">{registro.horasTrabajadas?.toFixed(1)}h</p>
-                            <p className="text-xs text-muted-foreground">trabajadas</p>
-                          </div>
+                          <p className="font-bold text-sm" style={{ color: GOLD }}>{r.horasTrabajadas?.toFixed(1)}h</p>
                         </div>
                       ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {registrosPeriodo.length === 0 && (
-                <div className="text-center p-8 bg-secondary/50 rounded-lg border-2 border-dashed border-border">
-                  <Calendar className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">
-                    No hay registros de asistencia para este día
+                {registrosPeriodo.length === 0 && (
+                  <p className="text-center text-xs py-4" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                    Sin registros para este día
                   </p>
-                </div>
-              )}
-            </TabsContent>
+                )}
+              </TabsContent>
 
-            <TabsContent value="semanal" className="space-y-4 mt-4">
-              {/* Resumen por Modelo */}
-              {Object.keys(estadisticas.porModelo).length > 0 ? (
-                <div>
-                  <h4 className="text-sm font-semibold mb-3">Resumen por Modelo</h4>
-                  <div className="space-y-2">
-                    {Object.entries(estadisticas.porModelo)
-                      .sort((a, b) => b[1].horas - a[1].horas)
-                      .map(([email, data]) => (
-                        <div
-                          key={email}
-                          className="flex items-center justify-between p-4 bg-secondary/50 rounded-lg border border-border"
-                        >
+              {/* ── TAB SEMANAL ── */}
+              <TabsContent value="semanal" className="space-y-2 mt-0">
+                {Object.keys(stats.porModelo).length > 0 ? (
+                  Object.entries(stats.porModelo)
+                    .sort((a,b) => b[1].horas - a[1].horas)
+                    .map(([email, data]) => (
+                      <div
+                        key={email}
+                        className="flex items-center justify-between p-3 rounded-lg"
+                        style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${BDR}` }}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                            style={{ border: `2px solid ${GOLD}`, background: 'rgba(201,169,97,0.1)' }}
+                          >
+                            <span className="font-bold text-sm" style={{ color: GOLD }}>{data.nombre.charAt(0)}</span>
+                          </div>
+                          <div>
+                            <p className="font-semibold text-sm text-white">{data.nombre}</p>
+                            <p className="text-xs" style={{ color: 'rgba(255,255,255,0.45)' }}>{data.dias} días</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xl font-bold" style={{ color: GOLD }}>{data.horas.toFixed(1)}h</p>
+                          <p className="text-xs" style={{ color: 'rgba(255,255,255,0.45)' }}>{(data.horas/data.dias).toFixed(1)}h/día</p>
+                        </div>
+                      </div>
+                    ))
+                ) : (
+                  <p className="text-center text-xs py-4" style={{ color: 'rgba(255,255,255,0.35)' }}>Sin registros esta semana</p>
+                )}
+              </TabsContent>
+
+              {/* ── TAB MENSUAL ── */}
+              <TabsContent value="mensual" className="space-y-2 mt-0">
+                {Object.keys(stats.porModelo).length > 0 ? (
+                  Object.entries(stats.porModelo)
+                    .sort((a,b) => b[1].horas - a[1].horas)
+                    .map(([email, data]) => (
+                      <div
+                        key={email}
+                        className="p-3 rounded-lg"
+                        style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${BDR}` }}
+                      >
+                        <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 rounded-full bg-primary/20 border-2 border-primary flex items-center justify-center">
-                              <span className="text-lg font-bold text-primary">
-                                {data.nombre.charAt(0)}
-                              </span>
+                            <div
+                              className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                              style={{ border: `2px solid ${GOLD}`, background: 'rgba(201,169,97,0.1)' }}
+                            >
+                              <span className="font-bold text-sm" style={{ color: GOLD }}>{data.nombre.charAt(0)}</span>
                             </div>
                             <div>
-                              <p className="font-semibold">{data.nombre}</p>
-                              <p className="text-sm text-muted-foreground">{data.dias} días trabajados</p>
+                              <p className="font-semibold text-white">{data.nombre}</p>
+                              <p className="text-xs" style={{ color: 'rgba(255,255,255,0.45)' }}>{email}</p>
                             </div>
                           </div>
-                          <div className="text-right">
-                            <p className="text-2xl font-bold text-primary">{data.horas.toFixed(1)}h</p>
-                            <p className="text-xs text-muted-foreground">
-                              {(data.horas / data.dias).toFixed(1)}h promedio/día
-                            </p>
-                          </div>
+                          <p className="text-2xl font-bold" style={{ color: GOLD }}>{data.horas.toFixed(1)}h</p>
                         </div>
-                      ))}
+                        <div className="grid grid-cols-3 gap-2 text-xs">
+                          {[
+                            { label: 'Días',       val: data.dias },
+                            { label: 'Prom/día',   val: (data.horas/data.dias).toFixed(1)+'h' },
+                            { label: 'Total',      val: data.horas.toFixed(1)+'h' },
+                          ].map(({ label, val }) => (
+                            <div
+                              key={label}
+                              className="p-2 rounded text-center"
+                              style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${BDR}` }}
+                            >
+                              <p style={{ color: 'rgba(255,255,255,0.45)' }} className="mb-1">{label}</p>
+                              <p className="font-bold" style={{ color: GOLD }}>{val}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))
+                ) : (
+                  <p className="text-center text-xs py-4" style={{ color: 'rgba(255,255,255,0.35)' }}>Sin registros este mes</p>
+                )}
+              </TabsContent>
+              {/* ── TAB MULTAS ── */}
+              <TabsContent value="multas" className="space-y-3 mt-0">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs font-semibold px-1">
+                    <span className="text-muted-foreground">Últimas Penalizaciones</span>
+                    <span className="text-red-400">Total: ${multas.reduce((s,m) => s + (m.estado === 'activa' ? m.monto : 0), 0).toLocaleString()}</span>
                   </div>
-                </div>
-              ) : (
-                <div className="text-center p-8 bg-secondary/50 rounded-lg border-2 border-dashed border-border">
-                  <Calendar className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">
-                    No hay registros de asistencia para esta semana
-                  </p>
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="mensual" className="space-y-4 mt-4">
-              {/* Resumen por Modelo */}
-              {Object.keys(estadisticas.porModelo).length > 0 ? (
-                <div>
-                  <h4 className="text-sm font-semibold mb-3">Resumen Mensual por Modelo</h4>
-                  <div className="space-y-3">
-                    {Object.entries(estadisticas.porModelo)
-                      .sort((a, b) => b[1].horas - a[1].horas)
-                      .map(([email, data]) => (
-                        <div
-                          key={email}
-                          className="p-4 bg-gradient-to-r from-secondary/50 to-secondary/30 rounded-lg border border-border"
+                  <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
+                    {multas.length === 0 ? (
+                      <p className="text-center text-xs py-12 text-muted-foreground">No hay multas registradas</p>
+                    ) : (
+                      multas.map(m => (
+                        <div 
+                          key={m.id}
+                          className="p-3 rounded-xl border border-red-500/20 bg-red-500/5 space-y-2"
                         >
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-3">
-                              <div className="w-12 h-12 rounded-full bg-primary/20 border-2 border-primary flex items-center justify-center">
-                                <span className="text-lg font-bold text-primary">
-                                  {data.nombre.charAt(0)}
-                                </span>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center border border-red-500/30">
+                                <AlertCircle className="w-4 h-4 text-red-400" />
                               </div>
                               <div>
-                                <p className="font-semibold text-lg">{data.nombre}</p>
-                                <p className="text-sm text-muted-foreground">{email}</p>
+                                <p className="text-sm font-bold text-white leading-none">{m.modeloNombre}</p>
+                                <p className="text-[10px] text-muted-foreground mt-1">
+                                  {new Date(m.fecha).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                </p>
                               </div>
                             </div>
                             <div className="text-right">
-                              <p className="text-3xl font-bold text-primary">{data.horas.toFixed(1)}h</p>
+                              <p className="text-sm font-black text-red-400">${m.monto.toLocaleString()}</p>
+                              <Badge variant="outline" className={`text-[9px] px-1 h-4 border-red-500/30 text-red-400 ${m.estado !== 'activa' && 'opacity-50'}`}>
+                                {m.estado === 'activa' ? 'Pendiente' : m.estado.toUpperCase()}
+                              </Badge>
                             </div>
                           </div>
-                          <div className="grid grid-cols-3 gap-3 text-sm">
-                            <div className="p-2 bg-background/50 rounded border border-border/50">
-                              <p className="text-xs text-muted-foreground mb-1">Días Trabajados</p>
-                              <p className="font-bold text-primary">{data.dias}</p>
-                            </div>
-                            <div className="p-2 bg-background/50 rounded border border-border/50">
-                              <p className="text-xs text-muted-foreground mb-1">Promedio/Día</p>
-                              <p className="font-bold text-primary">{(data.horas / data.dias).toFixed(1)}h</p>
-                            </div>
-                            <div className="p-2 bg-background/50 rounded border border-border/50">
-                              <p className="text-xs text-muted-foreground mb-1">Total Horas</p>
-                              <p className="font-bold text-primary">{data.horas.toFixed(1)}h</p>
-                            </div>
+                          <div className="text-[11px] text-muted-foreground bg-black/20 p-2 rounded-lg border border-white/5">
+                            <span className="font-bold text-white uppercase text-[9px] block mb-0.5">Motivo:</span>
+                            {m.motivo}
                           </div>
+                          {m.jornadaId && (
+                            <div className="flex items-center justify-between text-[10px]">
+                              <span className="text-muted-foreground">Horas trabajadas: <b className="text-white">{m.horasTrabajadas}h</b> / {m.horasRequeridas}h</span>
+                              <span className="text-red-400 font-bold">-{m.horasFaltantes}h</span>
+                            </div>
+                          )}
                         </div>
-                      ))}
+                      ))
+                    )}
                   </div>
                 </div>
-              ) : (
-                <div className="text-center p-8 bg-secondary/50 rounded-lg border-2 border-dashed border-border">
-                  <Calendar className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">
-                    No hay registros de asistencia para este mes
-                  </p>
-                </div>
-              )}
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      )}
-    </Card>
+              </TabsContent>
+            </Tabs>
+          </div>
+        )}
+      </div>
+    </>
   );
 }

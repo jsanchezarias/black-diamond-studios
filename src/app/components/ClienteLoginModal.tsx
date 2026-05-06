@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { supabase } from '../../utils/supabase/info';
+import { translateSupabaseError } from '../../utils/supabase/errors';
 import { Logo } from './Logo';
 import { usePublicUsers } from './PublicUsersContext';
 
@@ -66,7 +67,9 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
 
   const handleRecuperar = async () => {
     if (!recuperarTelefono.trim()) {
-      setError('Por favor ingresa tu número de teléfono');
+      const msg = 'Por favor ingresa tu número de teléfono';
+      setError(msg);
+      toast.error(msg);
       return;
     }
 
@@ -103,7 +106,9 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
 
       setRecuperarEnviado(true);
     } catch (err: any) {
-      setError('Error al enviar el correo de recuperación. Intenta nuevamente.');
+      const msg = translateSupabaseError(err);
+      setError(msg);
+      toast.error(msg);
     } finally {
       setProcesando(false);
     }
@@ -119,7 +124,9 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
 
   const handleLogin = async () => {
     if (!loginTelefono.trim() || !loginPassword.trim()) {
-      setError('Por favor ingresa tu teléfono y contraseña');
+      const msg = 'Por favor ingresa tu teléfono y contraseña';
+      setError(msg);
+      toast.error(msg);
       return;
     }
 
@@ -212,7 +219,6 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
         .from('clientes')
         .update({
           sesion_activa: true,
-          sesion_token: authData.session?.access_token || null,
           sesion_ultimo_acceso: new Date().toISOString(),
           sesion_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
         })
@@ -220,8 +226,9 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
 
       // Guardar también en localStorage para que App.tsx reconozca la sesión del dashboard
       if (authData.session && authData.user) {
+        // ✅ CRÍTICO: El accessToken NO se guarda en localStorage.
+        // Se mantiene en memoria y en sessionStorage manejado por Supabase.
         localStorage.setItem('blackDiamondUser', JSON.stringify({
-          accessToken: authData.session.access_token,
           userId: authData.user.id,
           email: authData.user.email || '',
           role: 'cliente'
@@ -233,12 +240,12 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
       setTimeout(() => {
         onLoginSuccess(clienteData);
         handleClose();
-        
-        // Redirigir automáticamente al dashboard si es cliente nuevo o si se prefiriera
-        window.location.reload(); 
+        // Ya no recargamos la página; dejamos que el estado de App.tsx reaccione al localStorage/Context
       }, 1500);
     } catch (err: any) {
-      setError('Error al iniciar sesión. Por favor verifica tu conexión e intenta nuevamente.');
+      const msg = translateSupabaseError(err);
+      setError(msg);
+      toast.error(msg);
     } finally {
       setProcesando(false);
     }
@@ -246,15 +253,21 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
 
   const handleRegistro = async () => {
     if (!nombre.trim() || !nombreUsuario.trim() || !telefono.trim() || !password.trim()) {
-      setError('Nombre, nombre de usuario, teléfono y contraseña son obligatorios');
+      const msg = 'Nombre, nombre de usuario, teléfono y contraseña son obligatorios';
+      setError(msg);
+      toast.error(msg);
       return;
     }
     if (password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres');
+      const msg = 'La contraseña debe tener al menos 6 caracteres';
+      setError(msg);
+      toast.error(msg);
       return;
     }
     if (password !== confirmPassword) {
-      setError('Las contraseñas no coinciden');
+      const msg = 'Las contraseñas no coinciden';
+      setError(msg);
+      toast.error(msg);
       return;
     }
 
@@ -292,16 +305,16 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
       });
 
       if (authError) {
-        if (authError.message.includes('already registered')) {
-          setError('Ya existe una cuenta con ese número de teléfono. Intenta iniciar sesión.');
-        } else {
-          setError('Error al crear la cuenta: ' + authError.message);
-        }
+        const msg = translateSupabaseError(authError);
+        setError(msg);
+        toast.error(msg);
         return;
       }
 
       if (!authData.user) {
-        setError('Error al crear el usuario. Intenta nuevamente.');
+        const msg = 'Error al crear el usuario. Intenta nuevamente.';
+        setError(msg);
+        toast.error(msg);
         return;
       }
 
@@ -315,7 +328,6 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
         fecha_nacimiento: fechaNacimiento || null,
         ciudad: ciudad.trim() || null,
         sesion_activa: true,
-        sesion_token: authData.session?.access_token || null,
         sesion_ultimo_acceso: new Date().toISOString(),
         sesion_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
         password_hash: 'supabase-auth', // columna requerida, la auth real está en Supabase Auth
@@ -330,7 +342,9 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
       if (clienteError) {
         // Si falla la inserción, limpiar el usuario de auth
         await supabase.auth.signOut();
-        setError('Error al crear tu perfil. Por favor intenta nuevamente.');
+        const msg = translateSupabaseError(clienteError);
+        setError(msg);
+        toast.error(msg);
         return;
       }
 
@@ -341,7 +355,9 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
         handleClose();
       }, 1500);
     } catch (err: any) {
-      setError(err.message || 'Error al registrarse');
+      const msg = translateSupabaseError(err);
+      setError(msg);
+      toast.error(msg);
     } finally {
       setProcesando(false);
     }

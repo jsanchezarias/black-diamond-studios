@@ -13,7 +13,7 @@ import {
   FileText,
   Award
 } from 'lucide-react';
-import { useClientes, Cliente } from './ClientesContext';
+import { useClientes } from './ClientesContext';
 
 interface ClienteInfoModalProps {
   telefono: string | null;
@@ -146,7 +146,7 @@ export function ClienteInfoModal({ telefono, open, onOpenChange }: ClienteInfoMo
 
                 <div className="text-center p-4 bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg border border-primary/20">
                   <p className="text-2xl font-bold text-primary">
-                    ${cliente.totalGastado.toLocaleString('es-CO')}
+                    ${(cliente.totalGastado ?? 0).toLocaleString('es-CO')}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">Total Gastado</p>
                 </div>

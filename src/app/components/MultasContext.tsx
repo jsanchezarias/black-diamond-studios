@@ -3,79 +3,156 @@ import {
   notificarMultaAplicada, 
   notificarMultaPagada 
 } from './NotificacionesHelpers';
+import { supabase } from '../../utils/supabase/info';
+import { toast } from 'sonner';
 
 export interface Multa {
-  id: number;
-  modeloId: number;
+  id: string;
+  modeloId: string;
   modeloNombre: string;
-  modeloEmail?: string; // Agregado para compatibilidad con el sistema
-  concepto: string;
-  descripcion?: string;
+  modeloEmail: string;
+  tipo: string;
+  motivo: string;
   monto: number;
   fecha: string;
-  estado: 'pendiente' | 'pagada' | 'cancelada';
+  estado: 'activa' | 'pagada' | 'cancelada';
+  jornadaId?: string;
+  horasTrabajadas?: number;
+  horasRequeridas?: number;
+  horasFaltantes?: number;
 }
 
 interface MultasContextType {
   multas: Multa[];
-  agregarMulta: (multa: Omit<Multa, 'id' | 'fecha' | 'estado'>) => void;
-  eliminarMulta: (id: number) => void;
-  actualizarEstadoMulta: (id: number, estado: 'pendiente' | 'pagada' | 'cancelada') => void;
-  obtenerMultasPorModelo: (modeloId: number) => Multa[];
+  agregarMulta: (multa: Omit<Multa, 'id' | 'fecha' | 'estado'>) => Promise<void>;
+  eliminarMulta: (id: string) => Promise<void>;
+  actualizarEstadoMulta: (id: string, estado: 'activa' | 'pagada' | 'cancelada') => Promise<void>;
+  obtenerMultasPorModelo: (modeloId: string) => Multa[];
   obtenerMultasPorEmail: (modeloEmail: string) => Multa[];
-  obtenerTotalMultasPendientes: (modeloId: number) => number;
+  obtenerTotalMultasPendientes: (modeloId: string) => number;
   obtenerTotalMultasPendientesPorEmail: (modeloEmail: string) => number;
 }
 
 const MultasContext = createContext<MultasContextType | undefined>(undefined);
 
+import { useEffect, useCallback } from 'react';
+
 export function MultasProvider({ children }: { children: ReactNode }) {
-  // ✅ SIN DATOS DEMO - Sistema listo para producción
   const [multas, setMultas] = useState<Multa[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const agregarMulta = (multa: Omit<Multa, 'id' | 'fecha' | 'estado'>) => {
-    const newId = Math.max(...multas.map(m => m.id), 0) + 1;
-    const today = new Date().toISOString().split('T')[0];
-    
-    const nuevaMulta = {
-      ...multa,
-      id: newId,
-      fecha: today,
-      estado: 'pendiente' as const,
-    };
-
-    setMultas(prev => [...prev, nuevaMulta]);
-
-    // 🔔 NOTIFICACIÓN: Multa aplicada
-    if (multa.modeloEmail) {
-      notificarMultaAplicada({
-        clienteEmail: multa.modeloEmail,
-        clienteNombre: multa.modeloNombre,
-        monto: multa.monto,
-        motivo: multa.concepto
-      }).catch(err => { if (process.env.NODE_ENV === 'development') console.error('Error notificando multa aplicada:', err); });
+  const cargarMultas = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('multas')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      setMultas((data || []).map(m => ({
+        id: m.id,
+        modeloId: m.modelo_id,
+        modeloNombre: m.modelo_nombre,
+        modeloEmail: m.modelo_email,
+        tipo: m.tipo,
+        motivo: m.motivo,
+        monto: m.monto,
+        fecha: m.created_at,
+        estado: m.estado,
+        jornadaId: m.jornada_id,
+        horasTrabajadas: m.horas_trabajadas,
+        horasRequeridas: m.horas_requeridas,
+        horasFaltantes: m.horas_faltantes
+      })));
+    } catch (e) {
+      console.error('Error cargando multas:', e);
+    } finally {
+      setLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    cargarMultas();
+    
+    const channel = supabase
+      .channel('multas_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'multas' }, cargarMultas)
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [cargarMultas]);
+
+  const agregarMulta = async (multa: Omit<Multa, 'id' | 'fecha' | 'estado'>) => {
+    const { data, error } = await supabase
+      .from('multas')
+      .insert({
+        modelo_id: multa.modeloId,
+        modelo_nombre: multa.modeloNombre,
+        modelo_email: multa.modeloEmail,
+        tipo: multa.tipo,
+        motivo: multa.motivo,
+        monto: multa.monto,
+        estado: 'activa'
+      })
+      .select()
+      .single();
+
+    if (error) {
+      toast.error('Error al crear multa');
+      throw error;
+    }
+
+    // 🔔 NOTIFICACIÓN
+    notificarMultaAplicada({
+      clienteEmail: multa.modeloEmail,
+      clienteNombre: multa.modeloNombre,
+      monto: multa.monto,
+      motivo: multa.motivo
+    }).catch(() => {});
   };
 
-  const eliminarMulta = (id: number) => {
-    setMultas(prev => prev.filter(m => m.id !== id));
+  const eliminarMulta = async (id: string) => {
+    const { error } = await supabase
+      .from('multas')
+      .delete()
+      .eq('id', id);
+    if (error) toast.error('Error al eliminar multa');
   };
 
-  const actualizarEstadoMulta = (id: number, estado: 'pendiente' | 'pagada' | 'cancelada') => {
+  const actualizarEstadoMulta = async (id: string, estado: 'activa' | 'pagada' | 'cancelada') => {
     const multa = multas.find(m => m.id === id);
     
-    setMultas(prev => prev.map(m => (m.id === id ? { ...m, estado } : m)));
+    const { error } = await supabase
+      .from('multas')
+      .update({ estado })
+      .eq('id', id);
 
-    // 🔔 NOTIFICACIÓN: Multa pagada
-    if (estado === 'pagada' && multa && multa.modeloEmail) {
+    if (error) {
+      toast.error('Error al actualizar multa');
+      return;
+    }
+
+    if (estado === 'pagada' && multa) {
       notificarMultaPagada({
         clienteEmail: multa.modeloEmail,
         monto: multa.monto
-      }).catch(err => { if (process.env.NODE_ENV === 'development') console.error('Error notificando multa pagada:', err); });
+      }).catch(() => {});
+      
+      // Registro en balance
+      await supabase.from('balance_financiero').insert({
+        tipo: 'egreso',
+        categoria: 'multa',
+        concepto: `Multa — ${multa.motivo} (${multa.modeloNombre})`,
+        monto: multa.monto,
+        referencia_id: id,
+        referencia_tabla: 'multas',
+        fecha: new Date().toISOString().split('T')[0]
+      });
     }
   };
 
-  const obtenerMultasPorModelo = (modeloId: number) => {
+  const obtenerMultasPorModelo = (modeloId: string) => {
     return multas.filter(m => m.modeloId === modeloId);
   };
 
@@ -83,15 +160,15 @@ export function MultasProvider({ children }: { children: ReactNode }) {
     return multas.filter(m => m.modeloEmail === modeloEmail);
   };
 
-  const obtenerTotalMultasPendientes = (modeloId: number) => {
+  const obtenerTotalMultasPendientes = (modeloId: string) => {
     return multas
-      .filter(m => m.modeloId === modeloId && m.estado === 'pendiente')
+      .filter(m => m.modeloId === modeloId && m.estado === 'activa')
       .reduce((total, m) => total + m.monto, 0);
   };
 
   const obtenerTotalMultasPendientesPorEmail = (modeloEmail: string) => {
     return multas
-      .filter(m => m.modeloEmail === modeloEmail && m.estado === 'pendiente')
+      .filter(m => m.modeloEmail === modeloEmail && m.estado === 'activa')
       .reduce((total, m) => total + m.monto, 0);
   };
 

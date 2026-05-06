@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../utils/supabase/info';
 import { toast } from 'sonner';
+import { NotificacionBell } from './NotificacionBell';
+import { LogOut } from 'lucide-react';
 
 export const formatearFecha = (fecha: string) => {
   if (!fecha) return '';
@@ -27,71 +29,76 @@ interface ClienteNavbarProps {
 
 export function ClienteNavbar({ currentUser, onLogout }: ClienteNavbarProps) {
   const [citasPendientes, setCitasPendientes] = useState<any[]>([]);
-  const [notificaciones, setNotificaciones] = useState<any[]>([]);
   const [mostrarCitas, setMostrarCitas] = useState(false);
   const [menuAbierto, setMenuAbierto] = useState(false);
-
-  const cargarCitas = async () => {
-    const hoy = new Date().toISOString().split('T')[0];
-    const { data } = await supabase
-      .from('agendamientos')
-      .select('id, fecha, hora, modelo_nombre, tipo_servicio, estado')
-      .eq('cliente_id', currentUser.id)
-      .gte('fecha', hoy)
-      .not('estado', 'in', '("completado","cancelado","no_show")')
-      .order('fecha', { ascending: true })
-      .order('hora', { ascending: true });
-      
-    setCitasPendientes(data || []);
-  };
-
-  const cargarNotificaciones = async () => {
-    const { data } = await supabase
-      .from('notificaciones')
-      .select('*')
-      .eq('usuario_id', currentUser.id)
-      .eq('leida', false)
-      .order('created_at', { ascending: false })
-      .limit(10);
-    setNotificaciones(data || []);
-  };
-
-  const marcarComoLeidas = async () => {
-    if (notificaciones.length === 0) return;
-    
-    await supabase
-      .from('notificaciones')
-      .update({ leida: true })
-      .eq('usuario_id', currentUser.id);
-      
-    setNotificaciones([]);
-  };
+  // const [notificaciones, setNotificaciones] = useState<any[]>([]);
+  const [noLeidas, setNoLeidas] = useState(0);
 
   useEffect(() => {
-    cargarCitas();
+    if (!currentUser?.id) return;
+
+    const cargarNotificaciones = async () => {
+      const { data } = await supabase
+        .from('notificaciones')
+        .select('*')
+        .eq('usuario_id', currentUser.id)
+        .eq('leida', false)
+        .order('created_at', { ascending: false })
+        .limit(10);
+      // setNotificaciones(data || []);
+      setNoLeidas(data?.length || 0);
+    };
+
+    const cargarCitas = async () => {
+      const hoy = new Date().toISOString().split('T')[0];
+      const { data } = await supabase
+        .from('agendamientos')
+        .select('id, fecha, hora, modelo_nombre, tipo_servicio, estado')
+        .eq('cliente_id', currentUser.id)
+        .gte('fecha', hoy)
+        .not('estado', 'in', '("completado","cancelado","no_show","archivado")')
+        .order('fecha', { ascending: true })
+        .order('hora', { ascending: true });
+        
+      setCitasPendientes(data || []);
+    };
+
     cargarNotificaciones();
+    cargarCitas();
 
     const channel = supabase
-      .channel('cliente-navbar-' + currentUser.id)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'agendamientos',
-        filter: 'cliente_id=eq.' + currentUser.id
-      }, () => { cargarCitas(); })
+      .channel('cliente-nav-' + currentUser.id)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
         table: 'notificaciones',
         filter: 'usuario_id=eq.' + currentUser.id
-      }, (payload) => {
-        setNotificaciones(prev => [payload.new, ...prev]);
-        toast(payload.new.titulo, { icon: '🔔' });
+      }, (_payload) => {
+        // setNotificaciones(prev => [payload.new, ...prev]);
+        setNoLeidas(prev => prev + 1);
+        toast('🔔 ' + ((_payload.new as any).titulo || 'Notificación'), { duration: 5000 });
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'agendamientos',
+        filter: 'cliente_id=eq.' + currentUser.id
+      }, () => {
+        cargarCitas();
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
-  }, [currentUser.id]);
+    return () => { 
+      supabase.removeChannel(channel); 
+    };
+  }, [currentUser?.id]);
+
+  const marcarTodasComoLeidas = async () => {
+    if (!currentUser?.id) return;
+    await supabase.from('notificaciones').update({ leida: true }).eq('usuario_id', currentUser.id);
+    setNoLeidas(0);
+    // setNotificaciones(prev => prev.map(n => ({ ...n, leida: true })));
+  };
 
   return (
     <>
@@ -119,6 +126,10 @@ export function ClienteNavbar({ currentUser, onLogout }: ClienteNavbarProps) {
 
         <div style={{ flex: 1 }} />
 
+        <div className="flex items-center gap-2">
+          <NotificacionBell />
+        </div>
+
         <button
           onClick={() => setMostrarCitas(!mostrarCitas)}
           style={{
@@ -135,7 +146,7 @@ export function ClienteNavbar({ currentUser, onLogout }: ClienteNavbarProps) {
           <span style={{ display: typeof window !== 'undefined' && window.innerWidth > 480 ? 'inline' : 'none' }}>
             Mis Citas
           </span>
-          {citasPendientes.length > 0 && (
+          {(citasPendientes || []).length > 0 && (
             <span style={{
               background: '#FF0000', color: 'white',
               borderRadius: '50%', width: 18, height: 18,
@@ -143,10 +154,27 @@ export function ClienteNavbar({ currentUser, onLogout }: ClienteNavbarProps) {
               alignItems: 'center', justifyContent: 'center',
               boxShadow: '0 0 6px #FF0000', flexShrink: 0
             }}>
-              {citasPendientes.length}
+              {(citasPendientes || []).length}
             </span>
           )}
         </button>
+
+        {onLogout && (
+          <button
+            onClick={() => onLogout && onLogout()}
+            style={{
+              background: 'rgba(255,68,68,0.1)',
+              border: '0.5px solid rgba(255,68,68,0.3)',
+              color: '#FF4444', borderRadius: 8,
+              padding: '6px', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: 36, height: 36
+            }}
+            title="Cerrar sesión"
+          >
+            <LogOut size={18} />
+          </button>
+        )}
 
         <button
           onClick={() => setMenuAbierto(!menuAbierto)}
@@ -211,9 +239,9 @@ export function ClienteNavbar({ currentUser, onLogout }: ClienteNavbarProps) {
             </div>
 
             {[
-              { icon: '🏠', label: 'Inicio', action: () => { window.scrollTo({ top: 0, behavior: 'smooth' }) } },
-              { icon: '📅', label: 'Mis Citas', badge: citasPendientes.length, action: () => { setMostrarCitas(true); setMenuAbierto(false); } },
-              { icon: '🔔', label: 'Notificaciones', badge: notificaciones.length, action: () => { marcarComoLeidas(); toast.success('Notificaciones marcadas como leídas'); } },
+              { icon: '🏠', label: 'Inicio', action: () => { window.scrollTo({ top: 0, behavior: 'smooth' }); setMenuAbierto(false); } },
+              { icon: '📅', label: 'Mis Citas', badge: (citasPendientes || []).length, action: () => { setMostrarCitas(true); setMenuAbierto(false); } },
+              { icon: '🔔', label: 'Notificaciones', badge: noLeidas || 0, action: () => { marcarTodasComoLeidas(); setMenuAbierto(false); toast.success('Notificaciones marcadas como leídas'); } },
             ].map(item => (
               <button
                 key={item.label}
@@ -245,7 +273,7 @@ export function ClienteNavbar({ currentUser, onLogout }: ClienteNavbarProps) {
             ))}
 
             <button
-              onClick={onLogout}
+              onClick={() => { setMenuAbierto(false); onLogout && onLogout(); }}
               style={{
                 display: 'flex', alignItems: 'center', gap: 12,
                 padding: '12px 16px', borderRadius: 8,
@@ -283,7 +311,7 @@ export function ClienteNavbar({ currentUser, onLogout }: ClienteNavbarProps) {
             >×</button>
           </div>
 
-          {citasPendientes.length === 0 ? (
+          {(citasPendientes || []).length === 0 ? (
             <div style={{ textAlign: 'center', padding: 20, color: 'rgba(255,255,255,0.4)' }}>
               <div style={{ fontSize: 32, marginBottom: 8 }}>📅</div>
               <p style={{ fontSize: 13, margin: 0 }}>No tienes citas pendientes</p>

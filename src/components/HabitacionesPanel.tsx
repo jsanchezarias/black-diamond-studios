@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { DoorOpen, Timer, Users, CheckCircle, Clock, AlertTriangle, X, Loader2, RefreshCw } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Card, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { supabase } from '../utils/supabase/info';
@@ -22,22 +22,28 @@ interface Habitacion {
 }
 
 function calcularTiempoRestante(horaFin: string | null): string {
-  if (!horaFin) return 'Sin tiempo definido';
+  if (!horaFin) return '--:--:--';
   const fin = new Date(horaFin);
-  const ahora = new Date();
-  const diff = fin.getTime() - ahora.getTime();
-  if (diff <= 0) return 'Tiempo cumplido';
-  const mins = Math.floor(diff / 60000);
-  const hrs = Math.floor(mins / 60);
-  const minsRest = mins % 60;
-  return hrs > 0 ? `${hrs}h ${minsRest}m restantes` : `${minsRest}m restantes`;
+  const diff = fin.getTime() - Date.now();
+  if (diff <= 0) return '00:00:00';
+  const totalSec = Math.floor(diff / 1000);
+  const hrs = Math.floor(totalSec / 3600);
+  const mins = Math.floor((totalSec % 3600) / 60);
+  const secs = totalSec % 60;
+  return [
+    String(hrs).padStart(2, '0'),
+    String(mins).padStart(2, '0'),
+    String(secs).padStart(2, '0'),
+  ].join(':');
+}
+
+function tiempoRestanteSegundos(horaFin: string | null): number {
+  if (!horaFin) return 99999;
+  return Math.floor((new Date(horaFin).getTime() - Date.now()) / 1000);
 }
 
 function tiempoRestanteMinutos(horaFin: string | null): number {
-  if (!horaFin) return 999;
-  const fin = new Date(horaFin);
-  const ahora = new Date();
-  return Math.floor((fin.getTime() - ahora.getTime()) / 60000);
+  return Math.floor(tiempoRestanteSegundos(horaFin) / 60);
 }
 
 export function HabitacionesPanel() {
@@ -87,11 +93,97 @@ export function HabitacionesPanel() {
     return () => { supabase.removeChannel(channel); };
   }, [cargarHabitaciones]);
 
-  // Tick cada minuto para cuentas regresivas
+  // Tick cada SEGUNDO para countdown en tiempo real
   useEffect(() => {
-    const interval = setInterval(() => setTick(t => t + 1), 60000);
+    const interval = setInterval(() => setTick(t => t + 1), 1000);
     return () => clearInterval(interval);
   }, []);
+
+  // Auto-liberar habitaciones cuyo tiempo ya venció y registrar en finanzas
+  useEffect(() => {
+    const vencidas = habitaciones.filter(
+      h => (h.estado === 'ocupada' || h.estado === 'reservada' as any) &&
+        h.hora_fin_estimada &&
+        tiempoRestanteSegundos(h.hora_fin_estimada) <= 0
+    );
+    if (!vencidas.length) return;
+
+    vencidas.forEach(async (hab) => {
+      // 1️⃣ Liberar la habitación → estado limpieza
+      await supabase
+        .from('habitaciones')
+        .update({
+          estado: 'limpieza',
+          modelo_email: null,
+          modelo_nombre: null,
+          hora_inicio: null,
+          hora_fin_estimada: null,
+          duracion_minutos: null,
+        })
+        .eq('id', hab.id);
+
+      // 2️⃣ Buscar el agendamiento — primero por habitacion_id, luego fallback por modelo_email
+      let agendamiento: any = null;
+
+      const { data: porHabitacion } = await supabase
+        .from('agendamientos')
+        .select('id, precio, monto_pago, modelo_nombre, modelo_id, cliente_nombre, servicio, fecha, hora')
+        .eq('habitacion_id', hab.id)
+        .in('estado', ['aceptado_programador', 'confirmado'])
+        .maybeSingle();
+
+      agendamiento = porHabitacion;
+
+      // Fallback: buscar por modelo_email si no hay habitacion_id vinculado
+      if (!agendamiento && hab.modelo_email) {
+        const { data: porModelo } = await supabase
+          .from('agendamientos')
+          .select('id, precio, monto_pago, modelo_nombre, modelo_id, cliente_nombre, servicio, fecha, hora')
+          .eq('modelo_email', hab.modelo_email)
+          .in('estado', ['aceptado_programador', 'confirmado'])
+          .order('fecha_creacion', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        agendamiento = porModelo;
+      }
+
+      if (agendamiento) {
+        // 3️⃣ Marcar agendamiento como completado
+        await supabase
+          .from('agendamientos')
+          .update({
+            estado: 'completado',
+            hora_fin_real: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          } as any)
+          .eq('id', agendamiento.id);
+
+        // 4️⃣ Registrar pago a la modelo en gastos
+        const montoServicio = Number(agendamiento.precio || agendamiento.monto_pago || 0);
+        const pagoModelo = Math.round(montoServicio * 0.6); // 60% para la modelo
+
+        if (pagoModelo > 0) {
+          await supabase.from('gastos').insert({
+            categoria: 'pago_modelo',
+            descripcion: `Servicio completado — ${agendamiento.modelo_nombre || hab.modelo_nombre || 'Modelo'} — ${agendamiento.servicio || 'Servicio'} (Cliente: ${agendamiento.cliente_nombre || ''})`,
+            monto: pagoModelo,
+            fecha: new Date().toISOString(),
+            agendamiento_id: agendamiento.id,
+            modelo_nombre: agendamiento.modelo_nombre || hab.modelo_nombre || null,
+            modelo_id: agendamiento.modelo_id || null,
+          } as any);
+        }
+
+        toast.success(
+          `✅ Servicio completado — ${hab.modelo_nombre || 'Modelo'} — Hab. ${hab.numero}\n💰 Pago registrado: $${pagoModelo.toLocaleString('es-CO')}`,
+          { duration: 8000 }
+        );
+      } else {
+        toast(`🧹 Habitación ${hab.numero} liberada — tiempo cumplido`, { duration: 6000 });
+      }
+    });
+  }, [tick, habitaciones]);
+
 
   const handleAsignar = async () => {
     if (!modalAsignar || !modeloSeleccionada) return;
@@ -268,9 +360,11 @@ export function HabitacionesPanel() {
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {habitaciones.map((hab) => {
-            const minsRestantes = hab.estado === 'ocupada' ? tiempoRestanteMinutos(hab.hora_fin_estimada) : 999;
-            const advertencia = hab.estado === 'ocupada' && minsRestantes <= 15 && minsRestantes > 0;
-            const tiempoCumplido = hab.estado === 'ocupada' && minsRestantes <= 0;
+            const segsRestantes = tiempoRestanteSegundos(hab.hora_fin_estimada);
+            const minsRestantes = Math.floor(segsRestantes / 60);
+            const enUso = hab.estado === 'ocupada' || (hab.estado as any) === 'reservada';
+            const advertencia = enUso && minsRestantes <= 15 && segsRestantes > 0;
+            const tiempoCumplido = enUso && segsRestantes <= 0;
 
             let borderColor = 'border-green-500/60';
             let bgGradient = 'from-green-950/50 to-green-950/20';
@@ -279,7 +373,7 @@ export function HabitacionesPanel() {
             let badgeLabel = 'DISPONIBLE';
             let iconColor = 'text-green-400';
 
-            if (hab.estado === 'ocupada') {
+            if (enUso) {
               if (tiempoCumplido) {
                 borderColor = 'border-red-500 animate-pulse';
               } else if (advertencia) {
@@ -290,7 +384,7 @@ export function HabitacionesPanel() {
               bgGradient = 'from-red-950/50 to-red-950/20';
               headerBg = 'bg-red-950/40 border-red-500/30';
               badgeClass = 'bg-red-500 text-white';
-              badgeLabel = 'OCUPADA';
+              badgeLabel = 'EN USO';
               iconColor = 'text-red-400';
             } else if (hab.estado === 'limpieza') {
               borderColor = 'border-yellow-500/60';
@@ -337,7 +431,7 @@ export function HabitacionesPanel() {
                     </>
                   )}
 
-                  {hab.estado === 'ocupada' && (
+                  {enUso && (
                     <>
                       {/* Modelo */}
                       <div>
@@ -346,29 +440,43 @@ export function HabitacionesPanel() {
                           <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                             <Clock className="w-3 h-3" />
                             Inicio: {new Date(hab.hora_inicio).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
+                            {hab.hora_fin_estimada && (
+                              <> → Fin: {new Date(hab.hora_fin_estimada).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}</>
+                            )}
                           </p>
                         )}
                       </div>
 
-                      {/* Tiempo restante */}
-                      <div className={`rounded-lg p-2.5 border text-center ${
+                      {/* Temporizador regresivo en tiempo real */}
+                      <div className={`rounded-xl p-3 border text-center ${
                         tiempoCumplido
-                          ? 'bg-red-900/50 border-red-400/50'
+                          ? 'bg-red-900/60 border-red-400/60'
                           : advertencia
                           ? 'bg-yellow-900/50 border-yellow-400/50'
-                          : 'bg-black/30 border-white/10'
+                          : 'bg-black/40 border-white/10'
                       }`}>
-                        <div className="flex items-center justify-center gap-1 mb-0.5">
-                          <Timer className={`w-3 h-3 ${tiempoCumplido ? 'text-red-400 animate-pulse' : advertencia ? 'text-yellow-400 animate-pulse' : 'text-primary'}`} />
+                        <div className="flex items-center justify-center gap-1.5 mb-1">
+                          <Timer className={`w-3.5 h-3.5 ${
+                            tiempoCumplido ? 'text-red-400 animate-ping' :
+                            advertencia ? 'text-yellow-400 animate-pulse' :
+                            'text-primary'
+                          }`} />
                           <span className="text-xs text-muted-foreground">
-                            {tiempoCumplido ? 'Tiempo cumplido' : advertencia ? '¡Próximo a terminar!' : 'Tiempo restante'}
+                            {tiempoCumplido ? '⚠️ Tiempo cumplido' : advertencia ? '⏰ ¡Próximo a terminar!' : 'Tiempo restante'}
                           </span>
                         </div>
-                        <p className={`text-xl font-bold font-mono tabular-nums ${
-                          tiempoCumplido ? 'text-red-400 animate-pulse' : advertencia ? 'text-yellow-400' : 'text-primary'
+                        <p className={`text-2xl font-bold font-mono tabular-nums tracking-widest ${
+                          tiempoCumplido ? 'text-red-400 animate-pulse' :
+                          advertencia ? 'text-yellow-300' :
+                          'text-primary'
                         }`}>
                           {calcularTiempoRestante(hab.hora_fin_estimada)}
                         </p>
+                        {hab.duracion_minutos && (
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            Duración total: {hab.duracion_minutos} min
+                          </p>
+                        )}
                       </div>
 
                       <Button

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Archive, RotateCcw, Search, Calendar, FileText, Trash2 } from 'lucide-react';
+import { Archive, RotateCcw, Search, Calendar } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';

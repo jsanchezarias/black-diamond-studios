@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -8,7 +8,7 @@ import {
   TrendingUp, 
   TrendingDown, 
   Download, 
-  Calendar,
+//  Calendar,
   PieChart,
   BarChart3,
   FileText,
@@ -16,10 +16,12 @@ import {
   Users,
   AlertCircle,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  CheckCircle2,
+  Loader2
 } from 'lucide-react';
 import { 
-  LineChart, 
+//  LineChart, 
   Line, 
   BarChart, 
   Bar, 
@@ -33,11 +35,13 @@ import {
   Legend, 
   ResponsiveContainer,
   Area,
-  AreaChart,
+//  AreaChart,
   ComposedChart
 } from 'recharts';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+
+import { supabase } from '../utils/supabase/info';
 
 declare module 'jspdf' {
   interface jsPDF {
@@ -54,11 +58,38 @@ interface FinanzasPanelProps {
 
 export function FinanzasPanel({ 
   serviciosFinalizados = [], 
-  ventasBoutique = [],
-  adelantos = [],
-  multas = []
+  ventasBoutique: _ventasBoutique = [],
+  adelantos: _adelantos = [],
+  multas: _multas = []
 }: FinanzasPanelProps) {
-  const [periodoComparativo, setPeriodoComparativo] = useState<'semana' | 'mes' | 'trimestre'>('mes');
+  const [periodoComparativo, _setPeriodoComparativo] = useState<'semana' | 'mes' | 'trimestre'>('mes');
+
+  // 🆕 Gastos reales desde Supabase (pagos a modelos)
+  const [gastosModelos, setGastosModelos] = useState<any[]>([]);
+  const [cargandoGastos, setCargandoGastos] = useState(true);
+
+  useEffect(() => {
+    const cargar = async () => {
+      const { data } = await supabase
+        .from('gastos')
+        .select('*')
+        .eq('categoria', 'pago_modelo')
+        .order('fecha', { ascending: false })
+        .limit(100);
+      setGastosModelos(data || []);
+      setCargandoGastos(false);
+    };
+    cargar();
+
+    // Realtime: actualizar cuando se inserten nuevos gastos
+    const ch = supabase
+      .channel('gastos-modelos-live')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'gastos' }, () => cargar())
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, []);
+
+  const totalPagosModelos = gastosModelos.reduce((s, g) => s + Number(g.monto || 0), 0);
 
   // Colores del tema
   const COLORS = {
@@ -505,7 +536,7 @@ export function FinanzasPanel({
 
       {/* Tabs de Visualizaciones */}
       <Tabs defaultValue="tendencias" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 bg-secondary">
+        <TabsList className="grid w-full grid-cols-5 bg-secondary">
           <TabsTrigger value="tendencias">
             <TrendingUp className="w-4 h-4 mr-2" />
             Tendencias
@@ -521,6 +552,10 @@ export function FinanzasPanel({
           <TabsTrigger value="modelos">
             <Users className="w-4 h-4 mr-2" />
             Por Modelo
+          </TabsTrigger>
+          <TabsTrigger value="pagos_modelos">
+            <DollarSign className="w-4 h-4 mr-2" />
+            Pagos a Modelos
           </TabsTrigger>
         </TabsList>
 
@@ -949,6 +984,77 @@ export function FinanzasPanel({
               </Card>
             ))}
           </div>
+        </TabsContent>
+        {/* Tab: Pagos a Modelos (Real-time) */}
+        <TabsContent value="pagos_modelos" className="space-y-4 mt-4">
+          <Card className="border-primary/20">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-xl text-primary">Historial de Pagos a Modelos</CardTitle>
+                <CardDescription>Pagos registrados automáticamente al finalizar servicios</CardDescription>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-muted-foreground uppercase">Total Pagado</p>
+                <p className="text-2xl font-bold text-primary">${totalPagosModelos.toLocaleString('es-CO')}</p>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {cargandoGastos ? (
+                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                  <Loader2 className="w-8 h-8 animate-spin mb-2" />
+                  <p>Cargando registros de pagos...</p>
+                </div>
+              ) : gastosModelos.length === 0 ? (
+                <div className="text-center py-12 border-2 border-dashed border-white/5 rounded-xl">
+                  <AlertCircle className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
+                  <p className="text-muted-foreground">No se han encontrado pagos registrados aún.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead>
+                      <tr className="border-b border-white/10 text-muted-foreground font-medium">
+                        <th className="px-4 py-3">Modelo</th>
+                        <th className="px-4 py-3">Descripción / Servicio</th>
+                        <th className="px-4 py-3 text-right">Monto Pagado</th>
+                        <th className="px-4 py-3 text-right">Fecha / Hora</th>
+                        <th className="px-4 py-3 text-center">Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {gastosModelos.map((gasto) => (
+                        <tr key={gasto.id} className="hover:bg-white/5 transition-colors">
+                          <td className="px-4 py-4 font-bold text-primary">
+                            {gasto.modelo_nombre || '—'}
+                          </td>
+                          <td className="px-4 py-4 text-white/80 max-w-[300px] truncate">
+                            {gasto.descripcion}
+                          </td>
+                          <td className="px-4 py-4 text-right font-mono font-bold text-green-400">
+                            ${Number(gasto.monto).toLocaleString('es-CO')}
+                          </td>
+                          <td className="px-4 py-4 text-right text-xs text-muted-foreground">
+                            {new Date(gasto.fecha).toLocaleString('es-CO', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </td>
+                          <td className="px-4 py-4 text-center">
+                            <Badge variant="outline" className="bg-green-500/10 text-green-400 border-green-500/20 text-[10px] py-0">
+                              <CheckCircle2 className="w-3 h-3 mr-1" /> PAGADO
+                            </Badge>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 

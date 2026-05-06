@@ -49,7 +49,7 @@ export interface Servicio {
   comprobantePago?: string;
   montoPagado?: number;
   propina?: number;
-  estado: 'activo' | 'completado' | 'cancelado' | 'no_show' | 'finalizado';
+  estado: 'pendiente' | 'confirmado' | 'aprobado' | 'en_curso' | 'activo' | 'completado' | 'cancelado' | 'no_show' | 'finalizado' | 'aceptado_programador' | 'solicitud_cliente' | 'creado_por_modelo';
   notasPreServicio?: string;
   notasPostServicio?: string;
   notasCierre?: string;
@@ -66,6 +66,7 @@ export interface Servicio {
   multaPagada?: boolean;
   fechaCreacion: string;
   creadoPor: string;
+  creadoPorRol?: string;
   agendamientoId: string;
   // Métricas financieras
   costoServicio?: number;
@@ -176,6 +177,7 @@ function rowToServicio(row: any): Servicio {
     multaPagada: row.multa_pagada ?? false,
     fechaCreacion: row.fecha_creacion ?? row.created_at ?? new Date().toISOString(),
     creadoPor: row.creado_por ?? 'sistema',
+    creadoPorRol: row.creado_por_rol,
     agendamientoId: row.agendamiento_id ?? '',
     costoServicio: row.monto_pactado ?? row.monto ?? 0,
     costoAdicionales: row.total_adicionales ?? 0,
@@ -228,8 +230,6 @@ export function ServiciosProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    cargarServicios();
-
     // ✅ REALTIME: recargar servicios ante cualquier cambio en agendamientos
     const channel = supabase
       .channel('servicios-agendamientos-rt')
@@ -401,7 +401,7 @@ export function ServiciosProvider({ children }: { children: ReactNode }) {
     await actualizarServicio(servicioId, {
       multaAplicada: true,
       montoMulta,
-      motivoMulta: `No-show. Multa: ${politicaPenalizacion.porcentajeMultaSobreTarifa}% o mínimo $${politicaPenalizacion.montoMultaBase.toLocaleString()}`,
+      motivoMulta: `No-show. Multa: ${politicaPenalizacion.porcentajeMultaSobreTarifa}% o mínimo $${(politicaPenalizacion.montoMultaBase || 0).toLocaleString()}`,
       multaPagada: false,
     });
   };

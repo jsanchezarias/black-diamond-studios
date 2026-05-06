@@ -1,12 +1,13 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '../../utils/supabase/info';
 import { configurarVerificacionPeriodica, AgendamientoParaRecordatorio } from './NotificacionesRecordatorios';
-import { notificarNuevoAgendamiento, notificarAgendamientoConfirmado, notificarProgramadores } from './NotificacionesHelpers';
+// import { notificarNuevoAgendamiento, notificarAgendamientoConfirmado, notificarProgramadores } from './NotificacionesHelpers';
 
 export interface Agendamiento {
   id: string;
   modeloEmail: string;
   modeloNombre: string;
+  modeloId?: string;
   clienteId: string;
   clienteNombre: string;
   clienteTelefono: string;
@@ -14,9 +15,10 @@ export interface Agendamiento {
   hora: string;
   duracionMinutos: number;
   tipoServicio: string;
-  estado: 'pendiente' | 'confirmado' | 'aprobado' | 'completado' | 'cancelado' | 'no_show';
+  estado: 'pendiente' | 'confirmado' | 'aprobado' | 'en_curso' | 'activo' | 'completado' | 'cancelado' | 'no_show' | 'finalizado' | 'aceptado_programador' | 'solicitud_cliente' | 'creado_por_modelo';
   notas?: string;
   creadoPor?: string;
+  creadoPorRol?: string;
   fechaCreacion?: string;
   motivoCancelacion?: string;
   canceladoPor?: string;
@@ -64,34 +66,42 @@ export const formatearHora = (hora: string) => {
 
 // Mapper: DB row (snake_case) → Agendamiento (camelCase)
 function rowToAgendamiento(row: any): Agendamiento {
-  return {
-    id: row.id,
-    modeloEmail: row.modelo_email ?? row.modeloEmail ?? '',
-    modeloNombre: row.modelo_nombre ?? row.modeloNombre ?? '',
-    clienteId: row.cliente_id ?? row.clienteId ?? '',
-    clienteNombre: row.cliente_nombre ?? row.clienteNombre ?? (row.clientes?.nombre ?? ''),
-    clienteTelefono: row.cliente_telefono ?? row.clienteTelefono ?? (row.clientes?.telefono ?? ''),
-    fecha: (row.fecha ? row.fecha.split('T')[0].split(' ')[0] : ''),
-    hora: row.hora ?? '',
-    duracionMinutos: row.duracion_minutos ?? row.duracion ?? row.duracionMinutos ?? 60,
-    tipoServicio: row.tipo_servicio ?? row.tipoServicio ?? 'sede',
-    estado: row.estado ?? 'pendiente',
-    notas: row.notas,
-    creadoPor: row.creado_por ?? row.creadoPor,
-    fechaCreacion: row.fecha_creacion ?? row.created_at,
-    motivoCancelacion: row.motivo_cancelacion ?? row.motivoCancelacion,
-    canceladoPor: row.cancelado_por ?? row.canceladoPor,
-    fechaCancelacion: row.fecha_cancelacion ?? row.fechaCancelacion,
-    montoPago: row.monto_pago ?? row.precio ?? row.montoPago ?? 0,
-    estadoPago: row.estado_pago ?? row.estadoPago ?? 'pendiente',
-    metodoPago: row.metodo_pago ?? row.metodoPago,
-    transaccionId: row.transaccion_id ?? row.transaccionId,
-    fechaPago: row.fecha_pago ?? row.fechaPago,
-    comprobantePago: row.comprobante_pago ?? row.comprobantePago,
-    tarifaNombre: row.tarifa_nombre ?? row.tarifaNombre ?? row.servicio,
-    tarifaDescripcion: row.tarifa_descripcion ?? row.tarifaDescripcion,
-    clienteRefId: row.cliente_ref_id ?? undefined,
-  };
+  if (!row) return {} as Agendamiento;
+  try {
+    return {
+      id: row.id,
+      modeloEmail: row.modelo_email ?? row.modeloEmail ?? '',
+      modeloNombre: row.modelo_nombre ?? row.modeloNombre ?? '',
+      modeloId: row.modelo_id ?? row.modeloId ?? '',
+      clienteId: row.cliente_id ?? row.clienteId ?? '',
+      clienteNombre: row.cliente_nombre ?? row.clienteNombre ?? (row.clientes?.nombre ?? ''),
+      clienteTelefono: row.cliente_telefono ?? row.clienteTelefono ?? (row.clientes?.telefono ?? ''),
+      fecha: (row.fecha ? (typeof row.fecha === 'string' ? row.fecha.split('T')[0].split(' ')[0] : String(row.fecha)) : ''),
+      hora: row.hora ?? '',
+      duracionMinutos: row.duracion_minutos ?? row.duracion ?? row.duracionMinutos ?? 60,
+      tipoServicio: row.tipo_servicio ?? row.tipoServicio ?? 'sede',
+      estado: row.estado ?? 'pendiente',
+      notas: row.notas,
+      creadoPor: row.creado_por ?? row.creadoPor,
+      creadoPorRol: row.creado_por_rol ?? row.creadoPorRol,
+      fechaCreacion: row.fecha_creacion ?? row.created_at,
+      motivoCancelacion: row.motivo_cancelacion ?? row.motivoCancelacion,
+      canceladoPor: row.cancelado_por ?? row.canceladoPor,
+      fechaCancelacion: row.fecha_cancelacion ?? row.fechaCancelacion,
+      montoPago: row.monto_pago ?? row.precio ?? row.montoPago ?? 0,
+      estadoPago: row.estado_pago ?? row.estadoPago ?? 'pendiente',
+      metodoPago: row.metodo_pago ?? row.metodoPago,
+      transaccionId: row.transaccion_id ?? row.transaccionId,
+      fechaPago: row.fecha_pago ?? row.fechaPago,
+      comprobantePago: row.comprobante_pago ?? row.comprobantePago,
+      tarifaNombre: row.tarifa_nombre ?? row.tarifaNombre ?? row.servicio,
+      tarifaDescripcion: row.tarifa_descripcion ?? row.tarifaDescripcion,
+      clienteRefId: row.cliente_ref_id ?? undefined,
+    };
+  } catch (e) {
+    console.error('❌ Error mapeando agendamiento:', e, row);
+    return { id: row?.id || 'error' } as Agendamiento;
+  }
 }
 
 // Mapper: Agendamiento → DB row (snake_case)
@@ -99,6 +109,7 @@ function agendamientoToRow(a: Partial<Agendamiento>): Record<string, any> {
   const row: Record<string, any> = {};
   if (a.modeloEmail !== undefined) row.modelo_email = a.modeloEmail;
   if (a.modeloNombre !== undefined) row.modelo_nombre = a.modeloNombre;
+  if (a.modeloId !== undefined) row.modelo_id = a.modeloId;
   if (a.clienteId !== undefined) row.cliente_id = a.clienteId;
   if (a.clienteNombre !== undefined) row.cliente_nombre = a.clienteNombre;
   if (a.clienteTelefono !== undefined) row.cliente_telefono = a.clienteTelefono;
@@ -112,6 +123,7 @@ function agendamientoToRow(a: Partial<Agendamiento>): Record<string, any> {
   if (a.estado !== undefined) row.estado = a.estado;
   if (a.notas !== undefined) row.notas = a.notas;
   if (a.creadoPor !== undefined) row.creado_por = a.creadoPor;
+  if (a.creadoPorRol !== undefined) row.creado_por_rol = a.creadoPorRol;
   if (a.motivoCancelacion !== undefined) row.motivo_cancelacion = a.motivoCancelacion;
   if (a.canceladoPor !== undefined) row.cancelado_por = a.canceladoPor;
   if (a.fechaCancelacion !== undefined) row.fecha_cancelacion = a.fechaCancelacion;
@@ -149,6 +161,7 @@ interface AgendamientosContextType {
   cambiarEstado: (id: string, nuevoEstado: Agendamiento['estado'], meta?: Partial<Agendamiento>) => Promise<void>;
   getAgendamientosHoy: () => Agendamiento[];
   getAgendamientosPendientesAprobacion: () => Agendamiento[];
+  terminarServicioCompleto: (id: string, notas?: string, montoTotalCosto?: number) => Promise<{ success: boolean; error?: any }>;
 }
 
 const AgendamientosContext = createContext<AgendamientosContextType | undefined>(undefined);
@@ -157,33 +170,41 @@ export function AgendamientosProvider({ children }: { children: ReactNode }) {
   const [agendamientos, setAgendamientos] = useState<Agendamiento[]>([]);
 
   useEffect(() => {
-    cargarAgendamientos();
-
-    // ✅ REALTIME: recargar agendamientos ante cualquier cambio (últimos 90 días)
+    // REALTIME: recargar agendamientos ante cualquier cambio
     const channel = supabase
       .channel('agendamientos-rt')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'agendamientos' }, (payload) => {
+        if (!payload.new) return;
         setAgendamientos(prev => {
           const nuevo = rowToAgendamiento(payload.new);
+          // Evitar duplicados
+          if (prev.some(a => a.id === nuevo.id)) return prev;
+          
           const actualizado = [...prev, nuevo];
           return actualizado.sort((a, b) => {
-            const fechaA = new Date(a.fecha + 'T' + (a.hora || '00:00'));
-            const fechaB = new Date(b.fecha + 'T' + (b.hora || '00:00'));
-            return fechaA.getTime() - fechaB.getTime();
+            try {
+              const fechaA = new Date((a.fecha || '2000-01-01') + 'T' + (a.hora || '00:00'));
+              const fechaB = new Date((b.fecha || '2000-01-01') + 'T' + (b.hora || '00:00'));
+              return fechaA.getTime() - fechaB.getTime();
+            } catch { return 0; }
           });
         });
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'agendamientos' }, (payload) => {
+        if (!payload.new) return;
         setAgendamientos(prev => {
           const actualizado = rowToAgendamiento(payload.new);
           return prev.map(a => a.id === actualizado.id ? actualizado : a).sort((a, b) => {
-            const fechaA = new Date(a.fecha + 'T' + (a.hora || '00:00'));
-            const fechaB = new Date(b.fecha + 'T' + (b.hora || '00:00'));
-            return fechaA.getTime() - fechaB.getTime();
+            try {
+              const fechaA = new Date((a.fecha || '2000-01-01') + 'T' + (a.hora || '00:00'));
+              const fechaB = new Date((b.fecha || '2000-01-01') + 'T' + (b.hora || '00:00'));
+              return fechaA.getTime() - fechaB.getTime();
+            } catch { return 0; }
           });
         });
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'agendamientos' }, (payload) => {
+        if (!payload.old?.id) return;
         setAgendamientos(prev => prev.filter(a => a.id !== payload.old.id));
       })
       .subscribe();
@@ -193,13 +214,21 @@ export function AgendamientosProvider({ children }: { children: ReactNode }) {
 
   const cargarAgendamientos = async () => {
     try {
-      // Cargar agendamientos de los últimos 90 días y futuros
+      // 1. Obtener sesión activa (si existe)
+      // const { data: { session } } = await supabase.auth.getSession();
+      await supabase.auth.getSession();
+      
+      // 💡 NOTA: Permitimos continuar sin sesión para que los clientes públicos
+      // puedan ver sus propios agendamientos (el RLS se encarga de la seguridad)
+
+      // 2. Cargar agendamientos de los últimos 90 días y futuros
       const fechaLimite = new Date();
       fechaLimite.setDate(fechaLimite.getDate() - 90);
       const { data, error } = await supabase
         .from('agendamientos')
         .select('*')
         .gte('fecha', fechaLimite.toISOString().split('T')[0])
+        .or('eliminado.is.null,eliminado.eq.false')
         .order('fecha', { ascending: true })
         .order('hora', { ascending: true })
         .limit(500);
@@ -243,30 +272,33 @@ export function AgendamientosProvider({ children }: { children: ReactNode }) {
         });
       });
 
-      // 🔔 Notificar a la modelo sobre el nuevo agendamiento
-      if (nuevo.modeloEmail) {
-        notificarNuevoAgendamiento({
-          modeloEmail: nuevo.modeloEmail,
-          modeloNombre: nuevo.modeloNombre,
-          clienteNombre: nuevo.clienteNombre,
-          fecha: nuevo.fecha,
-          hora: nuevo.hora,
-          duracion: nuevo.duracionMinutos,
-          tipoServicio: nuevo.tipoServicio,
-          agendamientoId: nuevo.id,
-        }).catch(() => { /* non-critical */ });
-      }
+      // 🔔 Notificar a los programadores
+      // Buscamos a los usuarios con rol programador para que les llegue la notificación
+      const { data: programadores } = await supabase
+        .from('usuarios')
+        .select('id')
+        .eq('role', 'programador');
 
-      // 🔔 Notificar a todos los programadores/admins
-      notificarProgramadores({
-        clienteNombre: nuevo.clienteNombre,
-        modeloNombre: nuevo.modeloNombre,
-        fecha: nuevo.fecha,
-        hora: nuevo.hora,
-        tipoServicio: nuevo.tipoServicio,
-        agendamientoId: nuevo.id,
-        duracion: nuevo.duracionMinutos,
-      }).catch(() => { /* non-critical */ });
+      if (programadores && programadores.length > 0) {
+        const notifications = programadores.map(p => ({
+          usuario_id: p.id,
+          para_rol: 'programador',
+          tipo: 'agendamiento_nuevo',
+          titulo: '📅 Nueva Reserva',
+          mensaje: `Nueva reserva de ${nuevo.clienteNombre} para el ${nuevo.fecha} ${nuevo.hora}`,
+          leida: false,
+          referencia_id: nuevo.id,
+          datos: {
+            agendamientoId: nuevo.id,
+            clienteNombre: nuevo.clienteNombre,
+            fecha: nuevo.fecha,
+            hora: nuevo.hora,
+            servicio: nuevo.tipoServicio
+          }
+        }));
+
+        await supabase.from('notificaciones').insert(notifications);
+      }
 
       return { success: true, data: nuevo };
     } catch (error) {
@@ -300,7 +332,7 @@ export function AgendamientosProvider({ children }: { children: ReactNode }) {
     try {
       const { error } = await supabase
         .from('agendamientos')
-        .delete()
+        .update({ eliminado: true, eliminado_en: new Date().toISOString() })
         .eq('id', id);
 
       if (error) {
@@ -384,15 +416,26 @@ export function AgendamientosProvider({ children }: { children: ReactNode }) {
       notas: `Aprobado por ${aprobadoPor} el ${new Date().toLocaleString('es-CO')}`,
     });
 
-    // 🔔 Notificar a la modelo que su agendamiento fue aprobado
+    // 🔔 Notificar a la modelo que su agendamiento fue aprobado (NUEVO FLUJO)
     const ag = agendamientos.find(a => a.id === id);
-    if (ag?.modeloEmail) {
-      notificarAgendamientoConfirmado({
-        modeloEmail: ag.modeloEmail,
-        clienteNombre: ag.clienteNombre,
-        fecha: ag.fecha,
-        hora: ag.hora,
-      }).catch(() => { /* non-critical */ });
+    if (ag) {
+      // Intentar obtener el ID del usuario modelo por su email
+      const { data: userData } = await supabase
+        .from('usuarios')
+        .select('id')
+        .eq('email', ag.modeloEmail)
+        .maybeSingle();
+
+      if (userData?.id) {
+        await supabase.from('notificaciones').insert({
+          para_usuario_id: userData.id,
+          tipo: 'reserva_aprobada',
+          titulo: '✅ Reserva Aprobada',
+          mensaje: `Tu reserva con ${ag.clienteNombre} para el ${ag.fecha} a las ${ag.hora} ha sido aprobada.`,
+          leida: false,
+          datos: { agendamientoId: id }
+        });
+      }
     }
   };
 
@@ -418,6 +461,69 @@ export function AgendamientosProvider({ children }: { children: ReactNode }) {
 
   const getAgendamientosPendientesAprobacion = (): Agendamiento[] => {
     return agendamientos.filter(a => a.estado === 'pendiente');
+  };
+
+  const terminarServicioCompleto = async (id: string, notas?: string, montoTotalCosto?: number): Promise<{ success: boolean; error?: any }> => {
+    try {
+      const ag = agendamientos.find(a => a.id === id);
+      if (!ag) throw new Error('Agendamiento no encontrado');
+
+      const horaFinActual = new Date().toISOString();
+
+      // 1. Actualizar Agendamiento
+      const resAg = await supabase
+        .from('agendamientos')
+        .update({
+          estado: 'completado',
+          hora_fin_real: horaFinActual,
+          notas: notas ? (ag.notas ? ag.notas + '\n\nNotas cierre: ' + notas : notas) : ag.notas
+        })
+        .eq('id', id);
+        
+      if (resAg.error) throw resAg.error;
+
+      // NOTA: Los pagos y las habitaciones son gestionados por admin/programador.
+      // El cambio de agendamiento a 'completado' dispara el trigger on_servicio_completado
+      // que notifica a admin/owner/contador automáticamente.
+
+      // 2. Obtener datos del modelo para registrar sus ganancias
+      const { data: userData } = await supabase
+        .from('usuarios')
+        .select('id, porcentaje_ganancia')
+        .eq('email', ag.modeloEmail)
+        .maybeSingle();
+
+      const modeloId = userData?.id ?? null;
+
+      // 3. Registrar Ganancias de la Modelo en 'gastos' (categoria 'pago_modelo')
+      if (modeloId) {
+        const montoBase = montoTotalCosto || ag.montoPago || 0;
+        // Fallback a 60% si no hay porcentaje configurado
+        const porcentaje = (userData as any)?.porcentaje_ganancia || 60;
+        const montoModelo = (montoBase * porcentaje) / 100;
+
+        await supabase
+          .from('gastos')
+          .insert({
+            categoria: 'pago_modelo',
+            descripcion: `Pago de servicio completado - ${ag.tipoServicio} - ${ag.clienteNombre}`,
+            monto: montoModelo,
+            fecha: horaFinActual,
+            agendamiento_id: id,
+            modelo_id: modeloId,
+            modelo_nombre: ag.modeloNombre,
+            created_by: modeloId
+          });
+      }
+
+      // Actualizar estado local
+      setAgendamientos(prev => prev.map(a => a.id === id ? { ...a, estado: 'completado' } : a));
+
+      return { success: true };
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') console.error('❌ Error en terminarServicioCompleto:', error);
+      return { success: false, error };
+    }
   };
 
   // Recordatorios automáticos
@@ -457,6 +563,7 @@ export function AgendamientosProvider({ children }: { children: ReactNode }) {
         cambiarEstado,
         getAgendamientosHoy,
         getAgendamientosPendientesAprobacion,
+        terminarServicioCompleto,
       }}
     >
       {children}
@@ -483,6 +590,7 @@ export function useAgendamientos() {
       cambiarEstado: async () => {},
       getAgendamientosHoy: () => [],
       getAgendamientosPendientesAprobacion: () => [],
+      terminarServicioCompleto: async () => ({ success: false, error: 'Provider no disponible' }),
     } as AgendamientosContextType;
   }
   return context;

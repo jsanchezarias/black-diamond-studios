@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../utils/supabase/info';
+import { translateSupabaseError } from '../../utils/supabase/errors';
 import { toast } from 'sonner';
 
 interface SolicitudServicioModalProps {
@@ -83,11 +84,11 @@ export function SolicitudServicioModal({ isOpen, onClose, data, currentUser }: S
         .from('usuarios')
         .select('nombre, email')
         .eq('id', currentUser.id)
-        .single();
+        .maybeSingle();
 
-      const { data: clienteInfo } = await supabase
+      let { data: clienteInfo } = await supabase
         .from('clientes')
-        .select('nombre, telefono')
+        .select('id, nombre, telefono')
         .eq('user_id', currentUser.id)
         .maybeSingle();
 
@@ -96,8 +97,33 @@ export function SolicitudServicioModal({ isOpen, onClose, data, currentUser }: S
         || perfilCliente?.email?.split('@')[0]
         || 'Cliente';
 
+      // 1. CREAR CLIENTE SI NO EXISTE
+      let cliente_id_final = clienteInfo?.id;
+      if (!cliente_id_final) {
+        const telefonoPlaceholder = 'NR-' + Math.floor(Math.random() * 1000000000);
+        const { data: newCliente, error: errCliente } = await supabase
+          .from('clientes')
+          .insert({
+             user_id: currentUser.id,
+             nombre: nombreCliente,
+             email: perfilCliente?.email || currentUser.email,
+             telefono: telefonoPlaceholder,
+             nombre_usuario: nombreCliente.toLowerCase().replace(/\s+/g, '') + Math.floor(Math.random() * 1000)
+          })
+          .select('id, telefono')
+          .single();
+        
+        if (!errCliente && newCliente) {
+          cliente_id_final = newCliente.id;
+          clienteInfo = { id: newCliente.id, nombre: nombreCliente, telefono: newCliente.telefono } as any;
+        } else {
+          cliente_id_final = currentUser.id;
+        }
+      }
+
       const modeloIdValido = modelo.id && String(modelo.id).includes('-') ? modelo.id : null;
-      const clienteIdValido = currentUser.id && String(currentUser.id).includes('-') ? currentUser.id : null;
+      // 2. USAR EL ID DEL CLIENTE CORRECTO
+      const clienteIdValido = cliente_id_final && String(cliente_id_final).includes('-') ? cliente_id_final : null;
 
       const insertData = {
           cliente_id: clienteIdValido,
@@ -122,8 +148,6 @@ export function SolicitudServicioModal({ isOpen, onClose, data, currentUser }: S
           updated_at: new Date().toISOString()
       };
 
-      console.log('INSERT DATA:', insertData);
-
       const { data: agendamiento, error } = await supabase
         .from('agendamientos')
         .insert(insertData)
@@ -131,10 +155,24 @@ export function SolicitudServicioModal({ isOpen, onClose, data, currentUser }: S
         .single();
 
       if (error) {
-        console.error('ERROR INSERT:', error.message, error.code, error.details);
-        toast.error('Error al enviar: ' + error.message);
+        if (process.env.NODE_ENV === 'development') console.error('ERROR INSERT:', error.message, error.code, error.details);
+        toast.error(translateSupabaseError(error));
         setLoading(false);
         return;
+      }
+
+      // 3. INICIALIZAR TABLA DE PAGOS
+      try {
+        await supabase.from('pagos').insert({
+          agendamiento_id: agendamiento.id,
+          monto: precioActual,
+          metodo_pago: 'pendiente',
+          estado: 'pendiente',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+      } catch (err) {
+        if (process.env.NODE_ENV === 'development') console.error('Error creando pago:', err);
       }
 
       // Notificar al programador
@@ -182,15 +220,15 @@ export function SolicitudServicioModal({ isOpen, onClose, data, currentUser }: S
           await supabase.from('notificaciones').insert(notificaciones);
         }
       } catch (err) {
-        console.error('Error enviando notificaciones:', err);
+        if (process.env.NODE_ENV === 'development') console.error('Error enviando notificaciones:', err);
       }
 
       toast.success('✅ Reserva enviada. Tu programador la confirmará pronto.');
       onClose();
       setLoading(false);
     } catch (err: any) {
-      console.error('Error general:', err);
-      toast.error('Error al enviar la reserva.');
+      if (process.env.NODE_ENV === 'development') console.error('Error general:', err);
+      toast.error(translateSupabaseError(err));
       setLoading(false);
     }
   };
@@ -329,9 +367,10 @@ export function SolicitudServicioModal({ isOpen, onClose, data, currentUser }: S
             onChange={(e) => setFecha(e.target.value)}
             style={{
               width: '100%', padding: '10px 12px', borderRadius: 8,
-              background: 'rgba(255,255,255,0.05)',
-              border: '0.5px solid rgba(255,255,255,0.15)',
-              color: 'white', fontSize: 13, boxSizing: 'border-box'
+              background: '#1a1a1a',
+              border: '1.5px solid rgba(255,215,0,0.2)',
+              color: 'white', fontSize: 13, boxSizing: 'border-box',
+              colorScheme: 'dark'
             }}
           />
           {fecha && (
@@ -355,9 +394,9 @@ export function SolicitudServicioModal({ isOpen, onClose, data, currentUser }: S
                 onClick={() => setHora(h)}
                 style={{
                   padding: '9px 4px', borderRadius: 6, cursor: 'pointer',
-                  border: hora === h ? '1.5px solid #FFD700' : '0.5px solid rgba(255,255,255,0.1)',
-                  background: hora === h ? 'rgba(255,215,0,0.15)' : 'rgba(255,255,255,0.03)',
-                  color: hora === h ? '#FFD700' : 'rgba(255,255,255,0.6)',
+                  border: hora === h ? '1.5px solid #FFD700 !important' : '1px solid rgba(255,255,255,0.1) !important',
+                  background: hora === h ? 'rgba(255,215,0,0.25) !important' : '#1a1a1a !important',
+                  color: hora === h ? '#FFD700 !important' : 'white !important',
                   fontWeight: hora === h ? 700 : 400, fontSize: 12
                 }}
               >

@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '../../utils/supabase/info';
-import { createClient } from '@supabase/supabase-js';
+// import { createClient } from '@supabase/supabase-js';
 import { CacheSystem } from '../../utils/cache';
 
 // Interfaz de modelo con campos de archivo
@@ -30,6 +30,7 @@ export interface Modelo {
   disponible: boolean; // ✅ Campo para indicar si la modelo está disponible en el momento
   domicilio: boolean; // ✅ NUEVO: Campo para indicar si presta servicio a domicilio
   politicaTarifa?: number; // ✅ NUEVO: Política de tarifa asignada (1, 2, 3, etc.)
+  porcentajeComision?: number; // % de comisión para la modelo
   servicios: number;
   ingresos: number;
   fechaArchivado?: string;
@@ -93,7 +94,7 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
     
     const inicializar = async () => {
       // 1. Intentar cargar desde caché para visualización instantánea
-      const cacheData = CacheSystem.get<{activos: Modelo[], archivados: Modelo[]}>('modelos_v2');
+      const cacheData = CacheSystem.get<{activos: Modelo[], archivados: Modelo[]}>('modelos_v3');
       if (cacheData && isMounted) {
         setModelos(cacheData.activos);
         setModelosArchivadas(cacheData.archivados);
@@ -120,7 +121,8 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
           filter: "role=eq.modelo"
         },
         () => {
-          // Si hay algún cambio, recargamos la lista
+          // Si hay algún cambio, invalidar caché y recargar desde BD
+          CacheSystem.clear('modelos_v3');
           cargarModelos();
         }
       )
@@ -132,6 +134,7 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
           table: 'modelo_fotos'
         },
         () => {
+          CacheSystem.clear('modelos_v3');
           cargarModelos();
         }
       )
@@ -227,10 +230,11 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
           } else if (todosServicios && todosServicios.length > 0) {
             // Agrupar servicios por política
             todosServicios.forEach(servicio => {
-              if (!politicasConServicios.has(servicio.politica_id)) {
-                politicasConServicios.set(servicio.politica_id, []);
+              const pid = Number(servicio.politica_id);
+              if (!politicasConServicios.has(pid)) {
+                politicasConServicios.set(pid, []);
               }
-              politicasConServicios.get(servicio.politica_id)!.push(servicio);
+              politicasConServicios.get(pid)!.push(servicio);
             });
             
           }
@@ -244,15 +248,16 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
           // Solo loguear información crítica, no cada campo de cada usuario
           
           // ✅ Obtener la política tarifaria de esta modelo
-          const politicaTarifaId = usuario.politica_tarifa || 2; // Default: Estándar
+          const rawPoliticaId = usuario.politica_tarifa || usuario.politicaTarifa;
+          const politicaTarifaId = rawPoliticaId ? Number(rawPoliticaId) : 2; // Default: Estándar
           const serviciosPolitica = politicasConServicios.get(politicaTarifaId) || [];
           
           // Formatear servicios al formato de la landing page
           const serviciosFormateados = serviciosPolitica.map(s => ({
             name: s.nombre,
             duration: s.duracion,
-            price: s.precio_sede.toLocaleString('es-CO'),
-            priceHome: s.precio_domicilio ? s.precio_domicilio.toLocaleString('es-CO') : undefined,
+            price: (s.precio_sede || 0).toLocaleString('es-CO'),
+            priceHome: s.precio_domicilio ? (s.precio_domicilio || 0).toLocaleString('es-CO') : undefined,
             description: s.descripcion || ''
           }));
           
@@ -305,10 +310,10 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
         setModelosArchivadas(modelosArchivados);
 
         // ✅ NUEVO: Guardar en caché para futuras cargas instantáneas
-        CacheSystem.set('modelos_v2', {
+        CacheSystem.set('modelos_v3', {
           activos: modelosActivos,
           archivados: modelosArchivados
-        }, 120); // Caché por 2 horas
+        }, 10); // ✅ Caché por 10 minutos (era 2 horas — causaba que modelos nuevas no aparecieran)
 
       } else {
         setModelos([]);
@@ -343,26 +348,25 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
     if (!modelo) return;
 
     try {
-      // 1. Eliminar de la tabla usuarios
+      // Archivar en vez de borrar — preserva historial de pagos y agendamientos
       const { error: dbError } = await supabase
         .from('usuarios')
-        .delete()
+        .update({
+          estado: 'archivado',
+          fecha_archivado: new Date().toISOString(),
+        })
         .eq('email', modelo.email)
         .eq('role', 'modelo');
 
       if (dbError) {
-        if (process.env.NODE_ENV === 'development') console.error('❌ Error eliminando de tabla usuarios:', dbError);
+        if (process.env.NODE_ENV === 'development') console.error('❌ Error archivando modelo:', dbError);
         throw dbError;
       }
 
-      // 2. Eliminar de Auth (requiere admin)
-      // Nota: La eliminación de Auth debe hacerse desde el servidor
-      // Por ahora solo eliminamos de la tabla
-
-      // 3. Actualizar estado local
+      // Actualizar estado local
       setModelos(prev => prev.filter(m => m.id !== id));
     } catch (error) {
-      if (process.env.NODE_ENV === 'development') console.error('❌ Error eliminando modelo:', error);
+      if (process.env.NODE_ENV === 'development') console.error('❌ Error archivando modelo:', error);
       throw error;
     }
   };
@@ -439,14 +443,7 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
     if (!modelo) return;
 
     try {
-      // Obtener sesión actual para usar el token del admin autenticado
-      const { data: { session } } = await supabase.auth.getSession();
-
-      if (!session) {
-        throw new Error('No hay sesión activa');
-      }
-
-      // ✅ PASO 1: Obtener el usuario de Auth para tener su ID
+      // PASO 1: Obtener el UUID del usuario en la tabla pública
       const { data: usuarioDB } = await supabase
         .from('usuarios')
         .select('id')
@@ -454,76 +451,92 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
         .eq('role', 'modelo')
         .single();
 
-      if (!usuarioDB) {
-        throw new Error('Usuario no encontrado en BD');
-      }
+      if (!usuarioDB) throw new Error('Usuario no encontrado en BD');
 
-      const authUserId = usuarioDB.id;
+      const targetUserId = usuarioDB.id;
 
-      // ✅ PASO 2: Actualizar Auth si cambia email o contraseña
+      // PASO 2: Separar authData (email/pass) de publicData (resto de campos)
+      const authData: Record<string, string> = {};
+      const publicData: Record<string, any> = {};
+
       const cambioEmail = datos.email && datos.email !== modelo.email;
       const cambioPassword = datos.password && datos.password !== modelo.password;
+      if (cambioEmail) authData.email = datos.email!;
+      if (cambioPassword) authData.password = datos.password!;
 
-      if (cambioEmail || cambioPassword) {
-        const authUpdateData: any = {};
-        if (cambioEmail) authUpdateData.email = datos.email;
-        if (cambioPassword) authUpdateData.password = datos.password;
-
-        const { error: authError } = await supabase.auth.admin.updateUserById(
-          authUserId,
-          authUpdateData
-        );
-
-        if (authError) {
-          if (process.env.NODE_ENV === 'development') console.error('❌ Error actualizando Auth:', authError);
-          throw authError;
-        }
+      if (datos.nombre !== undefined) publicData.nombre = datos.nombre;
+      if (datos.nombreArtistico !== undefined) publicData.nombreArtistico = datos.nombreArtistico;
+      if (datos.cedula !== undefined) publicData.cedula = datos.cedula;
+      if (datos.telefono !== undefined) publicData.telefono = datos.telefono;
+      if (datos.direccion !== undefined) publicData.direccion = datos.direccion;
+      if (datos.fotoPerfil !== undefined) publicData.fotoPerfil = datos.fotoPerfil;
+      if (datos.fotosAdicionales !== undefined) publicData.fotosAdicionales = datos.fotosAdicionales;
+      if (datos.documentoFrente !== undefined) publicData.documento_frente = datos.documentoFrente;
+      if (datos.documentoReverso !== undefined) publicData.documento_reverso = datos.documentoReverso;
+      if (datos.documento_tipo !== undefined) publicData.documento_tipo = datos.documento_tipo;
+      if (datos.documento_numero !== undefined) publicData.documento_numero = datos.documento_numero;
+      if (datos.documento_verificado !== undefined) publicData.documento_verificado = datos.documento_verificado;
+      if (datos.documento_fecha_subida !== undefined) publicData.documento_fecha_subida = datos.documento_fecha_subida;
+      if (datos.edad !== undefined) publicData.edad = datos.edad;
+      if (datos.altura !== undefined) publicData.altura = datos.altura;
+      if (datos.medidas !== undefined) publicData.medidas = datos.medidas;
+      if (datos.descripcion !== undefined) publicData.descripcion = datos.descripcion;
+      if (datos.sede !== undefined) publicData.sede = datos.sede;
+      if (datos.videos !== undefined) publicData.videos = datos.videos;
+      if (datos.activa !== undefined) {
+        publicData.estado = datos.activa ? 'activo' : 'inactivo';
+      } else if (cambioEmail) {
+        // ✅ REQUERIMIENTO: Si se cambia el correo, habilitar de una vez el dashboard
+        publicData.estado = 'activo';
       }
       
-      // ✅ PASO 3: Preparar datos para BD (camelCase)
-      const datosSupabase: any = {};
-      
-      if (datos.nombre !== undefined) datosSupabase.nombre = datos.nombre;
-      if (datos.nombreArtistico !== undefined) datosSupabase.nombreArtistico = datos.nombreArtistico;
-      if (datos.cedula !== undefined) datosSupabase.cedula = datos.cedula;
-      if (datos.telefono !== undefined) datosSupabase.telefono = datos.telefono;
-      if (datos.direccion !== undefined) datosSupabase.direccion = datos.direccion;
-      if (datos.email !== undefined) datosSupabase.email = datos.email; // ✅ Actualizar email en BD también
-      if (datos.fotoPerfil !== undefined) datosSupabase.fotoPerfil = datos.fotoPerfil;
-      if (datos.fotosAdicionales !== undefined) datosSupabase.fotosAdicionales = datos.fotosAdicionales;
-      // ✅ Campos de documentos de identidad
-      if (datos.documentoFrente !== undefined) datosSupabase.documento_frente = datos.documentoFrente;
-      if (datos.documentoReverso !== undefined) datosSupabase.documento_reverso = datos.documentoReverso;
-      if (datos.documento_tipo !== undefined) datosSupabase.documento_tipo = datos.documento_tipo;
-      if (datos.documento_numero !== undefined) datosSupabase.documento_numero = datos.documento_numero;
-      if (datos.documento_verificado !== undefined) datosSupabase.documento_verificado = datos.documento_verificado;
-      if (datos.documento_fecha_subida !== undefined) datosSupabase.documento_fecha_subida = datos.documento_fecha_subida;
-      if (datos.edad !== undefined) datosSupabase.edad = datos.edad;
-      if (datos.altura !== undefined) datosSupabase.altura = datos.altura;
-      if (datos.medidas !== undefined) datosSupabase.medidas = datos.medidas;
-      if (datos.descripcion !== undefined) datosSupabase.descripcion = datos.descripcion;
-      if (datos.sede !== undefined) datosSupabase.sede = datos.sede;
-      if (datos.videos !== undefined) datosSupabase.videos = datos.videos;
-      if (datos.activa !== undefined) datosSupabase.estado = datos.activa ? 'activo' : 'inactivo';
-      if (datos.disponible !== undefined) datosSupabase.disponible = datos.disponible; // ✅ NUEVO
-      if (datos.domicilio !== undefined) datosSupabase.domicilio = datos.domicilio;
-      if (datos.politicaTarifa !== undefined) datosSupabase.politica_tarifa = datos.politicaTarifa; // ✅ CORREGIDO: snake_case para BD
-      
-      // ✅ PASO 4: Actualizar en BD usando ID (más seguro que email)
-      const { error: dbError } = await supabase
-        .from('usuarios')
-        .update(datosSupabase)
-        .eq('id', authUserId)
-        .eq('role', 'modelo');
+      if (datos.disponible !== undefined) publicData.disponible = datos.disponible;
+      if (datos.domicilio !== undefined) publicData.domicilio = datos.domicilio;
+      if (datos.politicaTarifa !== undefined) publicData.politica_tarifa = datos.politicaTarifa;
+      if (datos.porcentajeComision !== undefined) publicData.porcentaje_comision = datos.porcentajeComision;
 
-      if (dbError) {
-        if (process.env.NODE_ENV === 'development') console.error('❌ Error actualizando en BD:', dbError);
-        throw dbError;
+      // Asegurar que el rol se mantenga como modelo
+      publicData.role = 'modelo';
+
+      // PASO 3: Llamar Edge Function admin-update-user (usa service_role, bypass RLS)
+      // IMPORTANTE: Refrescar la sesión para garantizar que el access_token no esté expirado
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+      const session = refreshData?.session;
+      
+      if (refreshError || !session) {
+        // Fallback: intentar con sesión actual si el refresh falla
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        if (!currentSession) throw new Error('No hay sesión activa. Por favor cierra sesión y vuelve a entrar.');
       }
+      
+      const accessToken = session?.access_token || (await supabase.auth.getSession()).data.session?.access_token;
+      if (!accessToken) throw new Error('No se pudo obtener el token de autenticación.');
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🎫 Token enviado (primeros 20 chars):', accessToken.substring(0, 20) + '...');
+      }
+
+      const response = await fetch('https://kzdjravwcjummegxxrkd.supabase.co/functions/v1/admin-update-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ targetUserId, authData, publicData }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        console.error('❌ Error en Edge Function:', result);
+        throw new Error(result.error || result.message || `Error del servidor (${response.status})`);
+      }
+
+      console.log('✅ Usuario actualizado exitosamente vía Edge Function');
 
       // Actualizar estado local
       setModelos(prev => prev.map(m => (m.id === id ? { ...m, ...datos } : m)));
-    } catch (error) {
+    } catch (error: any) {
       if (process.env.NODE_ENV === 'development') console.error('❌ Error actualizando modelo:', error);
       throw error;
     }

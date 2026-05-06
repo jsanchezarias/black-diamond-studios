@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { useAgendamientos, Agendamiento } from '../app/components/AgendamientosContext';
 import { useClientes } from '../app/components/ClientesContext';
 import { Logo } from '../app/components/Logo';
@@ -109,8 +110,8 @@ export function CancelarAgendamientoModal({
       setTimeout(() => {
         handleClose();
       }, 2000);
-    } catch (error) {
-      if (process.env.NODE_ENV === 'development') console.error('Error al procesar agendamiento:', error);
+    } catch (error: any) {
+      toast.error('Ocurrió un error inesperado', { description: error instanceof Error ? error.message : String(error) });
       setError('Error al procesar la solicitud. Intenta nuevamente.');
       setLoading(false);
     }

@@ -12,6 +12,25 @@ export function VideoShowcase() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Hooks SIEMPRE antes de cualquier return condicional — regla de hooks de React
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.load();
+      videoRef.current.play().catch(err => {
+        if (process.env.NODE_ENV === 'development') console.log('Autoplay prevented:', err);
+        setIsPlaying(false);
+      });
+    }
+  }, [currentVideoIndex]);
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+
   const currentVideo = videosActivos[currentVideoIndex];
 
   // Si no hay videos activos, no mostrar nada
@@ -68,30 +87,6 @@ export function VideoShowcase() {
       setShowControls(false);
     }, 3000);
   };
-
-  // ============================================
-  // 🔄 EFECTOS
-  // ============================================
-
-  // Autoplay cuando cambia el video
-  useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.load();
-      videoRef.current.play().catch(err => {
-        if (process.env.NODE_ENV === 'development') console.log('Autoplay prevented:', err);
-        setIsPlaying(false);
-      });
-    }
-  }, [currentVideoIndex]);
-
-  // Limpiar timeout al desmontar
-  useEffect(() => {
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, []);
 
   return (
     <section className="relative w-full h-screen overflow-hidden bg-black">

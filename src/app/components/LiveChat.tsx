@@ -12,7 +12,7 @@ interface LiveChatProps {
 }
 
 export function LiveChat({ onTipClick, recentTips = [], onLoginClick }: LiveChatProps) {
-  const { currentUser, logout, sendMessage, getVisibleMessages, onlineUsers, logoutRef } = usePublicUsers();
+  const { currentUser, sendMessage, getVisibleMessages, onlineUsers, logoutRef } = usePublicUsers();
   const [messageInput, setMessageInput] = useState('');
 
   const messagesEndRef = useRef<HTMLDivElement>(null);

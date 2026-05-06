@@ -2,7 +2,7 @@ import { toast } from 'sonner';
 import { X, DollarSign, Gem, Heart, Star, Zap, Crown, Sparkles, CreditCard, Building2 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent } from '../../components/ui/card';
-import { Badge } from '../../components/ui/badge';
+// import { Badge } from '../../components/ui/badge';
 import { useState } from 'react';
 
 interface TipModalProps {
@@ -31,7 +31,7 @@ const quickMessages = [
   '¡Gracias por todo! 💖',
 ];
 
-export function TipModal({ isOpen, onClose, onSendTip, modelName, userPhone }: TipModalProps) {
+export function TipModal({ isOpen, onClose, onSendTip, modelName, userPhone: _userPhone }: TipModalProps) {
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState('');
   const [message, setMessage] = useState('');

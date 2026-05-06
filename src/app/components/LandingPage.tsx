@@ -17,7 +17,7 @@ import { ParticlesBackground } from './ParticlesBackground'; // ✅ Fondo de par
 import { GoldenCursor } from './GoldenCursor'; // ✅ Cursor personalizado dorado
 import { ScrollUI } from './ScrollUI'; // ✅ Barra de progreso y back-to-top
 import { HeroStats } from './HeroStats'; // ✅ Estadísticas de impacto visual
-import { Gem, Calendar, Clock, MapPin, Shield, Award, Star, ChevronRight, Menu as MenuIcon, X, User as UserIcon, Phone, Mail, MessageSquare, Instagram, Twitter, Facebook, Sparkles, Crown, Globe, Heart, Send, LogOut } from 'lucide-react'; // ✅ Consolidar todos los icons
+import { Gem, Clock, MapPin, Shield, Award, Star, X, User as UserIcon, Phone, Mail, Sparkles, Heart, Send, LogOut } from 'lucide-react';
 import { useLanguage } from './LanguageContext';
 import { LanguageSelector } from './LanguageSelector';
 import { sedes } from './sedesData';
@@ -26,7 +26,6 @@ import { TipModal } from './TipModal';
 import { usePublicUsers } from './PublicUsersContext';
 import { useModelos } from './ModelosContext';
 import { supabase } from '../../utils/supabase/info';
-import { PerfilModeloPublico } from './PerfilModeloPublico';
 
 
 // ✅ Agregar tipos necesarios
@@ -56,9 +55,10 @@ function TipNotificationsContainer({ tips, onRemoveTip }: { tips: TipData[], onR
 interface LandingPageProps {
   onAccessSystem: () => void;
   currentUser?: { id: string; email: string; nombre?: string; role?: string } | null;
+  onLoginSuccess?: (accessToken: string, userId: string, email: string, role: string) => void;
 }
 
-export function LandingPage({ onAccessSystem, currentUser: currentUserProp }: LandingPageProps) {
+export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLoginSuccess }: LandingPageProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
   const [sedeActual, setSedeActual] = useState('sede-1');
@@ -87,19 +87,21 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp }: La
   // Estado para Solicitud de Servicio
   const [solicitudData, setSolicitudData] = useState<{model: any, service?: any, location?: 'sede' | 'domicilio', price?: string} | null>(null);
 
-  const { currentUser, logout, logoutRef, sendMessage } = usePublicUsers(); // ✅ Agregar logoutRef del contexto
+  const [streamActivo, setStreamActivo] = useState(false);
+
+  const { currentUser: chatUser, logout, logoutRef, sendMessage } = usePublicUsers(); // ✅ Renombrado para evitar conflicto
 
   // ============================================
-  // 🆕 SINCRONIZAR clienteActual con currentUser del chat
+  // 🆕 SINCRONIZAR clienteActual con chatUser del chat
   // ============================================
   useEffect(() => {
-    if (currentUser) {
+    if (chatUser) {
       // Solo actualizar si el ID cambió o no hay clienteActual
-      if (!clienteActual || clienteActual.id !== currentUser.id) {
+      if (!clienteActual || clienteActual.id !== chatUser.id) {
         setClienteActual({
-          id: currentUser.id,
-          nombre: currentUser.username,
-          telefono: currentUser.telefono
+          id: chatUser.id,
+          nombre: chatUser.username,
+          telefono: chatUser.telefono
         });
       }
     } else {
@@ -108,8 +110,23 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp }: La
         setClienteActual(null);
       }
     }
-  }, [currentUser]); // Eliminar clienteActual de las dependencias
-  
+  }, [chatUser]); // Eliminar clienteActual de las dependencias
+
+  // Verifica si hay transmisión activa — oculta el hero del stream cuando no hay stream
+  useEffect(() => {
+    const checkStream = async () => {
+      try {
+        const { data } = await supabase.from('stream_configs').select('is_live').eq('is_live', true).limit(1);
+        setStreamActivo(!!(data && data.length > 0));
+      } catch {
+        setStreamActivo(false);
+      }
+    };
+    checkStream();
+    const interval = setInterval(checkStream, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   // Hook para modelos desde Supabase
   const { modelos: modelosSupabase } = useModelos();
   
@@ -345,7 +362,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp }: La
 
 
   const handleContactModel = (model: any, service?: any, location?: 'sede' | 'domicilio', price?: string) => {
-    if (!currentUser) {
+    if (!currentUserProp) {
       toast.error('Por favor, inicia sesión para solicitar un servicio.');
       setShowClienteLogin(true);
       return;
@@ -357,7 +374,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp }: La
 
   // Handler para abrir modal de propinas
   const handleTipClick = () => {
-    if (!currentUser) {
+    if (!currentUserProp) {
       toast.error('Por favor inicia sesión para enviar propinas');
       return;
     }
@@ -365,26 +382,28 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp }: La
   };
 
   // Handler para enviar propina
-  const handleSendTip = async (amount: number, message: string, paymentMethod: 'payu' | 'pse') => {
-    if (!currentUser) return;
+  const handleSendTip = async (amount: number, message: string, _paymentMethod: 'payu' | 'pse') => {
+    if (!currentUserProp) return;
 
     try {
 
       // 🆕 INTEGRACIÓN CON PAYU/PSE
       // Crear referencia de pago única
-      const referenciaPago = `TIP-${currentUser.id}-${Date.now()}`;
+      const referenciaPago = `TIP-${currentUserProp.id}-${Date.now()}`;
       
       // Preparar datos de la transacción
+      /*
       const transaccionData = {
-        cliente_id: currentUser.id,
+        cliente_id: currentUserProp.id,
         monto: amount,
-        metodo_pago: paymentMethod,
+        metodo_pago: _paymentMethod,
         referencia: referenciaPago,
         mensaje: message,
         tipo: 'propina',
         estado: 'pendiente',
         created_at: new Date().toISOString()
       };
+      */
 
       // TODO: Implementar integración real con PayU/PSE
       // Por ahora simulamos el pago exitoso
@@ -394,7 +413,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp }: La
 
       const newTip: TipData = {
         id: Date.now().toString(),
-        username: currentUser.username,
+        username: chatUser?.username || 'Invitado',
         amount,
         message,
         timestamp: Date.now(),
@@ -407,7 +426,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp }: La
       setRecentTips([
         ...recentTips,
         {
-          username: currentUser.username,
+          username: chatUser?.username || 'Invitado',
           amount,
           timestamp: Date.now(),
         },
@@ -435,12 +454,13 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp }: La
         />
       )}
 
-      {/* Navigation */}
-      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        isScrolled 
-          ? 'bg-card/90 backdrop-blur-md border-b border-primary/20 shadow-premium py-1' 
-          : 'bg-transparent border-b border-transparent py-3'
-      }`}>
+      {/* Navigation - Solo mostrar si NO hay un usuario del sistema logueado (el dashboard provee su propio nav) */}
+      {!currentUserProp && (
+        <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+          isScrolled 
+            ? 'bg-card/90 backdrop-blur-md border-b border-primary/20 shadow-premium py-1' 
+            : 'bg-transparent border-b border-transparent py-3'
+        }`}>
         <div className="container mx-auto px-3 sm:px-4 lg:px-6">
           <div className="flex items-center justify-between gap-2 sm:gap-4">
             {/* Logo - Responsive size */}
@@ -645,13 +665,13 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp }: La
           </div>
         </div>
       </nav>
+      )}
 
       {/* Video Showcase Section - Full Screen Hero */}
       <VideoShowcase />
 
-      {/* Live Stream Hero Section — con partículas premium */}
+      {/* Live Stream Hero Section — siempre visible */}
       <section id="inicio" className="pt-16 relative overflow-hidden">
-        {/* 🌟 Partículas doradas de alta densidad en el hero */}
         <ParticlesBackground
           density="high"
           showConnections={true}
@@ -660,19 +680,16 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp }: La
           className="opacity-70"
         />
         <div className="w-full h-[calc(100vh-4rem)] flex flex-col lg:flex-row relative" style={{ zIndex: 1 }}>
-          {/* Video Stream - Ocupa 70% en desktop, reducido en mobile para dar más espacio al chat */}
           <div className="w-full lg:w-[70%] h-[40vh] lg:h-full relative">
-            <BoutiqueStreamPlayer 
+            <BoutiqueStreamPlayer
               modelId="hq-stream"
               modelName="Black Diamond"
               onTimeExpired={() => setShowAppointmentModal(true)}
               onTipClick={handleTipClick}
             />
           </div>
-
-          {/* Live Chat - Ocupa 30% en desktop, mayor espacio en mobile (60vh) */}
           <div className="w-full lg:w-[30%] h-[60vh] lg:h-full">
-            <LiveChat 
+            <LiveChat
               onTipClick={handleTipClick}
               recentTips={recentTips}
               onLoginClick={() => setShowClienteLogin(true)}
@@ -853,7 +870,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp }: La
           {/* Modelos Disponibles - Grid Vertical */}
           <div className="mb-8">
             <h3 className="text-2xl font-bold mb-6 text-center" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-              💎 {t.models.available} en {sedes.find(s => s.id === sedeActual)?.name}
+              💎 {t.models.available} en {sedes[0].name}
             </h3>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
@@ -1215,7 +1232,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp }: La
         onClose={() => setShowTipModal(false)}
         onSendTip={handleSendTip}
         modelName="Black Diamond"
-        userPhone={currentUser?.telefono}
+        userPhone={chatUser?.telefono || currentUserProp?.telefono}
       />
 
       {/* Notificaciones de Propinas */}
@@ -1239,6 +1256,19 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp }: La
             setClienteActual(cliente);
             setShowClienteLogin(false);
             toast.success(`¡Bienvenido de nuevo, ${cliente.nombre}!`);
+            
+            // ✅ SINCRONIZACIÓN GLOBAL: Notificar a App.tsx
+            if (onLoginSuccess) {
+              // Obtenemos la sesión actual de Supabase para pasar el accessToken
+              supabase.auth.getSession().then(({ data: { session } }) => {
+                onLoginSuccess(
+                  session?.access_token || '', 
+                  cliente.user_id || cliente.id, 
+                  cliente.email || '', 
+                  'cliente'
+                );
+              });
+            }
           }}
         />
       )}
@@ -1248,7 +1278,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp }: La
         isOpen={!!solicitudData}
         onClose={() => setSolicitudData(null)}
         data={solicitudData}
-        currentUser={currentUserProp || clienteActual || currentUser}
+        currentUser={currentUserProp}
       />
 
       {/* Modal de Registro de Clientes */}

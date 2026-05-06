@@ -1,23 +1,23 @@
 import { useState, useEffect } from 'react';
-import { Card } from './ui/card';
+// import { Card } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { ScrollArea } from './ui/scroll-area';
+// import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+// import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
+// import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+// import { ScrollArea } from './ui/scroll-area';
 import { toast } from 'sonner';
 import { 
   Calendar as CalendarIcon, 
-  Clock, 
+//  Clock, 
   User, 
-  Phone, 
-  Mail, 
-  DollarSign, 
-  Home, 
-  Briefcase, 
+//  Phone, 
+//  Mail, 
+//  DollarSign, 
+//  Home, 
+//  Briefcase, 
   ShoppingBag, 
   Plus, 
   Minus, 
@@ -26,7 +26,9 @@ import {
   Upload,
   Image as ImageIcon,
   PlayCircle,
-  Trash2
+  Trash2,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
 import { useServicios } from '../app/components/ServiciosContext';
 import { useTurnos } from '../app/components/TurnosContext';
@@ -84,6 +86,12 @@ export function IniciarServicioModal({ isOpen, onClose, modeloEmail, modeloNombr
 
   const [comprobantePago, setComprobantePago] = useState<string | null>(null);
   const [nombreArchivo, setNombreArchivo] = useState<string>('');
+  const [submitting, setSubmitting] = useState(false);
+  const [categoriasAbiertas, setCategoriasAbiertas] = useState<Record<string, boolean>>({});
+
+  const toggleCategoria = (cat: string) => {
+    setCategoriasAbiertas(prev => ({ ...prev, [cat]: !prev[cat] }));
+  };
 
   // Obtener agendamientos pendientes de esta modelo con validación
   const agendamientosPendientes = obtenerAgendamientosPendientes(modeloEmail) || [];
@@ -200,91 +208,99 @@ export function IniciarServicioModal({ isOpen, onClose, modeloEmail, modeloNombr
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    const totalServicio = (parseFloat(formData.costoServicio) || 0) +
-                         (parseFloat(formData.costoAdicionales) || 0) +
-                         totalConsumo;
-    
-    // Crear o actualizar cliente y registrar servicio
-    let clienteId: string | undefined;
-    
-    if (tipoRegistro === 'walkin') {
-      try {
-        // Si ya existe, actualizar con el registro del servicio
-        if (clienteEncontrado) {
-          clienteId = clienteEncontrado.id;
-          await registrarServicio(clienteId, totalServicio);
-        } else {
-          // Crear nuevo cliente
-          const nuevoCliente = await agregarCliente({
-            telefono: formData.clienteTelefono,
-            nombre: formData.clienteNombre,
-            nombreUsuario: formData.clienteNombre.toLowerCase().replace(/\s+/g, ''),
-            email: formData.clienteEmail || undefined,
-          });
-          clienteId = nuevoCliente.id;
+
+    try {
+      setSubmitting(true);
+
+      const totalServicio = (parseFloat(formData.costoServicio) || 0) +
+                           (parseFloat(formData.costoAdicionales) || 0) +
+                           totalConsumo;
+
+      // Crear o actualizar cliente y registrar servicio
+      let clienteId: string | undefined;
+
+      if (tipoRegistro === 'walkin') {
+        try {
+          // Si ya existe, actualizar con el registro del servicio
+          if (clienteEncontrado) {
+            clienteId = clienteEncontrado.id;
+            await registrarServicio(clienteId, totalServicio);
+          } else {
+            // Crear nuevo cliente
+            const nuevoCliente = await agregarCliente({
+              telefono: formData.clienteTelefono,
+              nombre: formData.clienteNombre,
+              nombreUsuario: formData.clienteNombre.toLowerCase().replace(/\s+/g, ''),
+              email: formData.clienteEmail || undefined,
+            });
+            clienteId = nuevoCliente.id;
+          }
+        } catch (clienteErr: any) {
+          toast.error('Ocurrió un error inesperado', { description: clienteErr instanceof Error ? clienteErr.message : String(clienteErr) });
         }
-      } catch (error) {
-        if (process.env.NODE_ENV === 'development') console.error('Error al gestionar cliente:', error);
       }
+
+      // Preparar datos de consumo detallado
+      const consumosDetallados = productosSeleccionados.map(producto => ({
+        productoId: producto.id,
+        nombre: producto.nombre,
+        descripcion: producto.nombre,
+        costo: producto.precio * producto.cantidad,
+        cantidad: producto.cantidad,
+      }));
+
+      const agendamientoIdStr = tipoRegistro === 'agendamiento' && agendamientoSeleccionado != null
+        ? String(agendamientoSeleccionado)
+        : '';
+      await iniciarServicio(agendamientoIdStr, {
+        modeloEmail,
+        modeloNombre,
+        clienteId: clienteId ?? '',
+        clienteNombre: formData.clienteNombre,
+        clienteTelefono: formData.clienteTelefono,
+        clienteEmail: formData.clienteEmail || undefined,
+        tipoServicio: formData.tipoServicio === 'Sede' ? 'sede' : 'domicilio',
+        habitacion: formData.tipoServicio === 'Sede' ? formData.habitacion : undefined,
+        tiempoServicio: formData.tiempoServicio,
+        costoServicio: parseFloat(formData.costoServicio) || 0,
+        metodoPago: formData.metodoPago,
+        comprobantePago: comprobantePago || undefined,
+        adicionales: typeof formData.adicionales === 'string' ? parseFloat(formData.adicionales) || 0 : (formData.adicionales ?? 0),
+        costoAdicionales: parseFloat(formData.costoAdicionales) || 0,
+        costoConsumo: 0,
+        consumosDetallados,
+        duracionMinutos: 0,
+      });
+
+      // Cambiar estado del turno a "En Servicio"
+      cambiarEstado(modeloEmail, 'En Servicio');
+
+      // Reset form
+      setTipoRegistro('agendamiento');
+      setAgendamientoSeleccionado(null);
+      setClienteEncontrado(null);
+      setProductosSeleccionados([]);
+      setFormData({
+        clienteNombre: '',
+        clienteTelefono: '',
+        clienteEmail: '',
+        tipoServicio: 'Sede',
+        habitacion: '101',
+        tiempoServicio: '1 hora',
+        costoServicio: '',
+        metodoPago: 'Efectivo',
+        adicionales: '',
+        costoAdicionales: '',
+      });
+      setComprobantePago(null);
+      setNombreArchivo('');
+
+      onClose();
+    } catch (err: any) {
+      toast.error('Error al guardar', { description: err.message });
+    } finally {
+      setSubmitting(false);
     }
-
-    // Preparar datos de consumo detallado
-    const consumosDetallados = productosSeleccionados.map(producto => ({
-      productoId: producto.id,
-      nombre: producto.nombre,
-      descripcion: producto.nombre,
-      costo: producto.precio * producto.cantidad,
-      cantidad: producto.cantidad,
-    }));
-
-    const agendamientoIdStr = tipoRegistro === 'agendamiento' && agendamientoSeleccionado != null
-      ? String(agendamientoSeleccionado)
-      : '';
-    iniciarServicio(agendamientoIdStr, {
-      modeloEmail,
-      modeloNombre,
-      clienteId: clienteId ?? '',
-      clienteNombre: formData.clienteNombre,
-      clienteTelefono: formData.clienteTelefono,
-      clienteEmail: formData.clienteEmail || undefined,
-      tipoServicio: formData.tipoServicio === 'Sede' ? 'sede' : 'domicilio',
-      habitacion: formData.tipoServicio === 'Sede' ? formData.habitacion : undefined,
-      tiempoServicio: formData.tiempoServicio,
-      costoServicio: parseFloat(formData.costoServicio) || 0,
-      metodoPago: formData.metodoPago,
-      comprobantePago: comprobantePago || undefined,
-      adicionales: typeof formData.adicionales === 'string' ? parseFloat(formData.adicionales) || 0 : (formData.adicionales ?? 0),
-      costoAdicionales: parseFloat(formData.costoAdicionales) || 0,
-      costoConsumo: 0,
-      consumosDetallados,
-      duracionMinutos: 0,
-    });
-
-    // Cambiar estado del turno a "En Servicio"
-    cambiarEstado(modeloEmail, 'En Servicio');
-
-    // Reset form
-    setTipoRegistro('agendamiento');
-    setAgendamientoSeleccionado(null);
-    setClienteEncontrado(null);
-    setProductosSeleccionados([]);
-    setFormData({
-      clienteNombre: '',
-      clienteTelefono: '',
-      clienteEmail: '',
-      tipoServicio: 'Sede',
-      habitacion: '101',
-      tiempoServicio: '1 hora',
-      costoServicio: '',
-      metodoPago: 'Efectivo',
-      adicionales: '',
-      costoAdicionales: '',
-    });
-    setComprobantePago(null);
-    setNombreArchivo('');
-
-    onClose();
   };
 
   if (!isOpen) return null;
@@ -471,7 +487,7 @@ export function IniciarServicioModal({ isOpen, onClose, modeloEmail, modeloNombr
                         try {
                           setFormData(prev => ({ ...prev, tipoServicio: tipo }));
                         } catch (error) {
-                          if (process.env.NODE_ENV === 'development') console.error('❌ Error al seleccionar tipo de servicio:', error);
+                          toast.error('Ocurrió un error inesperado', { description: error instanceof Error ? error.message : String(error) });
                         }
                       }}
                       className={`p-3 rounded-lg border-2 transition-all font-medium ${
@@ -499,7 +515,7 @@ export function IniciarServicioModal({ isOpen, onClose, modeloEmail, modeloNombr
                           try {
                             setFormData(prev => ({ ...prev, habitacion: hab }));
                           } catch (error) {
-                            if (process.env.NODE_ENV === 'development') console.error('❌ Error al seleccionar habitación:', error);
+                            toast.error('Ocurrió un error inesperado', { description: error instanceof Error ? error.message : String(error) });
                           }
                         }}
                         className={`p-3 rounded-lg border-2 font-bold transition-all ${
@@ -527,7 +543,7 @@ export function IniciarServicioModal({ isOpen, onClose, modeloEmail, modeloNombr
                         try {
                           setFormData(prev => ({ ...prev, tiempoServicio: tiempo }));
                         } catch (error) {
-                          if (process.env.NODE_ENV === 'development') console.error('❌ Error al seleccionar tiempo de servicio:', error);
+                          toast.error('Ocurrió un error inesperado', { description: error instanceof Error ? error.message : String(error) });
                         }
                       }}
                       className={`p-2.5 rounded-lg border-2 text-sm transition-all font-medium ${
@@ -609,36 +625,72 @@ export function IniciarServicioModal({ isOpen, onClose, modeloEmail, modeloNombr
                 </p>
 
                 {/* Grid de productos disponibles */}
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-h-80 overflow-y-auto p-2">
-                  {inventarioDisponible.filter(item => item.stock > 0).map((producto) => (
-                    <button
-                      key={producto.id}
-                      type="button"
-                      onClick={() => agregarProducto(producto)}
-                      className="group relative bg-card border border-border hover:border-primary/50 rounded-lg overflow-hidden transition-all hover:shadow-lg hover:scale-105"
-                    >
-                      <div className="aspect-square overflow-hidden">
-                        <img
-                          src={producto.imagen}
-                          alt={producto.nombre}
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                          width={120}
-                          height={120}
-                        />
+                {/* Módulo de Boutique Rediseñado - Menú Hamburguesa */}
+                <div className="bg-white/2 border border-white/5 rounded-2xl overflow-hidden mt-4">
+                  {Object.entries(
+                    inventarioDisponible
+                      .filter(item => item.stock > 0)
+                      .reduce((acc, item) => {
+                        const cat = item.categoria || 'Otros';
+                        if (!acc[cat]) acc[cat] = [];
+                        acc[cat].push(item);
+                        return acc;
+                      }, {} as Record<string, typeof inventarioDisponible>)
+                  ).map(([categoria, items]) => {
+                    const isOpen = categoriasAbiertas[categoria];
+                    return (
+                      <div key={categoria} className="border-b border-white/5 last:border-0">
+                        <button 
+                          type="button"
+                          onClick={() => toggleCategoria(categoria)}
+                          className="w-full bg-white/5 px-4 py-3 flex items-center justify-between hover:bg-white/10 transition-colors"
+                        >
+                          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">{categoria}</span>
+                          {isOpen ? <ChevronDown className="w-4 h-4 text-primary" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+                        </button>
+                        
+                        {isOpen && (
+                          <div className="divide-y divide-white/5 bg-black/20 animate-in slide-in-from-top-2 duration-200">
+                            {items.map((item) => {
+                              const isAdded = productosSeleccionados.some(p => p.id === item.id);
+                              return (
+                                <div 
+                                  key={item.id} 
+                                  className="flex items-center gap-3 p-3 hover:bg-white/5 transition-colors group"
+                                >
+                                  <div className="w-12 h-12 rounded-lg overflow-hidden bg-black/40 border border-white/10 flex-shrink-0">
+                                    <img 
+                                      src={item.imagen} 
+                                      alt={item.nombre} 
+                                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
+                                    />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <h4 className="text-sm font-bold text-white truncate">{item.nombre}</h4>
+                                    <p className="text-xs text-primary font-black">
+                                      ${(item.precioServicio || item.precioRegular).toLocaleString()}
+                                    </p>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => agregarProducto(item)}
+                                    className={`
+                                      w-8 h-8 rounded-full flex items-center justify-center transition-all
+                                      ${isAdded 
+                                        ? 'bg-primary text-black scale-110 shadow-[0_0_10px_rgba(212,175,55,0.4)]' 
+                                        : 'bg-white/10 text-white hover:bg-primary hover:text-black'}
+                                    `}
+                                  >
+                                    {isAdded ? <CheckCircle className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
-                      <div className="p-2 space-y-1">
-                        <p className="font-medium text-xs line-clamp-1">{producto.nombre}</p>
-                        <Badge variant="outline" className="text-[10px] px-1 py-0">{producto.categoria}</Badge>
-                        <p className="text-sm font-bold text-primary">
-                          ${((producto.precioServicio || 0) || 0).toLocaleString()}
-                        </p>
-                        <div className="absolute top-2 right-2 bg-primary/90 text-primary-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Plus className="w-3 h-3" />
-                        </div>
-                      </div>
-                    </button>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 {/* Productos seleccionados */}
@@ -801,9 +853,9 @@ export function IniciarServicioModal({ isOpen, onClose, modeloEmail, modeloNombr
                 <Button type="button" variant="outline" onClick={onClose} className="flex-1">
                   Cancelar
                 </Button>
-                <Button type="submit" className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90">
+                <Button type="submit" className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90" disabled={submitting}>
                   <PlayCircle className="w-4 h-4 mr-2" />
-                  Iniciar Servicio
+                  {submitting ? 'Iniciando...' : 'Iniciar Servicio'}
                 </Button>
               </div>
             </>

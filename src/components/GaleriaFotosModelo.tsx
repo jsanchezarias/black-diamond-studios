@@ -85,6 +85,12 @@ export function GaleriaFotosModelo({ modeloId: modeloIdProp, modeloEmail, soloLe
 
     const erroresFiltro: string[] = [];
     const validos = archivos.filter(f => {
+      // Validar tipo
+      if (!f.type.startsWith('image/')) {
+        erroresFiltro.push(`"${f.name}" no es una imagen`);
+        return false;
+      }
+      // Validar tamaño (10MB)
       if (f.size > 10 * 1024 * 1024) {
         erroresFiltro.push(`"${f.name}" supera 10MB`);
         return false;
@@ -94,6 +100,9 @@ export function GaleriaFotosModelo({ modeloId: modeloIdProp, modeloEmail, soloLe
 
     if (erroresFiltro.length) {
       setErrores(erroresFiltro);
+      toast.error('Algunos archivos fueron omitidos', { 
+        description: `${erroresFiltro.length} archivos no cumplen con los requisitos.` 
+      });
     } else {
       setErrores([]);
     }

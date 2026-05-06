@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { TrendingUp, TrendingDown, Star, DollarSign, Clock, ShoppingBag, Award, ArrowUpDown, Calendar } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { Button } from './ui/button';
+// import { Button } from './ui/button';
 import { useModelos } from '../app/components/ModelosContext';
 import { useServicios } from '../app/components/ServiciosContext';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
@@ -405,7 +405,7 @@ export function RendimientoModelosPanel() {
                                 fill="#8884d8"
                                 dataKey="value"
                               >
-                                {datosServiciosPorTipo.map((entry, index) => (
+                                {datosServiciosPorTipo.map((_entry, index) => (
                                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                 ))}
                               </Pie>

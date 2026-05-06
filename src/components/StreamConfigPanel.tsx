@@ -39,7 +39,7 @@ interface StreamConfigPanelProps {
   accessToken?: string;
 }
 
-export function StreamConfigPanel({ accessToken }: StreamConfigPanelProps) {
+export function StreamConfigPanel({ accessToken: _accessToken }: StreamConfigPanelProps) {
   const [streams, setStreams] = useState<StreamConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);

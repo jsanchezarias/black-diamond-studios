@@ -13,7 +13,7 @@ import {
   MapPin, 
   FileText, 
   DollarSign,
-  ShoppingCart,
+//  ShoppingCart,
   MessageSquare,
   History,
   TrendingUp,

@@ -5,7 +5,9 @@ import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Logo } from './Logo';
-import { supabase } from '../../utils/supabase/info'; // ✅ Corregido: ruta correcta
+import { supabase } from '../../utils/supabase/info';
+import { translateSupabaseError } from '../../utils/supabase/errors';
+import { toast } from 'sonner';
 
 interface LoginFormProps {
   onLogin: (accessToken: string, userId: string, email: string, role: string) => void;
@@ -54,16 +56,9 @@ export function LoginForm({ onLogin, onBackToLanding }: LoginFormProps) {
       });
 
       if (authError) {
-        // Mensajes de error amigables sin consolas técnicas
-        if (authError.message.includes('Invalid login credentials')) {
-          setError('Email o contraseña incorrectos.');
-        } else if (authError.message.includes('Email not confirmed')) {
-          setError('Email o contraseña incorrectos.');
-        } else if (authError.message.includes('too many requests')) {
-          setError('Demasiados intentos. Espera unos minutos.');
-        } else {
-          setError('Email o contraseña incorrectos.');
-        }
+        const msg = translateSupabaseError(authError);
+        setError(msg);
+        toast.error(msg);
         setLoading(false);
         return;
       }
@@ -79,33 +74,68 @@ export function LoginForm({ onLogin, onBackToLanding }: LoginFormProps) {
         .from('usuarios')
         .select('role, nombre, estado')
         .eq('id', authData.user.id)
-        .single();
+        .maybeSingle();
 
       let role: string | null = null;
 
       if (userError || !userData) {
-        // Logging específico por código de error para diagnóstico
-        if (userError?.code === 'PGRST116') {
-          console.error('USUARIO NO EXISTE EN TABLA usuarios:', authData.user.id, authData.user.email);
-        } else if (userError?.code === '42501') {
-          console.error('RLS BLOQUEANDO LECTURA:', authData.user.id);
-        } else {
-          console.error('ROL NO ENCONTRADO:', { userId: authData.user.id, email: authData.user.email, error: userError });
-        }
+        // Si no está en usuarios, verificar si es cliente
+        const { data: clienteData } = await supabase
+          .from('clientes')
+          .select('id, email, nombre, bloqueado')
+          .or(`user_id.eq.${authData.user.id},email.eq.${authData.user.email}`)
+          .maybeSingle();
 
-        // Fallback: intentar con metadata de auth
-        const roleMeta = authData.user.user_metadata?.role || authData.user.app_metadata?.role;
-        if (roleMeta) {
+        if (clienteData) {
+          if (clienteData.bloqueado) {
+            setError('Tu cuenta está bloqueada. Contacta al administrador.');
+            setLoading(false);
+            return;
+          }
+          
           onLogin(
             authData.session.access_token,
             authData.user.id,
             authData.user.email || '',
-            roleMeta
+            'cliente'
           );
           return;
         }
 
-        setError('No se pudo verificar el rol del usuario. Contacta al administrador.');
+        const nombreAuto = authData.user.user_metadata?.full_name || authData.user.email?.split('@')[0] || 'Cliente';
+
+        const { data: newCliente, error: createError } = await supabase
+          .from('clientes')
+          .insert({
+            user_id: authData.user.id,
+            email: authData.user.email,
+            nombre: nombreAuto,
+            telefono: '000-' + authData.user.id.substring(0, 8),
+            nombre_usuario: nombreAuto.toLowerCase().replace(/\s/g, '') + Math.floor(Math.random() * 100),
+            created_at: new Date().toISOString()
+          })
+          .select()
+          .maybeSingle();
+
+        if (createError) {
+          console.error('❌ Error creando perfil:', createError);
+          toast.error('Error de perfil: ' + createError.message);
+          setError('Error de base de datos: ' + createError.message);
+          setLoading(false);
+          return;
+        }
+
+        if (newCliente) {
+          onLogin(
+            authData.session.access_token,
+            authData.user.id,
+            authData.user.email || '',
+            'cliente'
+          );
+          return;
+        }
+
+        setError('No se pudo inicializar tu perfil. Contacta al administrador.');
         setLoading(false);
         return;
       }
@@ -120,20 +150,21 @@ export function LoginForm({ onLogin, onBackToLanding }: LoginFormProps) {
       role = userData.role;
 
       if (!role) {
-        // Fallback: intentar con metadata de auth
-        const roleMeta = authData.user.user_metadata?.role || authData.user.app_metadata?.role;
-        if (roleMeta) {
-          onLogin(
-            authData.session.access_token,
-            authData.user.id,
-            authData.user.email || '',
-            roleMeta
-          );
-          return;
-        }
         setError('Usuario sin rol asignado. Contacta al administrador.');
         setLoading(false);
         return;
+      }
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔑 [LoginForm] ROL RECIBIDO:', role);
+      }
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔑 [LoginForm] ROL RECIBIDO:', role);
+      }
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔑 [LoginForm] ROL RECIBIDO:', role);
       }
 
       onLogin(
@@ -145,7 +176,9 @@ export function LoginForm({ onLogin, onBackToLanding }: LoginFormProps) {
 
     } catch (err: any) {
       if (process.env.NODE_ENV === 'development') console.error('Error en login:', err);
-      setError('Error inesperado. Por favor intenta nuevamente.');
+      const msg = translateSupabaseError(err);
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }

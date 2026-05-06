@@ -1,14 +1,10 @@
-import { projectId, publicAnonKey } from './info';
-
 /**
  * Sube una imagen de comprobante (versión sin Supabase - convierte a base64)
  * @param file - Archivo de imagen a subir
- * @param folder - Carpeta donde guardar (ej: 'comprobantes-tiempo', 'comprobantes-adicionales', 'comprobantes-boutique')
  * @returns URL en base64 del archivo
  */
 export async function uploadComprobante(
-  file: File,
-  folder: 'comprobantes-tiempo' | 'comprobantes-adicionales' | 'comprobantes-boutique'
+  file: File
 ): Promise<string> {
   try {
     // Validar que sea una imagen

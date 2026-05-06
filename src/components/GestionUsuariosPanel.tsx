@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { UserPlus, Trash2, Mail, Calendar, User, Loader2 } from 'lucide-react';
+import { UserPlus, Trash2, Mail, Calendar, User, Loader2, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '../utils/supabase/info'; // ✅ Corregido: ruta correcta
+import { supabase } from '../utils/supabase/info';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
@@ -18,7 +18,7 @@ interface Usuario {
 
 interface GestionUsuariosPanelProps {
   accessToken?: string;
-  userRole: 'owner' | 'admin';
+  userRole: 'owner' | 'administrador';
 }
 
 export function GestionUsuariosPanel({ userRole }: GestionUsuariosPanelProps) {
@@ -27,26 +27,79 @@ export function GestionUsuariosPanel({ userRole }: GestionUsuariosPanelProps) {
   const [modalAbierto, setModalAbierto] = useState(false);
   const [creando, setCreando] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; email: string } | null>(null);
+  const [editando, setEditando] = useState<Usuario | null>(null);
+  const [guardandoEdit, setGuardandoEdit] = useState(false);
+  const [editForm, setEditForm] = useState({ nombre: '', email: '', password: '' });
+  const [editError, setEditError] = useState('');
 
-  // Form states
+  // Form states para crear
   const [nuevoEmail, setNuevoEmail] = useState('');
   const [nuevoPassword, setNuevoPassword] = useState('');
   const [nuevoNombre, setNuevoNombre] = useState('');
   const [error, setError] = useState('');
 
-  const roleACrear = userRole === 'owner' ? 'admin' : 'programador';
+  const roleACrear = userRole === 'owner' ? 'administrador' : 'programador';
   const roleNombre = userRole === 'owner' ? 'Administrador' : 'Programador';
 
   useEffect(() => {
     cargarUsuarios();
   }, [userRole]);
 
+  const abrirEditar = (usuario: Usuario) => {
+    setEditando(usuario);
+    setEditForm({ nombre: usuario.nombre, email: usuario.email, password: '' });
+    setEditError('');
+  };
+
+  const guardarEdicion = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editando) return;
+    setGuardandoEdit(true);
+    setEditError('');
+
+    try {
+      const authData: Record<string, string> = {};
+      const publicData: Record<string, string> = {};
+
+      if (editForm.email && editForm.email !== editando.email) authData.email = editForm.email;
+      if (editForm.password && editForm.password.length >= 6) authData.password = editForm.password;
+      if (editForm.nombre && editForm.nombre !== editando.nombre) publicData.nombre = editForm.nombre;
+
+      if (Object.keys(authData).length === 0 && Object.keys(publicData).length === 0) {
+        setEditError('No hay cambios para guardar');
+        setGuardandoEdit(false);
+        return;
+      }
+
+      if (editForm.password && editForm.password.length > 0 && editForm.password.length < 6) {
+        setEditError('La contraseña debe tener al menos 6 caracteres');
+        setGuardandoEdit(false);
+        return;
+      }
+
+      const { data, error: fnError } = await supabase.functions.invoke('admin-update-user', {
+        body: { targetUserId: editando.id, authData, publicData },
+      });
+
+      if (fnError) throw fnError;
+      if (data?.error) throw new Error(data.error);
+
+      await cargarUsuarios();
+      setEditando(null);
+      toast.success(`✅ Usuario ${editForm.nombre || editando.nombre} actualizado`);
+    } catch (err: any) {
+      setEditError(err.message || 'Error al actualizar usuario');
+    } finally {
+      setGuardandoEdit(false);
+    }
+  };
+
   const cargarUsuarios = async () => {
     try {
       setLoading(true);
       
       // Cargar usuarios según el rol del usuario actual
-      const rolABuscar = userRole === 'owner' ? 'admin' : 'programador';
+      const rolABuscar = userRole === 'owner' ? 'administrador' : 'programador';
       
       const { data, error } = await supabase
         .from('usuarios')
@@ -93,13 +146,13 @@ export function GestionUsuariosPanel({ userRole }: GestionUsuariosPanelProps) {
       // Esto evita el problema de confirmación de email que bloquea el login
       const { data, error: fnError } = await supabase.functions.invoke('server', {
         method: 'POST',
-        headers: { 'x-invoke-path': '/make-server-9dadc017/admin/crear-usuario' },
+        headers: { 'x-invoke-path': '/make-server-9dadc017/administrador/crear-usuario' },
         body: {
           email: nuevoEmail,
           password: nuevoPassword,
           nombre: nuevoNombre,
           role: roleACrear,
-          _path: '/make-server-9dadc017/admin/crear-usuario'
+          _path: '/make-server-9dadc017/administrador/crear-usuario'
         }
       });
 
@@ -291,14 +344,26 @@ export function GestionUsuariosPanel({ userRole }: GestionUsuariosPanelProps) {
                       {usuario.email}
                     </CardDescription>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => eliminarUsuario(usuario.id, usuario.email)}
-                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => abrirEditar(usuario)}
+                      className="text-primary hover:text-primary hover:bg-primary/10"
+                      title="Editar usuario"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => eliminarUsuario(usuario.id, usuario.email)}
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      title="Eliminar usuario"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
@@ -315,6 +380,89 @@ export function GestionUsuariosPanel({ userRole }: GestionUsuariosPanelProps) {
           ))
         )}
       </div>
+
+      {/* Modal de edición de usuario */}
+      {editando && (
+        <Dialog open={!!editando} onOpenChange={() => setEditando(null)}>
+          <DialogContent className="bg-[#1a1a24] border-primary/30 shadow-2xl">
+            <DialogHeader>
+              <DialogTitle className="text-white">Editar {roleNombre}</DialogTitle>
+              <DialogDescription className="text-muted-foreground">
+                Modificar datos de <span className="text-white font-semibold">{editando.email}</span>
+              </DialogDescription>
+            </DialogHeader>
+
+            <form onSubmit={guardarEdicion} className="space-y-4">
+              {editError && (
+                <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                  {editError}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-nombre">Nombre Completo</Label>
+                <Input
+                  id="edit-nombre"
+                  value={editForm.nombre}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, nombre: e.target.value }))}
+                  placeholder="Nombre completo"
+                  disabled={guardandoEdit}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-email">Correo Electrónico</Label>
+                <Input
+                  id="edit-email"
+                  type="email"
+                  value={editForm.email}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, email: e.target.value }))}
+                  placeholder="correo@ejemplo.com"
+                  disabled={guardandoEdit}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-password">Nueva Contraseña <span className="text-muted-foreground">(dejar vacío para no cambiar)</span></Label>
+                <Input
+                  id="edit-password"
+                  type="password"
+                  value={editForm.password}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, password: e.target.value }))}
+                  placeholder="Mínimo 6 caracteres"
+                  disabled={guardandoEdit}
+                />
+              </div>
+
+              <div className="flex gap-2 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEditando(null)}
+                  disabled={guardandoEdit}
+                  className="flex-1"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={guardandoEdit}
+                  className="flex-1 bg-primary hover:bg-primary/90"
+                >
+                  {guardandoEdit ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Guardando...
+                    </>
+                  ) : (
+                    'Guardar Cambios'
+                  )}
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Dialog de confirmación de eliminación */}
       {confirmDelete && (

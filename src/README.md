@@ -1,6 +1,6 @@
 # 💎 Black Diamond - Sistema de Gestión Premium
 
-Aplicación web completa para gestión de agencia premium con 4 roles de usuario: Owner, Admin, Programador y Modelo.
+Aplicación web completa para gestión de agencia premium con 4 roles de usuario: Owner, Administrador, Programador y Modelo.
 
 ## 🎨 Tema de Colores
 

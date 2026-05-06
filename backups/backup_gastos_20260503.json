@@ -1,0 +1,46 @@
+[
+  {
+    "id": "82ab087a-a341-4c69-b2da-555a853aa6c8",
+    "categoria": "operativo",
+    "descripcion": "Arriendo Sede Norte",
+    "monto": 2500000,
+    "fecha": "2026-04-01T00:00:00+00:00",
+    "comprobante_url": null,
+    "created_by": null,
+    "created_at": "2026-04-11T20:20:01.519515+00:00",
+    "updated_at": "2026-04-11T20:20:01.519515+00:00"
+  },
+  {
+    "id": "b780957a-5a99-4b59-bfc4-e1508397d059",
+    "categoria": "nomina",
+    "descripcion": "Pago Staff Programadores",
+    "monto": 1800000,
+    "fecha": "2026-04-01T00:00:00+00:00",
+    "comprobante_url": null,
+    "created_by": null,
+    "created_at": "2026-04-11T20:20:01.519515+00:00",
+    "updated_at": "2026-04-11T20:20:01.519515+00:00"
+  },
+  {
+    "id": "6e295009-2fce-40c7-936f-b1ee709dbc4b",
+    "categoria": "marketing",
+    "descripcion": "Publicidad Instagram",
+    "monto": 500000,
+    "fecha": "2026-04-01T00:00:00+00:00",
+    "comprobante_url": null,
+    "created_by": null,
+    "created_at": "2026-04-11T20:20:01.519515+00:00",
+    "updated_at": "2026-04-11T20:20:01.519515+00:00"
+  },
+  {
+    "id": "e485b73e-fd4c-4fa4-a9fb-7a643fd3a091",
+    "categoria": "operativo",
+    "descripcion": "Servicios Públicos",
+    "monto": 450000,
+    "fecha": "2026-04-01T00:00:00+00:00",
+    "comprobante_url": null,
+    "created_by": null,
+    "created_at": "2026-04-11T20:20:01.519515+00:00",
+    "updated_at": "2026-04-11T20:20:01.519515+00:00"
+  }
+]

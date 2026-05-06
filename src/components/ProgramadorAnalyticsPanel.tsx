@@ -70,7 +70,7 @@ function fmtNum(num: number): string {
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
-export function ProgramadorAnalyticsPanel({ userEmail, userId }: ProgramadorAnalyticsPanelProps) {
+export function ProgramadorAnalyticsPanel({ userEmail, userId: _userId }: ProgramadorAnalyticsPanelProps) {
   const [loading, setLoading]             = useState(true);
   const [mensajes, setMensajes]           = useState<MensajeRaw[]>([]);
   const [filtroPeriodo, setFiltroPeriodo] = useState<'hoy' | 'semana' | 'mes'>('semana');

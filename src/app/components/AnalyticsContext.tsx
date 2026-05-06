@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { useServicios } from './ServiciosContext';
 import { useClientes } from './ClientesContext';
 import { useModelos } from './ModelosContext';
@@ -185,6 +185,9 @@ interface AnalyticsContextValue {
   
   // Estado de carga
   cargando: boolean;
+
+  // Carga manual de datos
+  cargarVentas: () => Promise<void>;
 }
 
 const AnalyticsContext = createContext<AnalyticsContextValue | undefined>(undefined);
@@ -215,30 +218,26 @@ export function AnalyticsProvider({ children }: AnalyticsProviderProps) {
 
   // ==================== CARGAR VENTAS BOUTIQUE ====================
 
-  useEffect(() => {
-    const cargarVentas = async () => {
-      try {
-        const fechaLimite = new Date();
-        fechaLimite.setDate(fechaLimite.getDate() - 365); // último año
-        const { data, error } = await supabase
-          .from('ventas_boutique')
-          .select('*')
-          .gte('fecha', fechaLimite.toISOString().split('T')[0])
-          .order('fecha', { ascending: false })
-          .limit(500);
+  const cargarVentas = async () => {
+    try {
+      const fechaLimite = new Date();
+      fechaLimite.setDate(fechaLimite.getDate() - 365); // último año
+      const { data, error } = await supabase
+        .from('ventas_boutique')
+        .select('*')
+        .gte('fecha', fechaLimite.toISOString().split('T')[0])
+        .order('fecha', { ascending: false })
+        .limit(500);
 
-        if (!error && data) {
-          setVentasBoutique(data);
-        }
-      } catch (err) {
-        console.error('Error cargando ventas boutique:', err);
-      } finally {
-        setCargando(false);
+      if (!error && data) {
+        setVentasBoutique(data);
       }
-    };
-
-    cargarVentas();
-  }, []);
+    } catch (err) {
+      if (process.env.NODE_ENV === 'development') console.error('Error cargando ventas boutique:', err);
+    } finally {
+      setCargando(false);
+    }
+  };
 
   // ==================== UTILIDADES DE FECHA ====================
 
@@ -246,9 +245,9 @@ export function AnalyticsProvider({ children }: AnalyticsProviderProps) {
     return new Date().toISOString().split('T')[0];
   };
 
-  const obtenerFechaInicioDia = () => {
-    return obtenerFechaHoy();
-  };
+  // const obtenerFechaInicioDia = () => {
+  //   return obtenerFechaHoy();
+  // };
 
   const obtenerFechaInicioSemana = () => {
     const hoy = new Date();
@@ -325,7 +324,7 @@ export function AnalyticsProvider({ children }: AnalyticsProviderProps) {
 
   // ==================== MÉTRICAS GENERALES ====================
 
-  const obtenerMetricasGenerales = useCallback((filtros?: FiltrosAnalytics): MetricasGenerales => {
+  const obtenerMetricasGenerales = useCallback((_filtros?: FiltrosAnalytics): MetricasGenerales => {
     const hoy = obtenerFechaHoy();
     const inicioSemana = obtenerFechaInicioSemana();
     const inicioMes = obtenerFechaInicioMes();
@@ -858,6 +857,7 @@ export function AnalyticsProvider({ children }: AnalyticsProviderProps) {
     compararPeriodos,
     calcularTendencia,
     cargando,
+    cargarVentas,
   };
 
   return (

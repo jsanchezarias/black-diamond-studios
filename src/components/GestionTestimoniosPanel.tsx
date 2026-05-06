@@ -1,4 +1,4 @@
-import { Star, CheckCircle, XCircle, Trash2, MessageSquare, User, Mail, Calendar } from 'lucide-react';
+import { Star, CheckCircle, XCircle, Trash2, MessageSquare, Mail, Calendar } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
 import { Badge } from './ui/badge';

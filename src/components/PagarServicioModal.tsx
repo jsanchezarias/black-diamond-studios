@@ -17,6 +17,7 @@ export function PagarServicioModal({ isOpen, onClose, servicio }: PagarServicioM
   const [monto, setMonto] = useState(servicio.montoPromedio.toString());
   const [numeroReferencia, setNumeroReferencia] = useState('');
   const [comprobante, setComprobante] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   if (!isOpen) return null;
 
@@ -32,7 +33,7 @@ export function PagarServicioModal({ isOpen, onClose, servicio }: PagarServicioM
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!monto || parseFloat(monto) <= 0) {
@@ -40,22 +41,29 @@ export function PagarServicioModal({ isOpen, onClose, servicio }: PagarServicioM
       return;
     }
 
-    marcarServicioPagado(
-      servicio.id,
-      parseFloat(monto),
-      comprobante || undefined,
-      numeroReferencia.trim() || undefined
-    );
+    try {
+      setSubmitting(true);
+      await marcarServicioPagado(
+        servicio.id,
+        parseFloat(monto),
+        comprobante || undefined,
+        numeroReferencia.trim() || undefined
+      );
 
-    toast.success('✅ Servicio marcado como pagado', {
-      description: `${servicio.nombre} - $${parseFloat(monto).toLocaleString('es-CO')}`,
-    });
+      toast.success('Servicio marcado como pagado', {
+        description: `${servicio.nombre} - $${parseFloat(monto).toLocaleString('es-CO')}`,
+      });
 
-    // Reset
-    setMonto(servicio.montoPromedio.toString());
-    setNumeroReferencia('');
-    setComprobante(null);
-    onClose();
+      // Reset
+      setMonto(servicio.montoPromedio.toString());
+      setNumeroReferencia('');
+      setComprobante(null);
+      onClose();
+    } catch (err: any) {
+      toast.error('Error al actualizar', { description: err.message });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const tipoIconos: Record<string, string> = {
@@ -232,12 +240,13 @@ export function PagarServicioModal({ isOpen, onClose, servicio }: PagarServicioM
               >
                 Cancelar
               </Button>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 className="flex-1 bg-green-600 text-white hover:bg-green-700"
+                disabled={submitting}
               >
                 <CheckCircle className="w-4 h-4 mr-2" />
-                Confirmar Pago
+                {submitting ? 'Procesando...' : 'Confirmar Pago'}
               </Button>
             </div>
           </form>

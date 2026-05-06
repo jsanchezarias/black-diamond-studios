@@ -233,7 +233,7 @@ export function VideosProvider({ children }: { children: ReactNode }) {
       const fileName = `video_${timestamp}.${extension}`;
 
       // Subir archivo
-      const { data, error } = await supabase.storage
+      const { data: _data, error } = await supabase.storage
         .from(BUCKET_NAME)
         .upload(fileName, file, {
           cacheControl: '3600',

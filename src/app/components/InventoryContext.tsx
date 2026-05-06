@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '../../utils/supabase/info'; // ✅ Corregido: ruta correcta
+import { toast } from 'sonner';
 
 // Interfaz de producto
 export interface Producto {
@@ -7,6 +8,10 @@ export interface Producto {
   nombre: string;
   precioRegular: number;
   precioServicio: number;
+  // ✅ Nuevos: precio inicial (antes/tachado) y precio final (vigente)
+  // Son opcionales para no romper productos antiguos
+  precioInicial?: number | null;
+  precioFinal?: number | null;
   stock: number;
   categoria: string;
   descripcion: string;
@@ -31,18 +36,41 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
   const [inventario, setInventario] = useState<Producto[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // ✅ Cargar productos desde Supabase al inicializar + polling cada 5 minutos
-  // (inventario de boutique no requiere actualizaciones en tiempo real)
   useEffect(() => {
-    cargarProductos();
+    const channel = supabase
+      .channel('productos-rt')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'productos' }, (payload) => {
+        setInventario(prev => [...prev, mapRowToProducto(payload.new)]);
+        toast.success('📦 Nuevo producto agregado al inventario');
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'productos' }, (payload) => {
+        setInventario(prev => prev.map(p => p.id === payload.new.id ? mapRowToProducto(payload.new) : p));
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'productos' }, (payload) => {
+        setInventario(prev => prev.filter(p => p.id !== payload.old.id));
+      })
+      .subscribe();
 
-    // Polling cada 5 minutos en lugar de Realtime para reducir conexiones WebSocket
-    const pollingInterval = setInterval(() => {
-      cargarProductos();
-    }, 5 * 60 * 1000);
-
-    return () => { clearInterval(pollingInterval); };
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
+
+  // 🔧 Helper: mapea la fila raw de Supabase al tipo Producto (columnas lowercase → camelCase)
+  const mapRowToProducto = (row: any): Producto => ({
+    id: row.id,
+    nombre: row.nombre || '',
+    precioRegular: row.precioRegular ?? row.precioregular ?? 0,
+    precioServicio: row.precioServicio ?? row.precioservicio ?? 0,
+    precioInicial: row.precioInicial ?? row.precioinicial ?? null,
+    precioFinal: row.precioFinal ?? row.preciofinal ?? null,
+    stock: row.stock ?? 0,
+    categoria: row.categoria || '',
+    descripcion: row.descripcion || '',
+    imagen: row.imagen || '',
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  });
 
   const cargarProductos = async () => {
     try {
@@ -60,7 +88,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       }
 
       if (productos && productos.length > 0) {
-        setInventario(productos);
+        setInventario(productos.map(mapRowToProducto));
       } else {
         setInventario([]);
       }
@@ -75,12 +103,22 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
   const agregarProducto = async (producto: Omit<Producto, 'id' | 'created_at' | 'updated_at'>) => {
     try {
       
+      // ✅ Lógica de negocio: si hay precio final, ese es el precio que se cobra (precioRegular)
+      const finalPrice = (producto.precioFinal && producto.precioFinal > 0) ? producto.precioFinal : producto.precioRegular;
+
       const { data, error } = await supabase
         .from('productos')
         .insert({
           nombre: producto.nombre,
-          precioRegular: producto.precioRegular,
+          precioRegular: finalPrice, // ✅ Mantener compatibilidad con checkout
           precioServicio: producto.precioServicio,
+          // ✅ Insertar nuevos precios solo si están definidos (>0)
+          ...(producto.precioInicial && producto.precioInicial > 0
+            ? { precioInicial: producto.precioInicial }
+            : {}),
+          ...(producto.precioFinal && producto.precioFinal > 0
+            ? { precioFinal: producto.precioFinal }
+            : {}),
           stock: producto.stock,
           categoria: producto.categoria,
           descripcion: producto.descripcion || '',
@@ -96,7 +134,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
 
       if (data) {
         // Actualizar estado local
-        setInventario(prev => [...prev, data]);
+        setInventario(prev => [...prev, mapRowToProducto(data)]);
       }
     } catch (error) {
       if (process.env.NODE_ENV === 'development') console.error('❌ Error inesperado agregando producto:', error);
@@ -132,8 +170,23 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       
       const datosActualizar: any = {};
       if (producto.nombre !== undefined) datosActualizar.nombre = producto.nombre;
-      if (producto.precioRegular !== undefined) datosActualizar.precioRegular = producto.precioRegular;
+      
+      // ✅ Lógica de sincronización: si se actualiza precioFinal, también precioRegular
+      if (producto.precioFinal !== undefined && producto.precioFinal !== null) {
+        datosActualizar.precioFinal = producto.precioFinal;
+        if (producto.precioFinal > 0) {
+          datosActualizar.precioRegular = producto.precioFinal;
+        } else if (producto.precioRegular !== undefined) {
+          datosActualizar.precioRegular = producto.precioRegular;
+        }
+      } else if (producto.precioRegular !== undefined) {
+        datosActualizar.precioRegular = producto.precioRegular;
+      }
+
       if (producto.precioServicio !== undefined) datosActualizar.precioServicio = producto.precioServicio;
+      // ✅ Permitir asignar precio inicial
+      if (producto.precioInicial !== undefined) datosActualizar.precioInicial = producto.precioInicial;
+      
       if (producto.stock !== undefined) datosActualizar.stock = producto.stock;
       if (producto.categoria !== undefined) datosActualizar.categoria = producto.categoria;
       if (producto.descripcion !== undefined) datosActualizar.descripcion = producto.descripcion;
@@ -153,7 +206,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
 
       if (data) {
         // Actualizar estado local
-        setInventario(prev => prev.map(p => p.id === id ? data : p));
+        setInventario(prev => prev.map(p => p.id === id ? mapRowToProducto(data) : p));
       }
     } catch (error) {
       if (process.env.NODE_ENV === 'development') console.error('❌ Error inesperado actualizando producto:', error);
@@ -179,7 +232,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
 
       if (data) {
         // Actualizar estado local
-        setInventario(prev => prev.map(p => p.id === id ? data : p));
+        setInventario(prev => prev.map(p => p.id === id ? mapRowToProducto(data) : p));
       }
     } catch (error) {
       if (process.env.NODE_ENV === 'development') console.error('❌ Error inesperado actualizando stock:', error);

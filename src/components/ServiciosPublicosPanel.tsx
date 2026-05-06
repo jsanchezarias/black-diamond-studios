@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Zap, Plus, Bell, CheckCircle, AlertTriangle, Clock, Calendar, Eye, Edit, Trash2, DollarSign } from 'lucide-react';
+import { Zap, Plus, Bell, CheckCircle, AlertTriangle, Clock, Calendar, Eye, Trash2, DollarSign } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -15,11 +15,13 @@ const toDate = (fecha: string | Date | null | undefined): Date | null => {
   return isNaN(d.getTime()) ? null : d;
 };
 
+/*
 const formatFecha = (fecha: string | Date | null | undefined): string => {
   const d = toDate(fecha);
   if (!d) return 'Sin fecha';
   return d.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' });
 };
+*/
 
 // fechaLimitePago es number (día 1-31) en Supabase pero versiones antiguas podían ser Date/string
 const getDiaLimitePago = (v: number | Date | string | null | undefined): number => {

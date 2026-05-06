@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Card, CardContent } from '../../components/ui/card';
 import { 
-  Video, 
-  VideoOff, 
-  Users, 
+  Video,
+  Users,
   Heart, 
   MessageCircle, 
   Share2,
@@ -15,7 +14,6 @@ import {
   Settings,
   Clock,
   Radio,
-  AlertCircle,
   DollarSign,
   Send,
   Play
@@ -291,20 +289,22 @@ export function BoutiqueStreamPlayer({
 
   if (!isLive) {
     return (
-      <Card className="border-primary/20 bg-gradient-card">
-        <CardContent className="p-8 text-center">
-          <VideoOff className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
-          <h3 className="text-xl font-bold mb-2" style={{ fontFamily: 'Playfair Display, serif' }}>
-            No hay transmisión activa
+      <div className="w-full h-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #0f1014 0%, #1a1208 50%, #0f1014 100%)' }}>
+        <div className="text-center px-8">
+          <div className="w-20 h-20 rounded-full border-2 border-primary/30 flex items-center justify-center mx-auto mb-6" style={{ background: 'rgba(201,169,97,0.08)' }}>
+            <Radio className="w-9 h-9" style={{ color: '#c9a961' }} />
+          </div>
+          <h3 className="text-2xl font-bold mb-3" style={{ fontFamily: 'Playfair Display, serif', color: '#c9a961' }}>
+            Sin transmisión en vivo
           </h3>
-          <p className="text-muted-foreground mb-4">
-            {modelName} no transmite en este momento
+          <p className="text-sm mb-6" style={{ color: '#888' }}>
+            {modelName} no está transmitiendo en este momento
           </p>
-          <Badge variant="outline" className="border-primary/30">
-            <Video className="w-3 h-3 mr-1" /> Vuelve pronto
+          <Badge variant="outline" className="border-primary/30 text-primary">
+            <Clock className="w-3 h-3 mr-1" /> Vuelve pronto
           </Badge>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     );
   }
 

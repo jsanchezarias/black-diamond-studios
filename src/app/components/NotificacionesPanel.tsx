@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Bell, Settings, Trash2, CheckCheck, Filter, Search } from 'lucide-react';
+import { useState } from 'react';
+import { Bell, Settings, Trash2, CheckCheck, Search } from 'lucide-react';
 import { useNotificaciones, TipoNotificacion, obtenerIconoNotificacion, obtenerColorPrioridad } from './NotificacionesContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -17,8 +17,8 @@ import { toast } from 'sonner';
 
 export function NotificacionesPanel() {
   const {
-    notificaciones,
-    noLeidas,
+    notificaciones: listadoNotificaciones = [],
+    noLeidas = 0,
     preferencias,
     marcarComoLeida,
     marcarTodasComoLeidas,
@@ -32,7 +32,7 @@ export function NotificacionesPanel() {
   const [busqueda, setBusqueda] = useState('');
 
   // Filtrar notificaciones
-  const notificacionesFiltradas = notificaciones.filter(notif => {
+  const notificacionesFiltradas = (listadoNotificaciones || []).filter(notif => {
     // Filtro por tipo
     if (filtroTipo !== 'todas' && notif.tipo !== filtroTipo) return false;
     
@@ -199,7 +199,7 @@ export function NotificacionesPanel() {
               {/* Estadísticas */}
               <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-border/50">
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-foreground">{notificaciones.length}</p>
+                  <p className="text-2xl font-bold text-foreground">{(listadoNotificaciones || []).length}</p>
                   <p className="text-sm text-muted-foreground">Total</p>
                 </div>
                 <div className="text-center">
@@ -208,7 +208,7 @@ export function NotificacionesPanel() {
                 </div>
                 <div className="text-center">
                   <p className="text-2xl font-bold text-muted-foreground">
-                    {notificaciones.filter(n => n.leida).length}
+                    {(listadoNotificaciones || []).filter(n => n.leida).length}
                   </p>
                   <p className="text-sm text-muted-foreground">Leídas</p>
                 </div>

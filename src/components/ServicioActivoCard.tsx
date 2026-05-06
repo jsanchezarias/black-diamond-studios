@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Clock, Plus, DollarSign, ShoppingBag, AlertTriangle, CheckCircle, FileText, X, Receipt, Upload, Image as ImageIcon } from 'lucide-react';
+import { Clock, Plus, ShoppingBag, AlertTriangle, CheckCircle, X, Receipt, Image as ImageIcon } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -10,13 +10,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Textarea } from './ui/textarea';
 import { Separator } from './ui/separator';
 import { useServicios, Servicio } from '../app/components/ServiciosContext';
+import type { CalificacionData } from './CalificarClienteModal';
+import { useAgendamientos } from '../app/components/AgendamientosContext';
 import { useInventory } from '../app/components/InventoryContext';
 import { toast } from 'sonner';
 import { uploadComprobante } from '../utils/supabase/uploadComprobante';
 
 interface ServicioActivoCardProps {
   servicio: Servicio;
-  onFinalizar?: () => void;
+  onCalificarCliente?: (data: CalificacionData) => void;
 }
 
 const COSTOS_TIEMPO_ADICIONAL = {
@@ -25,8 +27,9 @@ const COSTOS_TIEMPO_ADICIONAL = {
   '2 horas': 280000,
 };
 
-export function ServicioActivoCard({ servicio, onFinalizar }: ServicioActivoCardProps) {
-  const { agregarTiempoAdicional, agregarAdicionalAServicio, finalizarServicio } = useServicios();
+export function ServicioActivoCard({ servicio, onCalificarCliente }: ServicioActivoCardProps) {
+  const { agregarTiempoAdicional, agregarAdicionalAServicio } = useServicios();
+  const { terminarServicioCompleto } = useAgendamientos();
   const { inventario, actualizarStock } = useInventory();
   
   const [mostrarTiempoExtra, setMostrarTiempoExtra] = useState(false);
@@ -51,9 +54,9 @@ export function ServicioActivoCard({ servicio, onFinalizar }: ServicioActivoCard
   // Estados para boutique
   const [productoSeleccionado, setProductoSeleccionado] = useState<string>('');
   const [cantidadProducto, setCantidadProducto] = useState(1);
-  const [metodoPagoBoutique, setMetodoPagoBoutique] = useState<'Efectivo' | 'QR' | 'Nequi' | 'Daviplata' | 'Datafono' | 'Convenio'>('Efectivo');
-  const [archivoComprobanteBoutique, setArchivoComprobanteBoutique] = useState<File | null>(null);
-  const [subiendoBoutique, setSubiendoBoutique] = useState(false);
+  // const [metodoPagoBoutique, setMetodoPagoBoutique] = useState<'Efectivo' | 'QR' | 'Nequi' | 'Daviplata' | 'Datafono' | 'Convenio'>('Efectivo');
+  // const [archivoComprobanteBoutique, setArchivoComprobanteBoutique] = useState<File | null>(null);
+  // const [subiendoBoutique, setSubiendoBoutique] = useState(false);
   const [productosAgregados, setProductosAgregados] = useState<{
     productoId: string; // ✅ Cambiar a string
     nombre: string;
@@ -108,7 +111,7 @@ export function ServicioActivoCard({ servicio, onFinalizar }: ServicioActivoCard
 
       // Si hay archivo, subirlo
       if (archivoComprobanteTiempo) {
-        urlComprobante = await uploadComprobante(archivoComprobanteTiempo, 'comprobantes-tiempo');
+        urlComprobante = await uploadComprobante(archivoComprobanteTiempo);
         toast.success('Comprobante subido exitosamente');
       }
 
@@ -147,7 +150,7 @@ export function ServicioActivoCard({ servicio, onFinalizar }: ServicioActivoCard
 
       // Si hay archivo, subirlo
       if (archivoComprobanteAdicional) {
-        urlComprobante = await uploadComprobante(archivoComprobanteAdicional, 'comprobantes-adicionales');
+        urlComprobante = await uploadComprobante(archivoComprobanteAdicional);
         toast.success('Comprobante subido exitosamente');
       }
 
@@ -233,11 +236,18 @@ export function ServicioActivoCard({ servicio, onFinalizar }: ServicioActivoCard
   };
 
   // Finalizar servicio
-  const handleFinalizar = () => {
-    finalizarServicio(servicio.id, notasCierre);
-    toast.success('Servicio finalizado exitosamente');
-    setMostrarFinalizar(false);
-    setMostrarReporte(true);
+  const handleFinalizar = async () => {
+    try {
+      const res = await terminarServicioCompleto(servicio.agendamientoId, notasCierre, costoTotal);
+      if (!res.success) throw res.error;
+      
+      toast.success('Servicio finalizado exitosamente');
+      setMostrarFinalizar(false);
+      setMostrarReporte(true);
+    } catch (error) {
+      toast.error('Error al finalizar el servicio');
+      if (process.env.NODE_ENV === 'development') console.error(error);
+    }
   };
 
   const costoTotal = calcularCostoTotal();
@@ -286,7 +296,7 @@ export function ServicioActivoCard({ servicio, onFinalizar }: ServicioActivoCard
               }
             </p>
             <p className="text-xs text-muted-foreground mt-2">
-              Inicio: {servicio.horaInicio.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
+              Inicio: {servicio.horaInicio ? servicio.horaInicio.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
               {' • '}
               Duración: {servicio.duracionMinutos} min
             </p>
@@ -819,7 +829,7 @@ export function ServicioActivoCard({ servicio, onFinalizar }: ServicioActivoCard
                 )}
                 <div className="flex justify-between items-start gap-2">
                   <span className="text-muted-foreground flex-shrink-0">Hora inicio:</span>
-                  <span className="font-semibold text-right whitespace-nowrap">{servicio.horaInicio.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}</span>
+                  <span className="font-semibold text-right whitespace-nowrap">{servicio.horaInicio ? servicio.horaInicio.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) : '--:--'}</span>
                 </div>
                 <div className="flex justify-between items-start gap-2">
                   <span className="text-muted-foreground flex-shrink-0">Hora fin:</span>
@@ -927,11 +937,19 @@ export function ServicioActivoCard({ servicio, onFinalizar }: ServicioActivoCard
           </div>
 
           <DialogFooter className="px-4 py-3 sm:px-6 sm:py-4 border-t flex-shrink-0">
-            <Button 
+            <Button
               onClick={() => {
                 setMostrarReporte(false);
-                onFinalizar?.();
-              }} 
+                onCalificarCliente?.({
+                  agendamientoId: servicio.agendamientoId,
+                  modeloId: servicio.modeloId ?? '',
+                  clienteId: servicio.clienteId,
+                  clienteNombre: servicio.clienteNombre || 'Cliente Anónimo',
+                  tipoServicio: servicio.tipoServicio,
+                  duracionMinutos: servicio.duracionMinutos,
+                  modeloNombre: servicio.modeloNombre,
+                });
+              }}
               className="w-full h-11 font-semibold"
             >
               <CheckCircle className="w-4 h-4 mr-2" />

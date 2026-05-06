@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Star, MapPin, Clock, ChevronRight, X, ZoomIn, ChevronLeft, Send, Building2, Home } from 'lucide-react';
+import { Star, MapPin, Clock, ChevronRight, X, ZoomIn, ChevronLeft, Building2, Home } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
@@ -44,16 +44,13 @@ export function ModelCard({ model, onContact }: ModelCardProps) {
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<'sede' | 'domicilio'>('sede');
   const [columnCount, setColumnCount] = useState(2); // Solo para el modal de galería completa
-  const [imageOrientations, setImageOrientations] = useState<('horizontal' | 'vertical' | 'square')[]>([]); // Track orientación de cada imagen
   const [showFullscreen, setShowFullscreen] = useState(false); // Nuevo estado para fullscreen
-  const [rightColumnHeight, setRightColumnHeight] = useState<number | null>(null); // Altura de la columna derecha
   const rightColumnRef = useRef<HTMLDivElement>(null); // Referencia a la columna derecha
   const headerRef = useRef<HTMLDivElement>(null); // Referencia al header de la galería
 
   // Determinar si la descripción es larga (más de 150 caracteres)
   const isLongDescription = model.description.length > 150;
-
-  // Detectar orientación de imágenes al cargar
+  /*
   useEffect(() => {
     const loadImageOrientations = async () => {
       const orientations = await Promise.all(
@@ -71,11 +68,14 @@ export function ModelCard({ model, onContact }: ModelCardProps) {
           });
         })
       );
-      setImageOrientations(orientations);
+      // setImageOrientations(orientations);
     };
 
-    loadImageOrientations();
+    if (model.gallery && model.gallery.length > 0) {
+      loadImageOrientations();
+    }
   }, [model.gallery]);
+  */
 
   // Efecto para calcular columnas del MODAL de galería completa
   useEffect(() => {
@@ -102,6 +102,7 @@ export function ModelCard({ model, onContact }: ModelCardProps) {
   }, [model.gallery.length]);
 
   // Función para solicitar reserva desde el sistema
+  /*
   const handleReservar = () => {
     if (selectedService) {
       const precioSeleccionado = model.domicilio 
@@ -112,6 +113,7 @@ export function ModelCard({ model, onContact }: ModelCardProps) {
       onContact(model);
     }
   };
+  */
 
   // Manejar navegación con teclado
   useEffect(() => {
@@ -134,6 +136,7 @@ export function ModelCard({ model, onContact }: ModelCardProps) {
   }, [showFullscreen, showGallery, selectedImage, model.gallery.length]);
 
   // Efecto para obtener la altura de la columna derecha
+  /*
   useEffect(() => {
     const updateHeights = () => {
       const rightCol = rightColumnRef.current;
@@ -144,17 +147,12 @@ export function ModelCard({ model, onContact }: ModelCardProps) {
         const headerHeight = headerEl.offsetHeight;
         const galleryHeight = rightHeight - headerHeight - 32; // 32px de padding
         
-        setRightColumnHeight(galleryHeight);
+        // setRightColumnHeight(galleryHeight);
       }
     };
 
-    // Actualizar al montar y cuando cambie el contenido
     updateHeights();
-    
-    // Actualizar en resize
     window.addEventListener('resize', updateHeights);
-    
-    // Actualizar después de que las imágenes carguen
     const timer = setTimeout(updateHeights, 100);
     
     return () => {
@@ -162,19 +160,20 @@ export function ModelCard({ model, onContact }: ModelCardProps) {
       clearTimeout(timer);
     };
   }, [model, selectedService, showFullDescription, selectedLocation]);
+  */
 
   return (
     <>
-      <Card className="border-primary/15 bg-gradient-card shadow-card overflow-hidden w-full">
+      <Card className="border-primary/15 bg-gradient-card shadow-card overflow-hidden w-full h-auto sm:h-[650px]">
         <CardContent className="p-0">
           {/* Layout Vertical optimizado para cuadrícula (Grid) */}
-          <div className="flex flex-col">
+          <div className="flex flex-col h-full">
             {/* Cabecera: Foto de perfil + Info básica */}
             <div className="w-full flex-shrink-0 flex flex-col border-b border-primary/10">
               {/* Header tipo Carrusel Full Width */}
               <div
                 ref={headerRef}
-                className="relative w-full h-80 sm:h-96 md:h-[400px] flex-shrink-0 overflow-hidden group bg-black"
+                className="relative w-full h-72 sm:h-80 md:h-[400px] flex-shrink-0 overflow-hidden group bg-black"
               >
                 {model.gallery.length > 0 ? (
                   <>
@@ -333,7 +332,6 @@ export function ModelCard({ model, onContact }: ModelCardProps) {
 
                 {/* Selector de Ubicación */}
                 {model.domicilio ? (
-                  // ✅ Modelo PRESTA servicio a domicilio - Mostrar selector
                   <div className="flex gap-2 mb-3 p-1 bg-gradient-to-r from-primary/10 to-primary/5 rounded-lg border border-primary/20">
                     <button
                       onClick={() => setSelectedLocation('sede')}
@@ -363,7 +361,6 @@ export function ModelCard({ model, onContact }: ModelCardProps) {
                     </button>
                   </div>
                 ) : (
-                  // ❌ Modelo NO hace domicilios - Mostrar aviso
                   <div className="mb-3 p-3 bg-amber-950/20 rounded-lg border border-amber-500/30">
                     <div className="flex items-start gap-3">
                       <Building2 className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
@@ -430,27 +427,33 @@ export function ModelCard({ model, onContact }: ModelCardProps) {
                 </div>
               </div>
 
-              {/* Botón de Reserva Directo */}
-              <div className="p-4 border-t border-primary/10 mt-auto">
+              {/* Footer con precio base y botón */}
+              <div className="p-4 border-t border-primary/10 bg-background/60 backdrop-blur-md mt-auto">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] uppercase tracking-[0.2em] font-black mb-0.5 text-primary">Desde</span>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-xs font-bold text-primary">$</span>
+                      <span className="text-2xl font-black tracking-tighter text-foreground">
+                        {(() => {
+                          const prices = model.services
+                            .map(s => {
+                              const p = selectedLocation === 'domicilio' && s.priceHome ? s.priceHome : s.price;
+                              return parseInt(String(p).replace(/[^0-9]/g, '')) || 0;
+                            })
+                            .filter(p => p > 0);
+                          return prices.length > 0 ? Math.min(...prices).toLocaleString('es-CO') : '---';
+                        })()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
                 <button
                   onClick={() => onContact(model)}
-                  style={{
-                    width: '100%',
-                    background: 'linear-gradient(135deg, #B8860B, #FFD700)',
-                    border: 'none',
-                    borderRadius: 10,
-                    padding: '14px',
-                    color: 'black',
-                    fontWeight: 700,
-                    fontSize: 15,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 8
-                  }}
+                  className="w-full py-4 rounded-xl font-bold text-[13px] uppercase tracking-[0.15em] transition-all duration-300 flex items-center justify-center gap-2 bg-gradient-to-r from-[#B8860B] to-[#FFD700] text-black hover:shadow-[0_0_20px_rgba(184,134,11,0.4)] active:scale-95"
                 >
-                  ✅ Reservar ahora
+                  ◆ Reservar ahora
                 </button>
               </div>
             </div>

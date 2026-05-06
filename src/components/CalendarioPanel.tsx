@@ -27,14 +27,14 @@ type FiltroTiempo = 'todos' | 'proximos' | 'pasados';
 
 interface CalendarioPanelProps {
   modeloEmail?: string; // Si se pasa, filtra solo servicios de esa modelo
-  userRole?: 'owner' | 'admin' | 'programador' | 'modelo'; // Rol del usuario para determinar acceso a info de clientes
+  userRole?: 'owner' | 'administrador' | 'programador' | 'modelo'; // Rol del usuario para determinar acceso a info de clientes
 }
 
 export function CalendarioPanel({ modeloEmail, userRole = 'modelo' }: CalendarioPanelProps) {
   // Usar servicios (array unificado) con guard defensivo
   const { servicios } = useServicios();
   const { modelos } = useModelos();
-  const { buscarPorTelefono } = useClientes();
+  const { buscarPorTelefono: _buscarPorTelefono } = useClientes();
   const [vista, setVista] = useState<VistaCalendario>('mes');
   const [filtroTiempo, setFiltroTiempo] = useState<FiltroTiempo>('todos');
   const [fechaActual, setFechaActual] = useState(new Date());
@@ -48,14 +48,16 @@ export function CalendarioPanel({ modeloEmail, userRole = 'modelo' }: Calendario
   };
 
   // Función para obtener el nombre de usuario del cliente
+  /*
   const obtenerNombreUsuarioCliente = (telefono?: string) => {
     if (!telefono) return null;
     const cliente = buscarPorTelefono(telefono);
     return cliente?.nombreUsuario || null;
   };
+  */
 
   // Determinar si el usuario tiene acceso a la info del cliente (owner, admin, programador)
-  const puedeVerInfoCliente = userRole === 'owner' || userRole === 'admin' || userRole === 'programador';
+  const puedeVerInfoCliente = userRole === 'owner' || userRole === 'administrador' || userRole === 'programador';
 
   // Combinar todos los servicios con guard defensivo
   const todosLosServicios = useMemo(() => {

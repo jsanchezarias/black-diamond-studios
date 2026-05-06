@@ -9,7 +9,7 @@ import { Calendar, Clock, User, Phone, MapPin, FileText, Plus, Loader2, AlertCir
 import { useAgendamientos } from '../app/components/AgendamientosContext';
 import { useModelos } from '../app/components/ModelosContext';
 import { useClientes } from '../app/components/ClientesContext';
-import { ClienteStatusChecker } from '../app/components/ClienteStatusChecker'; // 🆕 Checker de estado del cliente
+// import { ClienteStatusChecker } from '../app/components/ClienteStatusChecker'; // 🆕 Checker de estado del cliente
 import { toast } from 'sonner';
 import { SelectErrorBoundary } from './SelectErrorBoundary';
 
@@ -23,7 +23,7 @@ interface CrearAgendamientoModalProps {
 export function CrearAgendamientoModal({ 
   isOpen, 
   onClose, 
-  userEmail,
+  userEmail: _userEmail,
   modeloEmailPredefinido 
 }: CrearAgendamientoModalProps) {
   const agendamientosCtx = useAgendamientos();

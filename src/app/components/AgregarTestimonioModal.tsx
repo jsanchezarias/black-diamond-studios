@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Star, X, Camera, MessageSquare, User, Mail, Send, CheckCircle } from 'lucide-react';
+import { Star, MessageSquare, User, Mail, Send, CheckCircle } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';

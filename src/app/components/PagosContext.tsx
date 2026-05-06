@@ -4,6 +4,8 @@ import {
   notificarAdelantoAprobado,
   notificarAdelantoRechazado
 } from './NotificacionesHelpers';
+import { supabase } from '../../utils/supabase/info';
+import { toast } from 'sonner';
 
 export interface Adelanto {
   id: string;
@@ -232,6 +234,21 @@ export function PagosProvider({ children }: { children: ReactNode }) {
       concepto: 'Liquidación de servicios',
       metodoPago
     }).catch(err => { if (process.env.NODE_ENV === 'development') console.error('Error notificando pago recibido:', err); });
+
+    // 💰 REGISTRO EN BALANCE (NUEVO)
+    supabase.from('balance_financiero').insert({
+      tipo: 'ingreso',
+      categoria: 'reserva',
+      concepto: `Pago reserva — ${modeloNombre} (Liquidación)`,
+      monto: detalles.totalAPagar,
+      referencia_id: nuevoPago.id,
+      referencia_tabla: 'pagos',
+      fecha: new Date().toISOString().split('T')[0]
+    }).then(({ error }) => {
+      if (!error) {
+        toast.success(`💰 Ingreso registrado: $${detalles.totalAPagar.toLocaleString('es-CO')}`);
+      }
+    });
   };
 
   const obtenerAdelantosModelo = (modeloEmail: string) => {

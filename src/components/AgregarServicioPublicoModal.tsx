@@ -19,10 +19,11 @@ export function AgregarServicioPublicoModal({ isOpen, onClose }: AgregarServicio
   const [numeroCuenta, setNumeroCuenta] = useState('');
   const [diaLimitePago, setDiaLimitePago] = useState('15');
   const [montoPromedio, setMontoPromedio] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!nombre.trim() || !proveedor.trim() || !montoPromedio || parseFloat(montoPromedio) <= 0) {
@@ -39,35 +40,42 @@ export function AgregarServicioPublicoModal({ isOpen, onClose }: AgregarServicio
     // Calcular primera fecha de pago
     const hoy = new Date();
     const proximoPago = new Date(hoy.getFullYear(), hoy.getMonth(), dia);
-    
+
     // Si ya pasó este mes, programar para el siguiente
     if (proximoPago < hoy) {
       proximoPago.setMonth(proximoPago.getMonth() + 1);
     }
 
-    agregarServicio({
-      nombre: nombre.trim(),
-      tipo,
-      proveedor: proveedor.trim(),
-      numeroCuenta: numeroCuenta.trim() || undefined,
-      fechaLimitePago: dia, // Guardar el día del mes (1-31)
-      montoPromedio: parseFloat(montoPromedio),
-      proximoPago,
-      activo: true,
-    });
+    try {
+      setSubmitting(true);
+      await agregarServicio({
+        nombre: nombre.trim(),
+        tipo,
+        proveedor: proveedor.trim(),
+        numeroCuenta: numeroCuenta.trim() || undefined,
+        fechaLimitePago: dia,
+        montoPromedio: parseFloat(montoPromedio),
+        proximoPago,
+        activo: true,
+      });
 
-    toast.success('Servicio público registrado', {
-      description: `Se configuraron recordatorios para el día ${dia} de cada mes`,
-    });
+      toast.success('Servicio público registrado', {
+        description: `Se configuraron recordatorios para el día ${dia} de cada mes`,
+      });
 
-    // Reset
-    setNombre('');
-    setTipo('luz');
-    setProveedor('');
-    setNumeroCuenta('');
-    setDiaLimitePago('15');
-    setMontoPromedio('');
-    onClose();
+      // Reset
+      setNombre('');
+      setTipo('luz');
+      setProveedor('');
+      setNumeroCuenta('');
+      setDiaLimitePago('15');
+      setMontoPromedio('');
+      onClose();
+    } catch (err: any) {
+      toast.error('Error al guardar', { description: err.message });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const tiposServicio = [
@@ -263,9 +271,9 @@ export function AgregarServicioPublicoModal({ isOpen, onClose }: AgregarServicio
               >
                 Cancelar
               </Button>
-              <Button type="submit" className="flex-1 bg-primary text-primary-foreground">
+              <Button type="submit" className="flex-1 bg-primary text-primary-foreground" disabled={submitting}>
                 <Zap className="w-4 h-4 mr-2" />
-                Agregar Servicio
+                {submitting ? 'Guardando...' : 'Agregar Servicio'}
               </Button>
             </div>
           </form>

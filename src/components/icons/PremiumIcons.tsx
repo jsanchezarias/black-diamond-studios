@@ -18,23 +18,23 @@
 import {
   // ========== NAVEGACIÓN Y ACCIONES ==========
   X,
-  ChevronLeft,
-  ChevronRight,
+//  ChevronLeft,
+//  ChevronRight,
   ChevronDown,
   ChevronUp,
   Menu,
   MoreHorizontal,
-  MoreVertical,
+//  MoreVertical,
   ArrowLeft,
   ArrowRight,
-  ArrowUp,
-  ArrowDown,
+//  ArrowUp,
+//  ArrowDown,
   
   // ========== USUARIOS Y PERSONAS ==========
   User,
   UserPlus,
   UserMinus,
-  UserX,
+//  UserX,
   Users,
   Crown,
   
@@ -64,7 +64,7 @@ import {
   // ========== ESTADO Y ACCIONES ==========
   Check,
   CheckCircle2,
-  Circle,
+//  Circle,
   AlertCircle,
   Info,
   XCircle,
@@ -143,11 +143,13 @@ import {
 // CONFIGURACIÓN BASE
 // ============================================================
 
+/*
 const ICON_CONFIG = {
   strokeWidth: 1.5, // Líneas finas para look premium
   size: 20,         // Tamaño base consistente
   className: '',    // Clase adicional opcional
 };
+*/
 
 // ============================================================
 // COMPONENTE BASE PARA ICONOS

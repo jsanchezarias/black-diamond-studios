@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ArrowUp } from 'lucide-react';
 
 /**
@@ -8,7 +8,6 @@ import { ArrowUp } from 'lucide-react';
 export function ScrollUI() {
   const [progress, setProgress] = useState(0);
   const [showBtn, setShowBtn] = useState(false);
-  const rafRef = useRef<number>(0);
 
   useEffect(() => {
     const onScroll = () => {

@@ -884,7 +884,7 @@ app.get("/make-server-9dadc017/diagnostico/estado-completo", async (c) => {
     
     const porRole = {
       owner: dbUsers?.filter(u => u.role === 'owner').length || 0,
-      admin: dbUsers?.filter(u => u.role === 'admin').length || 0,
+      administrador: dbUsers?.filter(u => u.role === 'administrador').length || 0,
       programador: dbUsers?.filter(u => u.role === 'programador').length || 0,
       modelo: dbUsers?.filter(u => u.role === 'modelo').length || 0,
     };
@@ -1779,7 +1779,7 @@ app.post("/make-server-9dadc017/upload/update-modelo", async (c) => {
   }
 });
 
-// Crear nueva modelo (sin afectar sesión del admin)
+// Crear nueva modelo (sin afectar sesión del administrador)
 // Alias del endpoint usado por el panel CrearModelosRealesPanel
 app.post("/make-server-9dadc017/modelos/crear", async (c) => {
   try {
@@ -1925,8 +1925,8 @@ app.post("/make-server-9dadc017/modelos/crear", async (c) => {
   }
 });
 
-// Crear nueva modelo vía panel de admin (sin afectar sesión del admin)
-app.post("/make-server-9dadc017/admin/crear-modelo", async (c) => {
+// Crear nueva modelo vía panel de administrador (sin afectar sesión del administrador)
+app.post("/make-server-9dadc017/administrador/crear-modelo", async (c) => {
   try {
     const body = await c.req.json();
     const { 
@@ -2067,6 +2067,60 @@ app.post("/make-server-9dadc017/admin/crear-modelo", async (c) => {
       error: error.message || 'Error inesperado al crear modelo',
       errorDetails: error.toString()
     }, 500);
+  }
+});
+
+// ==================== UPDATE USER CREDENTIALS ====================
+
+app.post("/make-server-9dadc017/administrador/actualizar-credenciales", async (c) => {
+  try {
+    const body = await c.req.json();
+    const { userId, email, password } = body;
+
+    if (!userId) {
+      return c.json({ error: 'El ID del usuario es requerido' }, 400);
+    }
+
+    // Crear cliente de Supabase con Service Role Key
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+
+    const updateAuthData: any = {};
+    if (email) updateAuthData.email = email;
+    if (password) updateAuthData.password = password;
+    if (email) updateAuthData.user_metadata = { email };
+
+    // 1. Update Auth
+    const { data: authData, error: authError } = await supabase.auth.admin.updateUserById(
+      userId,
+      updateAuthData
+    );
+
+    if (authError) {
+      console.error('❌ Error actualizando credenciales en Auth:', authError);
+      return c.json({ error: `Error Auth: ${authError.message}` }, 500);
+    }
+
+    // 2. Update DB (usuarios)
+    if (email) {
+      const { error: dbError } = await supabase
+        .from('usuarios')
+        .update({ email: email })
+        .eq('id', userId);
+
+      if (dbError) {
+        console.error('❌ Error actualizando email en BD:', dbError);
+        return c.json({ error: `Error BD: ${dbError.message}` }, 500);
+      }
+    }
+
+    return c.json({ success: true, message: 'Credenciales actualizadas correctamente' });
+  } catch (error: any) {
+    console.error('❌ Error inesperado actualizando credenciales:', error);
+    return c.json({ error: error.message || 'Error inesperado' }, 500);
   }
 });
 
@@ -2296,10 +2350,10 @@ app.get("/make-server-9dadc017/payments/:reference", async (c) => {
   }
 });
 
-// ==================== GESTIÓN DE USUARIOS (ADMIN/PROGRAMADOR) ====================
+// ==================== GESTIÓN DE USUARIOS (ADMINISTRADOR/PROGRAMADOR) ====================
 
-// Crear usuario admin o programador con email confirmado (evita el problema de confirmación de email)
-app.post("/make-server-9dadc017/admin/crear-usuario", async (c) => {
+// Crear usuario administrador o programador con email confirmado (evita el problema de confirmación de email)
+app.post("/make-server-9dadc017/administrador/crear-usuario", async (c) => {
   try {
     const body = await c.req.json();
     const { email, password, nombre, role } = body;
@@ -2308,8 +2362,8 @@ app.post("/make-server-9dadc017/admin/crear-usuario", async (c) => {
       return c.json({ error: 'Email, contraseña, nombre y rol son requeridos' }, 400);
     }
 
-    if (!['admin', 'programador'].includes(role)) {
-      return c.json({ error: 'Rol inválido. Debe ser admin o programador' }, 400);
+    if (!['administrador', 'programador'].includes(role)) {
+      return c.json({ error: 'Rol inválido. Debe ser administrador o programador' }, 400);
     }
 
     if (password.length < 6) {
@@ -2368,6 +2422,76 @@ app.post("/make-server-9dadc017/admin/crear-usuario", async (c) => {
   } catch (error) {
     console.error('❌ Error inesperado creando usuario:', error);
     return c.json({ error: error.message || 'Error inesperado' }, 500);
+  }
+});
+
+// ==================== ONE-TIME SETUP MIGRATIONS ====================
+// Temporary endpoint — safe because protected by secret + idempotent
+app.post("/make-server-9dadc017/admin/run-setup", async (c) => {
+  try {
+    const body = await c.req.json();
+    const SECRET = 'bds-setup-2026-nore';
+    if (body.secret !== SECRET) {
+      return c.json({ error: 'Unauthorized' }, 403);
+    }
+
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+
+    const results: Record<string, any> = {};
+
+    // 1. Fix admin.test role
+    const { data: adminUser } = await supabase
+      .from('usuarios')
+      .select('id, email, role')
+      .eq('email', 'admin.test@blackdiamond.com')
+      .single();
+
+    if (adminUser) {
+      if (adminUser.role !== 'admin') {
+        const { error } = await supabase
+          .from('usuarios')
+          .update({ role: 'admin' })
+          .eq('email', 'admin.test@blackdiamond.com');
+        results.adminRoleFix = error ? `ERROR: ${error.message}` : 'OK — role set to admin';
+      } else {
+        results.adminRoleFix = 'SKIP — role already admin';
+      }
+    } else {
+      results.adminRoleFix = 'SKIP — admin.test not found';
+    }
+
+    // 2. Delete test agendamiento
+    const TEST_ID = 'a4d8b454-448c-49a6-8305-a283969f89b5';
+    const { count, error: delError } = await supabase
+      .from('agendamientos')
+      .delete({ count: 'exact' })
+      .eq('id', TEST_ID);
+    results.deleteTestAgendamiento = delError
+      ? `ERROR: ${delError.message}`
+      : count! > 0 ? 'OK — deleted' : 'SKIP — not found';
+
+    // 3. Delete any other simulation agendamientos
+    const { count: count2, error: delError2 } = await supabase
+      .from('agendamientos')
+      .delete({ count: 'exact' })
+      .ilike('notas', '%SIMULACION%');
+    results.deleteSimulacionNotes = delError2
+      ? `ERROR: ${delError2.message}`
+      : count2! > 0 ? `OK — deleted ${count2}` : 'SKIP — none found';
+
+    // 4. Ensure porcentaje_comision column exists (via rpc if available, else skip)
+    const { error: colError } = await supabase.rpc('ensure_porcentaje_comision');
+    results.porcentajeComisionCol = colError
+      ? 'SKIP — run SQL manually (ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS porcentaje_comision NUMERIC(5,2) DEFAULT 50)'
+      : 'OK';
+
+    return c.json({ success: true, results });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
   }
 });
 

@@ -29,6 +29,8 @@ export interface Notificacion {
   
   // Metadatos
   fechaCreacion: string;
+  created_at?: string;            // Alias para compatibilidad
+  referencia_id?: string;         // ID de referencia (ej: agendamiento_id)
   creadoPor: string;
   expiraEn?: string;              // Fecha de expiración
 }
@@ -111,10 +113,32 @@ interface NotificacionesContextType {
 
 const NotificacionesContext = createContext<NotificacionesContextType | undefined>(undefined);
 
+// 🔒 Fallback seguro para cuando el contexto no está disponible (ej: durante logout)
+const NOTIFICACIONES_FALLBACK: NotificacionesContextType = {
+  notificaciones: [],
+  noLeidas: 0,
+  preferencias: null,
+  cargando: false,
+  crearNotificacion: async () => {},
+  marcarComoLeida: async () => {},
+  marcarTodasComoLeidas: async () => {},
+  eliminarNotificacion: async () => {},
+  limpiarNotificacionesAntiguas: async () => {},
+  obtenerPreferencias: async () => null,
+  actualizarPreferencias: async () => {},
+  obtenerNotificacionesPorTipo: () => [],
+  obtenerNotificacionesNoLeidas: () => [],
+  obtenerNotificacionesRecientes: () => [],
+};
+
 export const useNotificaciones = () => {
   const context = useContext(NotificacionesContext);
+  // ✅ Retorna fallback seguro en vez de lanzar error durante teardown del contexto
   if (!context) {
-    throw new Error('useNotificaciones debe usarse dentro de NotificacionesProvider');
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('⚠️ useNotificaciones: contexto no disponible, usando fallback vacío');
+    }
+    return NOTIFICACIONES_FALLBACK;
   }
   return context;
 };
@@ -131,11 +155,23 @@ export const NotificacionesProvider = ({ children }: { children: ReactNode }) =>
     if (!usuarioId) return;
 
     try {
+      // 1. Obtener sesión activa para validación extra
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session || session.user.id !== usuarioId) return;
+
+      // Leer role desde localStorage — ya está guardado por App.tsx, evita query innecesaria a usuarios
+      let role: string | undefined;
+      try {
+        const saved = localStorage.getItem('blackDiamondUser');
+        if (saved) role = JSON.parse(saved).role ?? undefined;
+      } catch { /* ignorar */ }
+
       const { data, error } = await (supabase as any)
         .from('notificaciones')
         .select('*')
-        .or(`usuario_id.eq.${usuarioId},usuario_email.eq.${usuarioId}`)
-        .order('fecha_creacion', { ascending: false })
+        .or(`para_usuario_id.eq.${usuarioId},para_rol.eq.${role}`)
+        .or('eliminado.is.null,eliminado.eq.false')
+        .order('created_at', { ascending: false })
         .limit(50);
 
       if (error) {
@@ -146,7 +182,7 @@ export const NotificacionesProvider = ({ children }: { children: ReactNode }) =>
 
       const mapped = (data ?? []).map((row: any): Notificacion => ({
         id: row.id,
-        usuarioId: row.usuario_id ?? row.usuario_email ?? usuarioId,
+        usuarioId: row.para_usuario_id ?? row.usuario_id ?? row.usuario_email ?? usuarioId,
         usuarioEmail: row.usuario_email ?? usuarioId,
         tipo: row.tipo,
         titulo: row.titulo,
@@ -154,10 +190,21 @@ export const NotificacionesProvider = ({ children }: { children: ReactNode }) =>
         icono: row.icono,
         leida: row.leida ?? false,
         fechaLectura: row.fecha_lectura,
-        accion: row.accion ? (typeof row.accion === 'string' ? JSON.parse(row.accion) : row.accion) : undefined,
+        accion: (() => {
+          if (!row.accion) return row.datos ? { tipo: 'navegar', datos: row.datos } : undefined;
+          if (typeof row.accion !== 'string') return row.accion;
+          try {
+            return JSON.parse(row.accion);
+          } catch (e) {
+            console.warn('⚠️ Error parseando acción de notificación:', e);
+            return undefined;
+          }
+        })(),
         urlDestino: row.url_destino,
         prioridad: row.prioridad ?? 'media',
-        fechaCreacion: row.fecha_creacion ?? row.created_at ?? new Date().toISOString(),
+        fechaCreacion: row.created_at ?? row.fecha_creacion ?? new Date().toISOString(),
+        created_at: row.created_at,
+        referencia_id: row.referencia_id,
         creadoPor: row.creado_por ?? 'sistema',
         expiraEn: row.expira_en,
       }));
@@ -288,12 +335,12 @@ export const NotificacionesProvider = ({ children }: { children: ReactNode }) =>
     }
   };
 
-  // 🗑️ Eliminar notificación
+  // 🗑️ Eliminar notificación (soft delete)
   const eliminarNotificacion = async (id: string) => {
     try {
       await (supabase as any)
         .from('notificaciones')
-        .delete()
+        .update({ eliminado: true })
         .eq('id', id);
 
       setNotificaciones(prev => prev.filter(n => n.id !== id));
@@ -302,7 +349,7 @@ export const NotificacionesProvider = ({ children }: { children: ReactNode }) =>
     }
   };
 
-  // 🧹 Limpiar notificaciones antiguas (más de 30 días)
+  // 🧹 Limpiar notificaciones antiguas (más de 30 días, soft delete)
   const limpiarNotificacionesAntiguas = async () => {
     if (!usuarioActual) return;
 
@@ -312,7 +359,7 @@ export const NotificacionesProvider = ({ children }: { children: ReactNode }) =>
 
       await (supabase as any)
         .from('notificaciones')
-        .delete()
+        .update({ eliminado: true })
         .or(`usuario_id.eq.${usuarioActual},usuario_email.eq.${usuarioActual}`)
         .lt('fecha_creacion', fechaLimite.toISOString());
 
@@ -353,33 +400,54 @@ export const NotificacionesProvider = ({ children }: { children: ReactNode }) =>
 
   // 🔍 Obtener notificaciones por tipo
   const obtenerNotificacionesPorTipo = (tipo: TipoNotificacion): Notificacion[] => {
-    return notificaciones.filter(n => n.tipo === tipo);
+    return (notificaciones || []).filter(n => n.tipo === tipo);
   };
 
   // 🔍 Obtener notificaciones no leídas
   const obtenerNotificacionesNoLeidas = (): Notificacion[] => {
-    return notificaciones.filter(n => !n.leida);
+    return (notificaciones || []).filter(n => !n.leida);
   };
 
   // 🔍 Obtener notificaciones recientes
   const obtenerNotificacionesRecientes = (limite: number = 10): Notificacion[] => {
-    return notificaciones
+    return (notificaciones || [])
       .sort((a, b) => new Date(b.fechaCreacion).getTime() - new Date(a.fechaCreacion).getTime())
       .slice(0, limite);
   };
 
   // 📊 Calcular número de notificaciones no leídas
-  const noLeidas = notificaciones.filter(n => !n.leida).length;
+  const noLeidas = (notificaciones || []).filter(n => !n.leida).length;
 
   // 🔄 Cargar datos iniciales
   useEffect(() => {
-    const usuarioId = localStorage.getItem('currentUserId') || localStorage.getItem('currentUserEmail');
+    // ✅ Leer userId desde la clave correcta que usa App.tsx
+    let usuarioId: string | null = null;
+    try {
+      const saved = localStorage.getItem('blackDiamondUser');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        usuarioId = parsed.userId || parsed.email || null;
+      }
+    } catch {
+      // Fallback a claves legacy
+      usuarioId = localStorage.getItem('currentUserId') || localStorage.getItem('currentUserEmail');
+    }
+
+    // 🚩 Flag para evitar setState después del desmontaje (previene ReferenceError)
+    let mounted = true;
+
     if (usuarioId) {
       setUsuarioActual(usuarioId);
       cargarNotificaciones(usuarioId);
       obtenerPreferencias(usuarioId);
 
-      // ✅ REALTIME: Notificaciones en tiempo real
+      // ✅ REALTIME: Notificaciones en tiempo real (Usuario + Rol)
+      let resolvedRole: string | undefined;
+      try {
+        const saved = localStorage.getItem('blackDiamondUser');
+        if (saved) resolvedRole = JSON.parse(saved).role ?? undefined;
+      } catch { /* ignorar */ }
+
       const channel = supabase
         .channel(`notif-live-${usuarioId}`)
         .on('postgres_changes', {
@@ -387,48 +455,81 @@ export const NotificacionesProvider = ({ children }: { children: ReactNode }) =>
           schema: 'public',
           table: 'notificaciones'
         }, (payload) => {
-          const notif = payload.new;
-          const esParaUsuario = 
-            String(notif.usuario_id || '').toLowerCase() === String(usuarioId).toLowerCase() ||
-            String(notif.usuario_email || '').toLowerCase() === String(usuarioId).toLowerCase();
+          // ✅ No procesar si el provider ya se desmontó
+          if (!mounted) return;
 
-          if (!esParaUsuario) return;
+          const notif = payload.new;
+          const userRole = resolvedRole;
+
+          // Verificar si es para este usuario o para su rol
+          const esParaUsuario =
+            String(notif.para_usuario_id || '').toLowerCase() === String(usuarioId).toLowerCase() ||
+            String(notif.usuario_id || '').toLowerCase() === String(usuarioId).toLowerCase();
+
+          const esParaRol =
+            userRole && String(notif.para_rol || '').toLowerCase() === String(userRole).toLowerCase();
+
+          if (!esParaUsuario && !esParaRol) return;
 
           const mapped: Notificacion = {
             id: notif.id,
-            usuarioId: notif.usuario_id ?? notif.usuario_email ?? usuarioId,
-            usuarioEmail: notif.usuario_email ?? usuarioId,
+            usuarioId: notif.para_usuario_id ?? notif.usuario_id ?? notif.usuario_email ?? usuarioId!,
+            usuarioEmail: notif.usuario_email ?? usuarioId!,
             tipo: notif.tipo,
             titulo: notif.titulo,
             mensaje: notif.mensaje,
             icono: notif.icono,
             leida: notif.leida ?? false,
             fechaLectura: notif.fecha_lectura,
-            accion: notif.accion ? (typeof notif.accion === 'string' ? JSON.parse(notif.accion) : notif.accion) : undefined,
+            accion: (() => {
+              if (!notif.accion) return notif.datos ? { tipo: 'navegar', datos: notif.datos } : undefined;
+              if (typeof notif.accion !== 'string') return notif.accion;
+              try {
+                return JSON.parse(notif.accion);
+              } catch (e) {
+                return undefined;
+              }
+            })(),
             urlDestino: notif.url_destino,
             prioridad: notif.prioridad ?? 'media',
-            fechaCreacion: notif.fecha_creacion ?? notif.created_at ?? new Date().toISOString(),
+            fechaCreacion: notif.created_at ?? notif.fecha_creacion ?? new Date().toISOString(),
             creadoPor: notif.creado_por ?? 'sistema',
             expiraEn: notif.expira_en,
           };
-          setNotificaciones(prev => [mapped, ...prev]);
-          toast('🔔 ' + mapped.titulo, {
-            duration: 6000,
-            style: {
+
+          if (mounted) {
+            setNotificaciones(prev => [mapped, ...prev]);
+
+            // Mostrar toast según tipo
+            const toastStyles = {
+              nueva_reserva: { background: 'rgba(201,169,97,0.15)', border: '1px solid #c9a961' },
+              reserva_asignada: { background: 'rgba(74,222,128,0.15)', border: '1px solid #4ade80' },
+              reserva_confirmada: { background: 'rgba(74,222,128,0.15)', border: '1px solid #4ade80' }
+            };
+
+            const style = (toastStyles as any)[mapped.tipo] || {
               background: 'rgba(255,215,0,0.15)',
               border: '1px solid rgba(255,215,0,0.4)',
               color: 'white',
               fontWeight: '600'
-            }
-          });
+            };
+
+            toast('🔔 ' + mapped.titulo, {
+              duration: 6000,
+              description: mapped.mensaje,
+              style: { ...style, color: 'white' }
+            });
+          }
         })
         .subscribe();
 
       return () => {
+        mounted = false;
         supabase.removeChannel(channel);
       };
     } else {
       setCargando(false);
+      return () => { mounted = false; };
     }
   }, [cargarNotificaciones, obtenerPreferencias]);
 

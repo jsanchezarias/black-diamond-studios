@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '../../utils/supabase/info'; // ✅ Corregido: ruta correcta
+import { toast } from 'sonner';
 
 export interface ItemCarrito {
   id: string; // ✅ UUID de Supabase
@@ -36,6 +37,7 @@ interface CarritoContextType {
   obtenerComprasPorModelo: (modeloEmail: string) => Compra[];
   cargarCarrito: (modeloEmail: string) => Promise<void>;
   cargarCompras: (modeloEmail: string) => Promise<void>;
+  cargarTodasLasCompras: () => Promise<void>;
 }
 
 const CarritoContext = createContext<CarritoContextType | undefined>(undefined);
@@ -43,11 +45,32 @@ const CarritoContext = createContext<CarritoContextType | undefined>(undefined);
 export function CarritoProvider({ children }: { children: ReactNode }) {
   const [carrito, setCarrito] = useState<ItemCarrito[]>([]);
   const [compras, setCompras] = useState<Compra[]>([]);
-  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('compras-rt')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'compras' }, () => {
+        cargarTodasLasCompras();
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'compras' }, () => {
+        cargarTodasLasCompras();
+      })
+      .subscribe();
+
+    const handleFocus = () => cargarTodasLasCompras();
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      supabase.removeChannel(channel);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, []);
 
   // ✅ Cargar carrito desde Supabase
   const cargarCarrito = async (modeloEmail: string) => {
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
       
       const { data, error } = await supabase
         .from('carrito_items')
@@ -93,6 +116,8 @@ export function CarritoProvider({ children }: { children: ReactNode }) {
   // ✅ Cargar compras desde Supabase
   const cargarCompras = async (modeloEmail: string) => {
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
       
       const { data: comprasData, error: comprasError } = await supabase
         .from('compras')
@@ -109,7 +134,7 @@ export function CarritoProvider({ children }: { children: ReactNode }) {
         // Cargar items de cada compra
         const comprasConItems = await Promise.all(
           comprasData.map(async (compra) => {
-            const { data: itemsData, error: itemsError } = await supabase
+            const { data: itemsData } = await supabase
               .from('compras_items')
               .select('*')
               .eq('compra_id', compra.id);
@@ -145,6 +170,61 @@ export function CarritoProvider({ children }: { children: ReactNode }) {
       }
     } catch (error) {
       if (process.env.NODE_ENV === 'development') console.error('❌ Error cargando compras:', error);
+    }
+  };
+
+  // ✅ Cargar TODAS las compras (para Administrador/Owner)
+  const cargarTodasLasCompras = async () => {
+    try {
+      const { data: comprasData, error: comprasError } = await supabase
+        .from('compras')
+        .select('*')
+        .order('fecha', { ascending: false });
+
+      if (comprasError) {
+        if (process.env.NODE_ENV === 'development') console.error('❌ Error cargando todas las compras:', comprasError);
+        return;
+      }
+
+      if (comprasData) {
+        const comprasConItems = await Promise.all(
+          comprasData.map(async (compra) => {
+            const { data: itemsData } = await supabase
+              .from('compras_items')
+              .select('*')
+              .eq('compra_id', compra.id);
+
+            const items: ItemCarrito[] = itemsData
+              ? itemsData.map(item => ({
+                  id: item.id,
+                  productoId: item.producto_id || '',
+                  nombre: item.nombre,
+                  precio: parseFloat(item.precio),
+                  cantidad: item.cantidad,
+                  imagen: item.imagen || '',
+                  categoria: item.categoria || '',
+                }))
+              : [];
+
+            return {
+              id: compra.id,
+              modeloEmail: compra.modelo_email,
+              modeloNombre: compra.modelo_nombre,
+              items,
+              subtotal: parseFloat(compra.subtotal),
+              total: parseFloat(compra.total),
+              metodoPago: compra.metodo_pago as any,
+              comprobantePago: compra.comprobante_pago,
+              fecha: compra.fecha,
+              estado: compra.estado as any,
+            };
+          })
+        );
+
+        setCompras(comprasConItems);
+      }
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') console.error('❌ Error inesperado cargando todas las compras:', error);
     }
   };
 
@@ -298,6 +378,21 @@ export function CarritoProvider({ children }: { children: ReactNode }) {
 
       if (errorItems) throw errorItems;
 
+      // 💰 REGISTRO EN BALANCE (NUEVO)
+      supabase.from('balance_financiero').insert({
+        tipo: 'ingreso',
+        categoria: 'boutique',
+        concepto: `Venta boutique — ${modeloNombre}`,
+        monto: total,
+        referencia_id: compraId,
+        referencia_tabla: 'compras',
+        fecha: new Date().toISOString().split('T')[0]
+      }).then(({ error }) => {
+        if (!error) {
+          toast.success(`💰 Ingreso registrado: Venta boutique $${total.toLocaleString('es-CO')}`);
+        }
+      });
+
       // 3. Vaciar el carrito
       await vaciarCarrito(modeloEmail);
 
@@ -327,6 +422,7 @@ export function CarritoProvider({ children }: { children: ReactNode }) {
       obtenerComprasPorModelo,
       cargarCarrito,
       cargarCompras,
+      cargarTodasLasCompras,
     }}>
       {children}
     </CarritoContext.Provider>

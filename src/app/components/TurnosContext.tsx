@@ -50,8 +50,8 @@ export function TurnosProvider({ children }: { children: ReactNode }) {
         prevTurnos.map(turno => {
           if (!turno.horaEntrada || turno.horaSalida) return turno;
 
-          const ahora = new Date();
-          const tiempoTranscurrido = Math.floor((ahora.getTime() - turno.horaEntrada.getTime()) / 1000);
+          // const ahora = new Date();
+          // const tiempoTranscurrido = Math.floor((ahora.getTime() - turno.horaEntrada.getTime()) / 1000);
           
           // Actualizar según el estado actual
           if (turno.estado === 'En Servicio') {

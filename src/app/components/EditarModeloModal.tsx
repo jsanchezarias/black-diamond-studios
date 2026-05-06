@@ -41,6 +41,7 @@ export function EditarModeloModal({ open, onClose, modelo }: EditarModeloModalPr
     disponible: true,
     domicilio: true,
     politicaTarifa: 1,
+    porcentajeComision: 50,
     documento_tipo: 'cedula',
     documento_numero: '',
     documentoFrente: '',
@@ -75,6 +76,7 @@ export function EditarModeloModal({ open, onClose, modelo }: EditarModeloModalPr
         disponible: modelo.disponible ?? true,
         domicilio: modelo.domicilio ?? true,
         politicaTarifa: modelo.politicaTarifa || 1,
+        porcentajeComision: modelo.porcentajeComision ?? 50,
         documento_tipo: modelo.documento_tipo || 'cedula',
         documento_numero: modelo.documento_numero || '',
         documentoFrente: modelo.documentoFrente || '',
@@ -87,23 +89,44 @@ export function EditarModeloModal({ open, onClose, modelo }: EditarModeloModalPr
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const result = reader.result as string;
-        setFotoPerfil(result);
-        setFormData(prev => ({ ...prev, fotoPerfil: result }));
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+
+    // Validar tipo
+    if (!file.type.startsWith('image/')) {
+      toast.error('Formato no válido', { description: 'Selecciona una imagen (JPG, PNG, WEBP).' });
+      return;
     }
+
+    // Validar tamaño
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Imagen demasiado pesada', { description: 'El límite es 5MB.' });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result as string;
+      setFotoPerfil(result);
+      setFormData(prev => ({ ...prev, fotoPerfil: result }));
+    };
+    reader.readAsDataURL(file);
   };
 
   const subirDocumento = async (e: React.ChangeEvent<HTMLInputElement>, cara: 'frente' | 'reverso') => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Validar tipo
+    const isImage = file.type.startsWith('image/');
+    const isPdf = file.type === 'application/pdf';
+    if (!isImage && !isPdf) {
+      toast.error('Archivo no soportado', { description: 'Usa imágenes o PDF.' });
+      return;
+    }
+
+    // Validar tamaño
     if (file.size > 5 * 1024 * 1024) {
-      toast.error('El archivo no puede superar 5MB');
+      toast.error('Archivo demasiado pesado', { description: 'El límite es 5MB.' });
       return;
     }
 
@@ -120,9 +143,10 @@ export function EditarModeloModal({ open, onClose, modelo }: EditarModeloModalPr
 
       const campo = cara === 'frente' ? 'documentoFrente' : 'documentoReverso';
       setFormData(prev => ({ ...prev, [campo]: fileName }));
-      toast.success(`Documento ${cara === 'frente' ? 'frontal' : 'posterior'} cargado`);
-    } catch (err) {
-      toast.error('Error al subir documento');
+      toast.success(`Documento ${cara === 'frente' ? 'frontal' : 'posterior'} cargado correctamente`);
+    } catch (err: any) {
+      if (process.env.NODE_ENV === 'development') console.error('Error doc upload:', err);
+      toast.error('Error al subir documento', { description: 'Verifica tu conexión e intenta de nuevo.' });
     } finally {
       setSubiendoDoc(null);
     }
@@ -190,6 +214,7 @@ export function EditarModeloModal({ open, onClose, modelo }: EditarModeloModalPr
         disponible: formData.disponible,
         domicilio: formData.domicilio,
         politicaTarifa: formData.politicaTarifa,
+        porcentajeComision: formData.porcentajeComision,
         documento_tipo: formData.documento_tipo,
         documento_numero: formData.documento_numero,
         documentoFrente: formData.documentoFrente || undefined,
@@ -207,21 +232,23 @@ export function EditarModeloModal({ open, onClose, modelo }: EditarModeloModalPr
 
       // Actualizar modelo en la base de datos
       await actualizarModelo(modelo.id, updateData);
-      
-      // ✅ Las tarifas se actualizan automáticamente porque ahora se leen dinámicamente
-      // de la tabla politicas_tarifas_servicios según el campo politica_tarifa
-      // YA NO es necesario llamar a aplicar_politica_tarifa() porque no duplicamos datos
-      
-      toast.success(`✅ Modelo actualizada exitosamente!`, {
+
+      toast.success('Modelo actualizada exitosamente', {
         description: `${formData.nombre} ha sido actualizada correctamente.`
       });
-      
+
       handleClose();
-    } catch (error) {
-      if (process.env.NODE_ENV === 'development') console.error('Error actualizando modelo:', error);
-      toast.error(`❌ Error al actualizar modelo`, {
-        description: 'Hubo un problema al guardar los cambios. Por favor intenta de nuevo.'
-      });
+    } catch (error: any) {
+      // Mostrar error específico en español
+      if (error.code === '42501') {
+        toast.error('Error al actualizar', { description: 'Sin permisos para actualizar. Contacta al programador.' });
+      } else if (error.code === '23505') {
+        toast.error('Error al actualizar', { description: 'Ya existe un registro con esos datos.' });
+      } else if (error.message?.includes('JWT') || error.message?.includes('session')) {
+        toast.error('Error al actualizar', { description: 'Sesión expirada o inválida. Re-inicia sesión.' });
+      } else {
+        toast.error('Error al actualizar', { description: error.message || 'Error desconocido' });
+      }
     } finally {
       setLoading(false);
     }
@@ -246,6 +273,7 @@ export function EditarModeloModal({ open, onClose, modelo }: EditarModeloModalPr
       disponible: true,
       domicilio: true,
       politicaTarifa: 1,
+      porcentajeComision: 50,
       documento_tipo: 'cedula',
       documento_numero: '',
       documentoFrente: '',
@@ -406,7 +434,16 @@ export function EditarModeloModal({ open, onClose, modelo }: EditarModeloModalPr
                     id="email"
                     type="email"
                     value={formData.email}
-                    onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                    onChange={(e) => {
+                      const newEmail = e.target.value;
+                      setFormData(prev => ({ 
+                        ...prev, 
+                        email: newEmail,
+                        // ✅ REQUERIMIENTO: Si se cambia el correo, habilitamos el dashboard automáticamente
+                        activa: true 
+                      }));
+                      if (errors.email) setErrors(prev => ({ ...prev, email: '' }));
+                    }}
                     className={errors.email ? 'border-red-500' : ''}
                   />
                   {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
@@ -474,6 +511,23 @@ export function EditarModeloModal({ open, onClose, modelo }: EditarModeloModalPr
                     <option value="Sede Sur">Sede Sur</option>
                     <option value="Sede Centro">Sede Centro</option>
                   </select>
+                </div>
+
+                <div>
+                  <Label htmlFor="porcentajeComision">% Comisión de la Modelo</Label>
+                  <Input
+                    id="porcentajeComision"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={formData.porcentajeComision}
+                    onChange={(e) => setFormData(prev => ({ ...prev, porcentajeComision: Math.min(100, Math.max(0, parseInt(e.target.value) || 0)) }))}
+                    placeholder="50"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Porcentaje que recibe la modelo sobre cada servicio (0–100)
+                  </p>
                 </div>
               </div>
 
@@ -877,7 +931,7 @@ export function EditarModeloModal({ open, onClose, modelo }: EditarModeloModalPr
 
           {/* Botones de Acción */}
           <div className="flex justify-end gap-2 pt-4 border-t">
-            <Button type="button" variant="outline" onClick={handleClose} disabled={loading}>
+            <Button type="button" variant="outline" onClick={handleClose}>
               Cancelar
             </Button>
             <Button type="submit" className="bg-primary text-primary-foreground hover:bg-primary/90" disabled={loading}>

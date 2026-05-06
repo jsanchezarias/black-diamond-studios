@@ -25,8 +25,8 @@ interface ChatModeratorPanelProps {
 export function ChatModeratorPanel({ userEmail, userId }: ChatModeratorPanelProps) {
   const { currentUser, loginUser, logout, sendMessage, messages, onlineUsers } = usePublicUsers();
   const [messageInput, setMessageInput] = useState('');
-  const [selectedUserId, setSelectedUserId] = useState<string>('');
-  const [users, setUsers] = useState<any[]>([]);
+  const [_selectedUserId, _setSelectedUserId] = useState<string>('');
+  const [_users, _setUsers] = useState<any[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [mostrarLimpiarDialog, setMostrarLimpiarDialog] = useState(false);
   const [autoLoginAttempted, setAutoLoginAttempted] = useState(false);
@@ -73,10 +73,11 @@ export function ChatModeratorPanel({ userEmail, userId }: ChatModeratorPanelProp
       .limit(200);
 
     if (!error && data) {
-      setUsers(data);
+      _setUsers(data);
     }
   };
 
+  /*
   // Obtener lista de usuarios únicos con mensajes
   const getUsersWithMessages = () => {
     const usersSet = new Set<string>();
@@ -114,11 +115,12 @@ export function ChatModeratorPanel({ userEmail, userId }: ChatModeratorPanelProp
       !msg.receiverId
     ).length;
   };
+  */
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (!messageInput.trim()) return;
-    sendMessage(messageInput, selectedUserId || undefined);
+    sendMessage(messageInput, _selectedUserId || undefined);
     setMessageInput('');
   };
 
