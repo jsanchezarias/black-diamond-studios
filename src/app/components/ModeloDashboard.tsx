@@ -1,7 +1,7 @@
-import { useState, lazy, Suspense, useEffect } from 'react';
+import { useState, lazy, Suspense, useEffect, useRef } from 'react';
 import IngresosWidget from '../../components/IngresosWidget';
 import { GaleriaFotosModelo } from '../../components/GaleriaFotosModelo';
-import { format, subMonths, startOfMonth, endOfMonth, getMonth, getYear, parseISO, isValid } from 'date-fns';
+import { format, subMonths, startOfMonth, getMonth, getYear, parseISO, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
   User,
@@ -10,8 +10,6 @@ import {
   CheckCircle,
   Clock,
   TrendingUp,
-  AlertCircle,
-  LogOut,
   Activity,
   CreditCard,
   XCircle,
@@ -20,11 +18,9 @@ import {
   ShoppingBag,
   ShoppingCart,
   Sparkles,
-  Info,
   MapPin,
   Bell,
   PieChart,
-  Video,
   Menu,
   X,
   BarChart3,
@@ -38,18 +34,21 @@ import {
   Save,
   Edit3,
   RefreshCw,
+  LogOut,
+  Video,
+  History
 } from 'lucide-react';
 import {
-  BarChart, Bar, LineChart, Line, PieChart as RechartsPie, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Area, AreaChart
+  BarChart, Bar, PieChart as RechartsPie, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart
 } from 'recharts';
-import { LogoIsotipo } from './LogoIsotipo';
+// import { LogoIsotipo } from './LogoIsotipo';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '../../components/ui/avatar';
 import { useModelos } from './ModelosContext';
-import { useServicios } from './ServiciosContext';
+import { useServicios, Servicio } from './ServiciosContext';
 import { useMultas } from './MultasContext';
 import { usePagos } from './PagosContext';
 import { useAgendamientos, formatearHora } from './AgendamientosContext';
@@ -59,12 +58,15 @@ import { useCarrito } from './CarritoContext';
 import { supabase } from '../../utils/supabase/info';
 import { toast } from 'sonner';
 import { useServiceAlarms } from './useServiceAlarms';
+import { ConfirmarAgendamientoModeloModal } from '../../components/ConfirmarAgendamientoModeloModal';
+import type { CalificacionData } from '../../components/CalificarClienteModal';
 
 // Lazy loading de paneles pesados
-const AgendamientosPanel = lazy(() => import('./AgendamientosPanel').then(m => ({ default: m.AgendamientosPanel })));
-const AgendamientosMetrics = lazy(() => import('./AgendamientosMetrics').then(m => ({ default: m.AgendamientosMetrics })));
+// const AgendamientosPanel = lazy(() => import('./AgendamientosPanel').then(m => ({ default: m.AgendamientosPanel })));
+// const AgendamientosMetrics = lazy(() => import('./AgendamientosMetrics').then(m => ({ default: m.AgendamientosMetrics })));
 const RegistroEntradaModal = lazy(() => import('../../components/RegistroEntradaModal').then(m => ({ default: m.RegistroEntradaModal })));
 const IniciarServicioModal = lazy(() => import('../../components/IniciarServicioModal').then(m => ({ default: m.IniciarServicioModal })));
+const ServicioDirectoModal = lazy(() => import('./ServicioDirectoModal').then(m => ({ default: m.ServicioDirectoModal })));
 const ServicioActivoCard = lazy(() => import('../../components/ServicioActivoCard').then(m => ({ default: m.ServicioActivoCard })));
 const CarritoBoutiqueModal = lazy(() => import('../../components/CarritoBoutiqueModal').then(m => ({ default: m.CarritoBoutiqueModal })));
 const CheckoutBoutiqueModal = lazy(() => import('../../components/CheckoutBoutiqueModal').then(m => ({ default: m.CheckoutBoutiqueModal })));
@@ -72,8 +74,9 @@ const CalendarioModeloView = lazy(() => import('../../components/CalendarioModel
 const CalendarioPanel = lazy(() => import('../../components/CalendarioPanel').then(m => ({ default: m.CalendarioPanel })));
 const DetalleCitaModal = lazy(() => import('../../components/DetalleCitaModal').then(m => ({ default: m.DetalleCitaModal })));
 const NotificacionesPanel = lazy(() => import('./NotificacionesPanel').then(m => ({ default: m.NotificacionesPanel })));
-const AnalyticsPanel = lazy(() => import('./AnalyticsPanel').then(m => ({ default: m.AnalyticsPanel })));
+// const AnalyticsPanel = lazy(() => import('./AnalyticsPanel').then(m => ({ default: m.AnalyticsPanel })));
 const StreamingControl = lazy(() => import('./StreamingControl').then(m => ({ default: m.StreamingControl })));
+const CalificarClienteModal = lazy(() => import('../../components/CalificarClienteModal').then(m => ({ default: m.CalificarClienteModal })));
 
 interface ModeloDashboardProps {
   accessToken: string;
@@ -134,6 +137,7 @@ const getFotoProducto = (producto: { nombre?: string; imagen?: string; categoria
 };
 
 // ─── Skeletons ────────────────────────────────────────────────────────────────
+/*
 function KPISkeleton() {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -143,6 +147,7 @@ function KPISkeleton() {
     </div>
   );
 }
+*/
 
 function ChartSkeleton({ h = 280 }: { h?: number }) {
   return <div className={`rounded-xl animate-pulse bg-white/5 border border-white/10`} style={{ height: h }} />;
@@ -161,15 +166,221 @@ function TooltipCOP({ active, payload, label }: any) {
   );
 }
 
+// ─── TemporizadorTurno: siempre visible, muestra jornada activa o "sin turno" ─
+function JornadaBanner({ userEmail, onRegistrarEntrada }: { userEmail: string; onRegistrarEntrada: () => void }) {
+  const { jornadas, finalizarJornada, obtenerRegistroActual, obtenerSolicitudPorModelo } = useAsistencia();
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const jornadaActiva = (jornadas || []).find(j => j.modeloEmail === userEmail && j.estado === 'en_curso');
+
+  if (!jornadaActiva) {
+    const solicitud = obtenerSolicitudPorModelo(userEmail);
+    const registro = obtenerRegistroActual(userEmail);
+    return (
+      <Card className="border-[#2a2a2a] bg-[#16181c]">
+        <CardContent className="p-3 sm:p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center flex-shrink-0">
+                <Clock className="w-5 h-5 text-red-400" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-white">⏱️ Sin turno activo</p>
+                <p className="text-xs text-muted-foreground">
+                  {solicitud ? 'Solicitud de entrada pendiente de aprobación' : 'Registra tu entrada para iniciar el turno'}
+                </p>
+              </div>
+            </div>
+            {!solicitud && !registro && (
+              <Button onClick={onRegistrarEntrada} size="sm" className="bg-primary text-black hover:bg-primary/90 gap-1.5 flex-shrink-0">
+                <Camera className="w-4 h-4" />
+                <span className="hidden sm:inline">Registrar</span> Entrada
+              </Button>
+            )}
+            {solicitud && (
+              <span className="text-xs px-2 py-1 rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 flex-shrink-0 whitespace-nowrap">
+                ⏳ Pendiente
+              </span>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const diffMs = now.getTime() - new Date(jornadaActiva.horaInicio).getTime();
+  const diffSecs = Math.max(0, Math.floor(diffMs / 1000));
+  const horas = Math.floor(diffSecs / 3600);
+  const mins = Math.floor((diffSecs % 3600) / 60);
+  const secs = diffSecs % 60;
+  const totalReqSecs = (jornadaActiva.horasRequeridas || 8) * 3600;
+  const progreso = Math.min(100, (diffSecs / totalReqSecs) * 100);
+  const faltanSecs = Math.max(0, totalReqSecs - diffSecs);
+  const faltanHoras = Math.floor(faltanSecs / 3600);
+  const faltanMins = Math.floor((faltanSecs % 3600) / 60);
+  const colorBarra = progreso < 40 ? '#ef4444' : progreso < 75 ? '#eab308' : progreso < 100 ? '#22c55e' : '#c9a961';
+
+  const handleCheckout = async () => {
+    const confirm = window.confirm(
+      progreso < 100
+        ? `⚠️ Aún no has completado las ${jornadaActiva.horasRequeridas} horas de turno. Si finalizas ahora, el sistema generará una multa automática. ¿Deseas continuar?`
+        : `¿Deseas finalizar tu jornada de hoy?`
+    );
+    if (confirm) {
+      try {
+        await finalizarJornada(jornadaActiva.id);
+        toast.success("Jornada finalizada correctamente");
+      } catch (e: any) {
+        toast.error("Error al finalizar jornada: " + e.message);
+      }
+    }
+  };
+
+  const horaInicio = jornadaActiva.horaInicio instanceof Date
+    ? jornadaActiva.horaInicio
+    : new Date(jornadaActiva.horaInicio);
+
+  return (
+    <Card className="border-[#2a2a2a] bg-[#16181c] overflow-hidden relative">
+      <div className="absolute bottom-0 left-0 h-1 bg-[#2a2a2a] w-full" />
+      <div
+        className="absolute bottom-0 left-0 h-1 transition-all duration-1000"
+        style={{ width: `${progreso}%`, backgroundColor: colorBarra, boxShadow: `0 0 8px ${colorBarra}66` }}
+      />
+      <CardContent className="p-3 sm:p-4">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[#888] text-xs flex items-center gap-1.5 font-medium">⏱️ TURNO</span>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1 border ${
+            progreso >= 100
+              ? 'bg-[#c9a961]/20 text-[#c9a961] border-[#c9a961]/30'
+              : 'bg-green-500/20 text-green-400 border-green-500/30'
+          }`}>
+            {progreso >= 100 ? '✅ Turno completo' : '🟢 En turno'}
+          </span>
+        </div>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex-shrink-0">
+            <span className="text-3xl sm:text-4xl font-black tabular-nums tracking-tighter" style={{ color: colorBarra }}>
+              {horas.toString().padStart(2, '0')}
+              <span className="text-[#444] mx-0.5">:</span>
+              {mins.toString().padStart(2, '0')}
+              <span className="text-[#444] mx-0.5">:</span>
+              {secs.toString().padStart(2, '0')}
+            </span>
+          </div>
+          <div className="flex-1 min-w-0 space-y-1.5">
+            <div className="flex justify-between text-[11px] text-[#888]">
+              <span>Entrada: {horaInicio.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}</span>
+              <span style={{ color: colorBarra }}>{Math.floor(progreso)}%</span>
+              <span>{progreso >= 100 ? '✅ Completo' : `Faltan ${faltanHoras}h ${faltanMins}m`}</span>
+            </div>
+          </div>
+          <Button
+            onClick={handleCheckout}
+            size="sm"
+            className={`flex-shrink-0 ${progreso >= 100 ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600/20 hover:bg-red-600 border border-red-500/50'} text-white font-bold h-9 px-4 rounded-xl gap-1.5`}
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Finalizar</span> Jornada
+          </Button>
+        </div>
+        {progreso >= 100 && (
+          <div className="mt-2 text-center text-[11px] text-[#c9a961] bg-[#c9a961]/10 rounded-lg py-1.5">
+            ✅ ¡Completaste tus {jornadaActiva.horasRequeridas}h! Puedes salir sin multa
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── TemporizadorServicio: contador dorado del servicio activo ────────────────
+function TemporizadorServicio({ servicio }: { servicio: Servicio }) {
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const horaInicio = servicio.horaInicio
+    ? (servicio.horaInicio instanceof Date ? servicio.horaInicio : new Date(servicio.horaInicio))
+    : new Date();
+  const diffMs = Math.max(0, now.getTime() - horaInicio.getTime());
+  const diffSecs = Math.floor(diffMs / 1000);
+  const horas = Math.floor(diffSecs / 3600);
+  const mins = Math.floor((diffSecs % 3600) / 60);
+  const secs = diffSecs % 60;
+  const duracionSecs = (servicio.duracionMinutos || 60) * 60;
+  const porcentaje = Math.min(100, (diffSecs / duracionSecs) * 100);
+  const excedido = porcentaje >= 100;
+  const colorActivo = excedido ? '#ef4444' : '#c9a961';
+
+  return (
+    <Card className="overflow-hidden relative" style={{ border: `1px solid ${colorActivo}44`, background: `${colorActivo}08` }}>
+      <div className="absolute bottom-0 left-0 h-1 bg-[#2a2a2a] w-full" />
+      <div
+        className="absolute bottom-0 left-0 h-1 transition-all duration-1000"
+        style={{ width: `${porcentaje}%`, backgroundColor: colorActivo, boxShadow: `0 0 8px ${colorActivo}66` }}
+      />
+      <CardContent className="p-3 sm:p-4">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-semibold flex items-center gap-1.5" style={{ color: colorActivo }}>
+            🛎️ SERVICIO ACTIVO
+          </span>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1 border ${
+            excedido
+              ? 'bg-red-500/20 text-red-400 border-red-500/30'
+              : 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
+          }`}>
+            {excedido ? '⚠️ Tiempo excedido' : '💛 En progreso'}
+          </span>
+        </div>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex-shrink-0">
+            <p className="text-[11px] text-[#888] mb-1">
+              Cliente: <span className="text-[#e8e6e3] font-medium">{servicio.clienteNombre || 'Anónimo'}</span>
+              {servicio.habitacion && <span className="ml-2">· 🏠 {servicio.habitacion}</span>}
+            </p>
+            <span className="text-3xl sm:text-4xl font-black tabular-nums tracking-tighter" style={{ color: colorActivo }}>
+              {horas.toString().padStart(2, '0')}
+              <span className="opacity-40 mx-0.5">:</span>
+              {mins.toString().padStart(2, '0')}
+              <span className="opacity-40 mx-0.5">:</span>
+              {secs.toString().padStart(2, '0')}
+            </span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex justify-between text-[11px] text-[#888]">
+              <span>💆 {servicio.tipoServicio}</span>
+              <span style={{ color: colorActivo }}>{Math.floor(porcentaje)}%</span>
+              <span>{servicio.duracionMinutos ?? '—'}min pactados</span>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ─── Component principal ──────────────────────────────────────────────────────
-export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: ModeloDashboardProps) {
+export function ModeloDashboard({ accessToken: _accessToken, userId, userEmail, onLogout }: ModeloDashboardProps) {
   const [selectedTab, setSelectedTab] = useState('inicio');
   const [menuOpen, setMenuOpen] = useState(false);
   const [mostrarRegistroEntrada, setMostrarRegistroEntrada] = useState(false);
   const [mostrarIniciarServicio, setMostrarIniciarServicio] = useState(false);
+  const [mostrarServicioDirecto, setMostrarServicioDirecto] = useState(false);
   const [mostrarCarritoBoutique, setMostrarCarritoBoutique] = useState(false);
   const [mostrarCheckoutBoutique, setMostrarCheckoutBoutique] = useState(false);
   const [citaSeleccionada, setCitaSeleccionada] = useState<any>(null);
+  const [mostrarConfirmarAgendamiento, setMostrarConfirmarAgendamiento] = useState(false);
+  const [agendamientoAConfirmar, setAgendamientoAConfirmar] = useState<any>(null);
+  const [calificacionPendiente, setCalificacionPendiente] = useState<CalificacionData | null>(null);
 
   // 🔔 Integrar alarmas de 15 min para la modelo
   useServiceAlarms(userEmail, 'modelo');
@@ -182,6 +393,12 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
   const [mostrarPanelCarrito, setMostrarPanelCarrito] = useState(false);
   const [enviandoSolicitud, setEnviandoSolicitud] = useState(false);
   const [categoriaFiltroBoutique, setCategoriaFiltroBoutique] = useState('Todos');
+
+  // Estados Selfie Check-in
+  const [selfiePreview, setSelfiePreview] = useState<string | null>(null);
+  const [selfieFile, setSelfieFile] = useState<File | null>(null);
+  const [subiendo, setSubiendo] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Estados para datos directos de Supabase
   const [liquidaciones, setLiquidaciones] = useState<any[]>([]);
@@ -198,17 +415,27 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
 
   // Paginación servicios
   const [paginaServicios, setPaginaServicios] = useState(1);
-  const [filtroServicios, setFiltroServicios] = useState<'mes' | '3meses' | 'todo'>('mes');
+  const [filtroServicios, setFiltroServicios] = useState<'mes' | '3meses' | 'todo' | 'directos'>('mes');
   const [busquedaServicios, setBusquedaServicios] = useState('');
+  
+  // Boutique: Mis Pedidos
+  const [misPedidos, setMisPedidos] = useState<any[]>([]);
+  const [loadingPedidos, setLoadingPedidos] = useState(true);
 
-  const { modelos, loading: loadingModelos } = useModelos();
-  const { servicios, obtenerServiciosPorModelo } = useServicios();
+  const { modelos } = useModelos();
+  const { servicios, recargarServicios } = useServicios();
   const { multas, obtenerTotalMultasPendientesPorEmail } = useMultas();
   const { obtenerAdelantosPendientes } = usePagos();
-  const { obtenerAgendamientosPendientes } = useAgendamientos();
-  const { registrarSalida, obtenerRegistroActual, obtenerSolicitudPorModelo } = useAsistencia();
-  const { inventario } = useInventory();
-  const { carrito, agregarAlCarrito } = useCarrito();
+  const { obtenerAgendamientosPendientes, obtenerAgendamientosPorModelo, recargarAgendamientos } = useAgendamientos();
+  const { registrarSalida, obtenerRegistroActual, obtenerSolicitudPorModelo, crearSolicitudEntrada, jornadas } = useAsistencia();
+  const { inventario, recargarProductos } = useInventory();
+  const { carrito } = useCarrito();
+
+  useEffect(() => {
+    recargarAgendamientos();
+    recargarServicios();
+    recargarProductos();
+  }, []);
 
   // ── PERFIL DIRECTO DESDE SUPABASE (fuente más confiable) ──────────────────
   useEffect(() => {
@@ -245,8 +472,55 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
     fetchPerfil();
   }, [userId, userEmail]);
 
+  // ── CARGAR MIS PEDIDOS BOUTIQUE ───────────────────────────────────────────
+  const cargarMisPedidos = async () => {
+    if (!userId && !userEmail) return;
+    try {
+      const { data, error } = await supabase
+        .from('ventas_boutique')
+        .select('*')
+        .eq('modelo_id', userId)
+        .order('fecha', { ascending: false });
+      
+      if (error) throw error;
+      setMisPedidos(data || []);
+    } catch (err) {
+      console.error('Error cargando pedidos boutique:', err);
+    } finally {
+      setLoadingPedidos(false);
+    }
+  };
+
+  useEffect(() => {
+    cargarMisPedidos();
+
+    // Suscripción Realtime para cambios en mis pedidos
+    const channel = supabase
+      .channel(`mis-pedidos-${userId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'ventas_boutique',
+        filter: `modelo_id=eq.${userId}`
+      }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          setMisPedidos(prev => [payload.new, ...prev]);
+        } else if (payload.eventType === 'UPDATE') {
+          setMisPedidos(prev => prev.map(p => p.id === payload.new.id ? payload.new : p));
+          if (payload.new.estado === 'aceptado') {
+            toast.success(`✅ Pedido de ${payload.new.producto_nombre} aceptado`);
+          } else if (payload.new.estado === 'rechazado') {
+            toast.error(`❌ Pedido de ${payload.new.producto_nombre} rechazado`);
+          }
+        }
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [userId]);
+
   // ── Construir modeloActual: contexto → DB → fallback mínimo ───────────────
-  const modeloDesdeContexto = modelos.find(m =>
+  const modeloDesdeContexto = (modelos || []).find(m =>
     m.email?.toLowerCase() === userEmail?.toLowerCase()
   );
 
@@ -344,11 +618,14 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
   const ingresosMes = serviciosMes.reduce((sum, s) => sum + (s.montoPagado ?? s.montoPactado ?? 0), 0);
   const clientesMes = new Set(serviciosMes.map(s => s.clienteNombre)).size;
 
+  const agendamientosDeModelo = modeloActual ? obtenerAgendamientosPorModelo(emailModelo) : [];
   const citasProximas = modeloActual ? obtenerAgendamientosPendientes(emailModelo) : [];
+  /*
   const citasHoy = citasProximas.filter(c => {
     const d = new Date(c.fecha);
     return d.toDateString() === ahora.toDateString();
   }).sort((a, b) => (a.hora ?? '').localeCompare(b.hora ?? ''));
+  */
 
   const registroActivo = modeloActual ? obtenerRegistroActual(emailModelo) : undefined;
   const solicitudEntrada = modeloActual ? obtenerSolicitudPorModelo(emailModelo) : undefined;
@@ -425,7 +702,8 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
         const ok = isValid(d) && d >= desde;
         const busq = busquedaServicios.toLowerCase();
         const matchBusq = !busq || (s.clienteNombre || '').toLowerCase().includes(busq);
-        return ok && matchBusq;
+        const matchDirecto = filtroServicios !== 'directos' || s.creadoPorRol === 'modelo';
+        return ok && matchBusq && matchDirecto;
       })
       .sort((a, b) => b.fecha?.localeCompare(a.fecha || '') ?? 0);
   };
@@ -525,6 +803,47 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
 
   const nombreDisplay = modeloActual?.nombreArtistico || modeloActual?.nombre || userEmail.split('@')[0];
   const fotoDisplay = modeloActual?.fotoPerfil || '';
+  // ── Selfie Check-in ─────────────────────────────────────────────────────────
+  const handleSelfieChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { toast.error('Solo se permiten imágenes'); return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error('La imagen es muy grande (máx 5MB)'); return; }
+
+    const reader = new FileReader();
+    reader.onload = (e) => setSelfiePreview(e.target?.result as string);
+    reader.readAsDataURL(file);
+    setSelfieFile(file);
+  };
+
+  const subirSelfie = async () => {
+    if (!selfieFile) return;
+    setSubiendo(true);
+    try {
+      const extension = selfieFile.name.split('.').pop() || 'jpg';
+      const safeEmail = userEmail.replace(/[^a-zA-Z0-9]/g, '_');
+      const nombreArchivo = `checkins/${safeEmail}_${Date.now()}.${extension}`;
+      const arrayBuffer = await selfieFile.arrayBuffer();
+
+      const { error: uploadError } = await supabase.storage
+        .from('fotos-modelos')
+        .upload(nombreArchivo, arrayBuffer, { contentType: selfieFile.type, upsert: false });
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage.from('fotos-modelos').getPublicUrl(nombreArchivo);
+      await crearSolicitudEntrada(userEmail, nombreDisplay, urlData.publicUrl);
+      
+      toast.success('✅ Selfie enviada — Esperando aprobación');
+      setSelfiePreview(null);
+      setSelfieFile(null);
+    } catch (err: any) {
+      console.error('Error inesperado:', err);
+      toast.error(`Error: ${err.message}`);
+    } finally {
+      setSubiendo(false);
+    }
+  };
 
   return (
     <div className="min-h-screen w-full bg-background" style={{ fontFamily: 'Montserrat, sans-serif' }}>
@@ -630,6 +949,63 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
       {/* ── MAIN CONTENT ─────────────────────────────────────────────────── */}
       <main className="pt-[88px] pb-16 px-4 max-w-7xl mx-auto space-y-6">
 
+        {/* ━━━ SIEMPRE VISIBLE ARRIBA ━━━ */}
+
+        {/* CASO 1: No ha hecho check-in */}
+        {!registroActivo && !solicitudEntrada && !jornadas.find(j => j.modeloEmail === userEmail && j.estado === 'en_curso') && (
+          <div className="rounded-xl p-5 border border-[#c9a961]/40 bg-[#c9a961]/5 shadow-[0_0_15px_rgba(201,169,97,0.1)]">
+            <div className="text-center space-y-4">
+              <div className="text-5xl drop-shadow-md">📸</div>
+              <div>
+                <h3 className="text-[#c9a961] font-bold text-xl font-['Playfair_Display']">Registra tu entrada</h3>
+                <p className="text-[#888] text-sm mt-1">Tómate una selfie para iniciar tu turno</p>
+              </div>
+
+              {selfiePreview && (
+                <div className="flex justify-center">
+                  <img src={selfiePreview} alt="Preview selfie" className="w-40 h-40 rounded-full object-cover border-4 border-[#c9a961] shadow-xl" />
+                </div>
+              )}
+
+              {!selfiePreview ? (
+                <>
+                  <input type="file" accept="image/*" capture="user" onChange={handleSelfieChange} ref={inputRef} className="hidden" />
+                  <button onClick={() => inputRef.current?.click()} className="w-full max-w-sm mx-auto py-3.5 rounded-xl bg-gradient-to-r from-[#B8860B] to-[#FFD700] text-black font-black text-base flex items-center justify-center gap-2 shadow-lg hover:opacity-90 transition-all">
+                    <Camera className="w-5 h-5" /> Tomar selfie
+                  </button>
+                </>
+              ) : (
+                <div className="flex gap-3 max-w-sm mx-auto">
+                  <button onClick={() => { setSelfiePreview(null); setSelfieFile(null); }} className="flex-1 py-3.5 rounded-xl border border-white/10 hover:bg-white/5 text-[#888] font-bold transition-all">
+                    🔄 Repetir
+                  </button>
+                  <button onClick={subirSelfie} disabled={subiendo} className="flex-1 py-3.5 rounded-xl bg-gradient-to-r from-[#B8860B] to-[#FFD700] text-black font-black shadow-lg disabled:opacity-50 hover:opacity-90 transition-all">
+                    {subiendo ? '⏳ Enviando...' : '✅ Enviar'}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* CASO: Esperando aprobación */}
+        {solicitudEntrada && solicitudEntrada.estado === 'pendiente' && (
+          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 text-yellow-400 text-sm text-center font-medium shadow-[0_0_15px_rgba(234,179,8,0.1)] flex items-center justify-center gap-2">
+            <Clock className="w-5 h-5 animate-pulse" /> Selfie enviada — Esperando aprobación del administrador
+          </div>
+        )}
+
+        {/* CASO 2: En turno */}
+        {(registroActivo || jornadas.find(j => j.modeloEmail === userEmail && j.estado === 'en_curso') || (solicitudEntrada && solicitudEntrada.estado === 'aprobada')) && (
+          <JornadaBanner
+            userEmail={userEmail}
+            onRegistrarEntrada={() => setMostrarRegistroEntrada(true)}
+          />
+        )}
+
+        {/* Temporizador de servicio activo */}
+        {servicioActivo && <TemporizadorServicio servicio={servicioActivo} />}
+
         {/* ═══════════════════════ TAB: INICIO ═══════════════════════════ */}
         {selectedTab === 'inicio' && (
           <div className="space-y-6">
@@ -655,8 +1031,74 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
                     <Play className="w-4 h-4" /> Iniciar Servicio
                   </Button>
                 )}
+                {registroActivo && (
+                  <button
+                    onClick={() => setMostrarServicioDirecto(true)}
+                    style={{
+                      background: 'linear-gradient(135deg, #B8860B, #FFD700)',
+                      border: 'none',
+                      borderRadius: 10,
+                      padding: '8px 16px',
+                      cursor: 'pointer',
+                      fontWeight: 700,
+                      fontSize: 13,
+                      color: 'black',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6
+                    }}
+                  >
+                    ➕ Servicio Directo
+                  </button>
+                )}
               </div>
             </div>
+
+            {/* Panel: Acción Requerida (Citas aceptadas por programador) */}
+            {(() => {
+              const pendientesConfirmar = agendamientosDeModelo.filter(a => a.estado === 'aceptado_programador');
+              if (pendientesConfirmar.length === 0) return null;
+
+              return (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-primary animate-pulse">
+                    <Zap className="w-5 h-5 fill-primary" />
+                    <h3 className="text-lg font-bold uppercase tracking-tighter">Acción Requerida</h3>
+                    <Badge className="bg-primary text-black font-black">{pendientesConfirmar.length}</Badge>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {pendientesConfirmar.map(cita => (
+                      <Card key={cita.id} className="border-primary/40 bg-primary/5 shadow-[0_0_15px_rgba(212,175,55,0.1)] hover:border-primary transition-all">
+                        <CardContent className="p-4 flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center">
+                              <User className="w-6 h-6 text-primary" />
+                            </div>
+                            <div>
+                              <p className="text-white font-bold">{cita.clienteNombre}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {format(parseISO(cita.fecha), "dd 'de' MMMM", { locale: es })} · {formatearHora(cita.hora)}
+                              </p>
+                              <p className="text-[10px] text-primary font-bold uppercase mt-1">{cita.tarifaNombre}</p>
+                            </div>
+                          </div>
+                          <Button 
+                            size="sm" 
+                            className="bg-primary text-black hover:bg-primary/90 font-bold"
+                            onClick={() => {
+                              setAgendamientoAConfirmar(cita);
+                              setMostrarConfirmarAgendamiento(true);
+                            }}
+                          >
+                            CONFIRMAR E INICIAR
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
 
             <IngresosWidget rol="modelo" modeloEmail={userEmail} mostrarDetalle={false} />
 
@@ -715,7 +1157,7 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
                   </div>
                   {!registroActivo.horaSalida && (
                     <Button size="sm" variant="outline" className="border-red-500/30 text-red-400 hover:bg-red-500/10"
-                      onClick={() => { registrarSalida(emailModelo); toast.success('Salida registrada'); }}>
+                      onClick={async () => { try { await registrarSalida(emailModelo); toast.success('Salida registrada'); } catch { toast.error('Error al registrar salida'); } }}>
                       <XCircle className="w-4 h-4 mr-2" /> Registrar Salida
                     </Button>
                   )}
@@ -728,7 +1170,7 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
               <Suspense fallback={<div className="h-20 rounded-xl animate-pulse bg-white/5" />}>
                 <ServicioActivoCard
                   servicio={servicioActivo}
-                  onFinalizar={() => toast.success('Servicio finalizado')}
+                  onCalificarCliente={(data) => setCalificacionPendiente({ ...data, modeloId: userId })}
                 />
               </Suspense>
             )}
@@ -818,13 +1260,13 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
             {/* Filtros */}
             <div className="flex flex-wrap gap-3 items-center">
               <div className="flex rounded-lg overflow-hidden border border-white/10">
-                {(['mes', '3meses', 'todo'] as const).map(f => (
+                {(['mes', '3meses', 'todo', 'directos'] as const).map(f => (
                   <button
                     key={f}
                     onClick={() => { setFiltroServicios(f); setPaginaServicios(1); }}
                     className={`px-4 py-2 text-xs font-medium transition-colors ${filtroServicios === f ? 'bg-primary text-black' : 'bg-card text-muted-foreground hover:text-white'}`}
                   >
-                    {f === 'mes' ? 'Este mes' : f === '3meses' ? 'Últimos 3 meses' : 'Todo'}
+                    {f === 'mes' ? 'Este mes' : f === '3meses' ? 'Últimos 3 meses' : f === 'todo' ? 'Todo' : 'Directos'}
                   </button>
                 ))}
               </div>
@@ -867,10 +1309,17 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
                           <td className="px-4 py-3 text-white">{s.fecha}</td>
                           <td className="px-4 py-3 text-muted-foreground">{formatearHora(s.hora)}</td>
                           <td className="px-4 py-3 text-white font-medium">{s.clienteNombre}</td>
-                          <td className="px-4 py-3 text-muted-foreground capitalize">{s.tipoServicio || '—'}</td>
+                          <td className="px-4 py-3 text-muted-foreground capitalize">
+                            {s.tipoServicio || '—'}
+                            {s.creadoPorRol === 'modelo' && (
+                              <span className="ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'linear-gradient(135deg, #B8860B, #FFD700)', color: 'black' }}>
+                                ⚡ Directo
+                              </span>
+                            )}
+                          </td>
                           <td className="px-4 py-3 text-muted-foreground">{s.duracionEstimadaMinutos ? `${s.duracionEstimadaMinutos}min` : '—'}</td>
                           <td className="px-4 py-3 text-right text-green-400 font-semibold">{formatCOP(s.montoPagado ?? s.montoPactado ?? 0)}</td>
-                          <td className="px-4 py-3 text-center">
+                           <td className="px-4 py-3 text-center">
                             <Badge className={`text-xs border ${s.estado === 'completado' ? 'bg-green-500/15 text-green-400 border-green-500/30' : 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30'}`}>
                               {s.estado}
                             </Badge>
@@ -1017,11 +1466,11 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
                   {multasModelo.map(m => (
                     <div key={m.id} className="flex items-center justify-between p-3 bg-red-500/5 border border-red-500/15 rounded-lg">
                       <div>
-                        <p className="text-sm font-medium text-white">{m.concepto}</p>
+                        <p className="text-sm font-medium text-white">{m.motivo}</p>
                         <p className="text-xs text-muted-foreground">{m.fecha}</p>
                       </div>
                       <div className="flex items-center gap-3">
-                        <Badge className={`text-xs border ${m.estado === 'pendiente' ? 'bg-red-500/15 text-red-400 border-red-500/30' : 'bg-green-500/15 text-green-400 border-green-500/30'}`}>
+                        <Badge className={`text-xs border ${m.estado === 'activa' ? 'bg-red-500/15 text-red-400 border-red-500/30' : 'bg-green-500/15 text-green-400 border-green-500/30'}`}>
                           {m.estado}
                         </Badge>
                         <span className="font-bold text-red-400">{formatCOP(m.monto)}</span>
@@ -1288,24 +1737,50 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
                         className="w-full bg-primary text-black hover:bg-primary/90 gap-2"
                         disabled={enviandoSolicitud}
                         onClick={async () => {
+                          if (carritoLocal.length === 0) return;
                           setEnviandoSolicitud(true);
                           try {
                             const modeloIdValido = userId && String(userId).includes('-') ? userId : null;
-                            const { error } = await supabase
-                              .from('boutique_solicitudes')
-                              .insert({
-                                modelo_email: emailModelo,
-                                modelo_id: modeloIdValido,
-                                items: carritoLocal,
-                                total: carritoLocal.reduce((s, i) => s + i.precio * i.cantidad, 0),
-                                estado: 'pendiente',
-                              });
-                            if (error) throw error;
+                            if (!modeloIdValido) throw new Error('ID de modelo no válido');
+
+                            // PASO 3 — Insertar cada item como un pedido pendiente
+                            for (const item of carritoLocal) {
+                              const { error: errorInsert } = await supabase
+                                .from('ventas_boutique')
+                                .insert({
+                                  producto_id: item.id,
+                                  producto_nombre: item.nombre,
+                                  modelo_id: modeloIdValido,
+                                  cantidad: item.cantidad,
+                                  precio_unitario: item.precio,
+                                  total: item.precio * item.cantidad,
+                                  estado: 'pendiente',
+                                  vendido_por: modeloIdValido,
+                                  fecha: new Date().toISOString(),
+                                  notas: (item as any).notas || null
+                                });
+                              
+                              if (errorInsert) throw errorInsert;
+                            }
+
+                            // Notificar al administrador (una sola notificación por pedido completo)
+                            const resumenItems = carritoLocal.map(i => `• ${i.cantidad}x ${i.nombre}`).join('\n');
+                            const totalPedido = carritoLocal.reduce((s, i) => s + i.precio * i.cantidad, 0);
+
+                            await supabase.from('notificaciones').insert({
+                              para_rol: 'administrador',
+                              titulo: '🛍️ Nuevo pedido de boutique',
+                              mensaje: `${modeloActual?.nombreArtistico || 'Una modelo'} ha realizado un nuevo pedido:\n${resumenItems}\n\n💰 Total: ${formatCOP(totalPedido)}`,
+                              tipo: 'pedido_boutique',
+                              leida: false
+                            });
+
                             setCarritoLocal([]);
                             setMostrarPanelCarrito(false);
-                            toast.success('✅ Solicitud enviada correctamente. El admin la procesará pronto.');
-                          } catch {
-                            toast.error('Error al enviar la solicitud. Intenta de nuevo.');
+                            toast.success('✅ Pedido enviado — Esperando aprobación del admin');
+                          } catch (err: any) {
+                            console.error('Error al enviar pedido:', err);
+                            toast.error('Error al enviar el pedido. Intenta de nuevo.');
                           } finally {
                             setEnviandoSolicitud(false);
                           }
@@ -1314,7 +1789,7 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
                         {enviandoSolicitud ? (
                           <><RefreshCw className="w-4 h-4 animate-spin" /> Enviando...</>
                         ) : (
-                          <><CheckCircle className="w-4 h-4" /> Enviar Solicitud</>
+                          <><CheckCircle className="w-4 h-4" /> Confirmar Pedido</>
                         )}
                       </Button>
                       <button
@@ -1328,6 +1803,60 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
                 </div>
               </div>
             )}
+
+            {/* 🛍️ SECCIÓN: MIS PEDIDOS */}
+            <div className="mt-12 space-y-4">
+              <div className="flex items-center gap-2 border-b border-white/10 pb-2">
+                <History className="w-5 h-5 text-primary" />
+                <h3 className="text-lg font-bold text-white uppercase tracking-tighter">Mis Pedidos Boutique</h3>
+              </div>
+
+              {loadingPedidos ? (
+                <div className="h-24 bg-white/5 rounded-xl animate-pulse" />
+              ) : misPedidos.length === 0 ? (
+                <Card className="bg-card/30 border-dashed border-white/10">
+                  <CardContent className="py-8 text-center text-muted-foreground">
+                    <p className="text-sm">Aún no has realizado pedidos</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {misPedidos.map((pedido) => (
+                    <div key={pedido.id} className="bg-card/40 border border-white/10 rounded-xl p-4 flex flex-col gap-2 group hover:border-primary/20 transition-all">
+                      <div className="flex justify-between items-start">
+                        <div className="min-w-0">
+                          <p className="font-bold text-white truncate">{pedido.producto_nombre}</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {format(new Date(pedido.fecha), "d 'de' MMMM, HH:mm", { locale: es })}
+                          </p>
+                        </div>
+                        <Badge className={`
+                          border px-2 py-0.5 text-[10px]
+                          ${pedido.estado === 'pendiente' ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' :
+                            pedido.estado === 'aceptado' ? 'bg-green-500/10 text-green-500 border-green-500/20' :
+                            pedido.estado === 'rechazado' ? 'bg-red-500/10 text-red-500 border-red-500/20' :
+                            'bg-primary/10 text-primary border-primary/20'}
+                        `}>
+                          {pedido.estado}
+                        </Badge>
+                      </div>
+                      
+                      <div className="flex justify-between items-center text-sm pt-1 border-t border-white/5 mt-1">
+                        <span className="text-muted-foreground">{pedido.cantidad} unidad(es)</span>
+                        <span className="font-bold text-primary">{formatCOP(pedido.total)}</span>
+                      </div>
+
+                      {pedido.estado === 'rechazado' && pedido.motivo_rechazo && (
+                        <div className="mt-2 p-2 bg-red-500/5 border border-red-500/10 rounded-lg">
+                          <p className="text-[10px] text-red-400 font-bold uppercase">Motivo del rechazo:</p>
+                          <p className="text-xs text-red-300/80 italic">{pedido.motivo_rechazo}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -1722,6 +2251,18 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
             modeloNombre={modeloActual.nombre}
           />
         )}
+        {modeloActual && mostrarServicioDirecto && (
+          <ServicioDirectoModal
+            isOpen={mostrarServicioDirecto}
+            onClose={() => setMostrarServicioDirecto(false)}
+            currentUser={{ id: String(modeloActual.id || ''), email: emailModelo, nombre: modeloActual.nombre || '' }}
+            onSuccess={() => {
+              // Recargar datos
+              recargarAgendamientos();
+              recargarServicios();
+            }}
+          />
+        )}
         <CarritoBoutiqueModal
           isOpen={mostrarCarritoBoutique}
           onClose={() => setMostrarCarritoBoutique(false)}
@@ -1739,6 +2280,30 @@ export function ModeloDashboard({ accessToken, userId, userEmail, onLogout }: Mo
           isOpen={!!citaSeleccionada}
           onClose={() => setCitaSeleccionada(null)}
           cita={citaSeleccionada}
+        />
+        {agendamientoAConfirmar && (
+          <ConfirmarAgendamientoModeloModal
+            isOpen={mostrarConfirmarAgendamiento}
+            onClose={() => {
+              setMostrarConfirmarAgendamiento(false);
+              setAgendamientoAConfirmar(null);
+            }}
+            agendamiento={agendamientoAConfirmar}
+            modeloEmail={userEmail}
+            modeloNombre={perfilDB?.nombreArtistico || perfilDB?.nombre || 'Modelo'}
+            onSuccess={() => {
+              // El contexto de agendamientos suele ser realtime, pero podemos forzar refresh si fuera necesario
+            }}
+          />
+        )}
+      </Suspense>
+
+      {/* Modal de calificación de cliente — aparece tras cerrar el reporte */}
+      <Suspense fallback={null}>
+        <CalificarClienteModal
+          isOpen={!!calificacionPendiente}
+          onClose={() => setCalificacionPendiente(null)}
+          data={calificacionPendiente}
         />
       </Suspense>
     </div>

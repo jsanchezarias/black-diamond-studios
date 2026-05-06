@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { AlertCircle, Camera, CheckCircle, Info, Loader2, RefreshCw, Upload, X } from 'lucide-react';
+import { toast } from 'sonner';
 import { useAsistencia } from '../app/components/AsistenciaContext';
 import { supabase } from '../utils/supabase/info'; // ✅ Corregido: ruta correcta
 import { Alert, AlertDescription } from './ui/alert';
@@ -173,38 +174,42 @@ export function RegistroEntradaModal({ isOpen, onClose, modeloEmail, modeloNombr
     try {
       let selfieUrl = imagenCapturada; // Fallback: usar base64
 
-      // Intentar subir a Supabase Storage (si está configurado)
-      // NOTA: Si no hay bucket configurado, simplemente usamos base64
+      // Intentar subir a Supabase Storage
       try {
         const blob = await fetch(imagenCapturada).then(r => r.blob());
-        const fileName = `selfies/${modeloEmail}/${Date.now()}.jpg`;
+        const arrayBuffer = await blob.arrayBuffer();
+        
+        // Limpiar el email para usarlo en el path sin caracteres problemáticos
+        const safeEmail = modeloEmail.replace(/[^a-zA-Z0-9]/g, '_');
+        const fileName = `checkins/${safeEmail}_${Date.now()}.jpg`;
         
         const { data, error: uploadError } = await supabase.storage
-          .from('asistencia') // Bucket que debe existir en Supabase
-          .upload(fileName, blob, {
+          .from('fotos-modelos') // Usamos el bucket correcto
+          .upload(fileName, arrayBuffer, {
             contentType: 'image/jpeg',
             upsert: false
           });
 
         if (uploadError) {
-          // Silencioso: es normal que no haya bucket configurado
-          // Simplemente usamos el base64 como fallback
+          console.error('Upload error:', uploadError);
+          throw uploadError; // Lanza el error para ser capturado en el catch principal
         } else if (data) {
           // Obtener URL pública
           const { data: urlData } = supabase.storage
-            .from('asistencia')
+            .from('fotos-modelos')
             .getPublicUrl(fileName);
           
           if (urlData?.publicUrl) {
             selfieUrl = urlData.publicUrl;
           }
         }
-      } catch (storageError) {
-        // Silencioso: Storage no configurado, usar base64
+      } catch (storageError: any) {
+        console.error('Error en storage:', storageError);
+        throw new Error(`Error al subir la foto: ${storageError.message || 'Desconocido'}`);
       }
 
-      // Crear la solicitud de entrada
-      crearSolicitudEntrada(modeloEmail, modeloNombre, selfieUrl);
+      // Crear la solicitud de entrada en Supabase
+      await crearSolicitudEntrada(modeloEmail, modeloNombre, selfieUrl);
       
       setPaso('exito');
       
@@ -214,8 +219,8 @@ export function RegistroEntradaModal({ isOpen, onClose, modeloEmail, modeloNombr
         resetearModal();
       }, 3000);
 
-    } catch (err) {
-      if (process.env.NODE_ENV === 'development') console.error('Error al enviar solicitud:', err);
+    } catch (err: any) {
+      toast.error('Error al guardar', { description: err instanceof Error ? err.message : String(err) });
       setError('Hubo un error al enviar la solicitud. Por favor, intenta de nuevo.');
       setPaso('error');
     }
@@ -389,6 +394,7 @@ export function RegistroEntradaModal({ isOpen, onClose, modeloEmail, modeloNombr
                 ref={fileInputRef}
                 type="file"
                 accept="image/*"
+                capture="user"
                 onChange={manejarSubidaArchivo}
                 className="hidden"
               />
