@@ -407,76 +407,70 @@ export function RegistroEntradaModal({ isOpen, onClose, modeloEmail, modeloNombr
 
           {/* Paso 1: Captura de cámara */}
           {paso === 'camara' && (
-            <>
-              <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden border-2 border-primary/30">
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="w-full h-full object-cover mirror"
-                  style={{ transform: 'scaleX(-1)' }} // Efecto espejo
-                />
-                
-                {/* Overlay guía */}
-                {!error && (
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="w-64 h-80 border-4 border-primary/50 rounded-full" />
-                  </div>
-                )}
-
-                {error && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/80">
-                    <div className="text-center p-6 max-w-md">
-                      <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
-                      <p className="text-white text-sm mb-4">{error}</p>
-                      
-                      {tipoError === 'permiso' && (
-                        <div className="space-y-3">
-                          <div className="text-xs text-gray-300 text-left bg-black/50 p-3 rounded">
-                            <p className="font-semibold mb-2">Para permitir el acceso a la cámara:</p>
-                            <ul className="list-disc list-inside space-y-1">
-                              <li>Haz clic en el ícono de candado/cámara en la barra de direcciones</li>
-                              <li>Selecciona "Permitir" para el acceso a la cámara</li>
-                              <li>Recarga la página si es necesario</li>
-                            </ul>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button onClick={iniciarCamara} className="flex-1">
-                              <RefreshCw className="w-4 h-4 mr-2" />
-                              Reintentar
-                            </Button>
-                            <Button onClick={() => fileInputRef.current?.click()} variant="outline" className="flex-1">
-                              <Upload className="w-4 h-4 mr-2" />
-                              Subir Foto
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-                      
-                      {tipoError !== 'permiso' && (
-                        <div className="flex gap-2">
-                          <Button onClick={() => setPaso('seleccion')} className="flex-1">
-                            Volver
-                          </Button>
-                          <Button onClick={() => fileInputRef.current?.click()} variant="outline" className="flex-1">
-                            <Upload className="w-4 h-4 mr-2" />
-                            Subir Foto
-                          </Button>
-                        </div>
-                      )}
+            <div className="space-y-4">
+              {error ? (
+                <div className="bg-black/40 rounded-lg p-5 border border-red-500/30">
+                  <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
+                  <p className="text-white text-sm text-center mb-4">{error}</p>
+                  
+                  {tipoError === 'permiso' ? (
+                    <div className="space-y-4">
+                      <div className="text-xs text-gray-300 text-left bg-black/60 p-4 rounded border border-white/5">
+                        <p className="font-semibold mb-2 text-[#c9a961]">Para permitir el acceso a la cámara:</p>
+                        <ul className="list-disc list-inside space-y-2">
+                          <li>Haz clic en el ícono de candado en la barra de direcciones de tu navegador.</li>
+                          <li>Selecciona <strong>"Permitir"</strong> para el acceso a la cámara.</li>
+                          <li>Recarga la página para aplicar los cambios.</li>
+                        </ul>
+                      </div>
+                      <div className="flex flex-col sm:flex-row gap-3 mt-4">
+                        <Button onClick={iniciarCamara} className="flex-1 h-12 bg-white/10 hover:bg-white/20 text-white border-none">
+                          <RefreshCw className="w-5 h-5 mr-2" />
+                          Reintentar Cámara
+                        </Button>
+                        <Button onClick={() => fileInputRef.current?.click()} className="flex-1 h-12 bg-[#c9a961] text-black hover:bg-[#b59550] font-bold">
+                          <Upload className="w-5 h-5 mr-2" />
+                          Subir de Galería
+                        </Button>
+                      </div>
                     </div>
+                  ) : (
+                    <div className="flex flex-col sm:flex-row gap-3 justify-center mt-4">
+                      <Button onClick={() => setPaso('seleccion')} className="flex-1 h-12" variant="outline">
+                        Volver
+                      </Button>
+                      <Button onClick={() => fileInputRef.current?.click()} className="flex-1 h-12 bg-[#c9a961] text-black hover:bg-[#b59550] font-bold">
+                        <Upload className="w-5 h-5 mr-2" />
+                        Subir de Galería
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden border-2 border-primary/30">
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full h-full object-cover mirror"
+                    style={{ transform: 'scaleX(-1)' }}
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="w-64 h-80 border-4 border-primary/50 rounded-full shadow-[0_0_20px_rgba(201,169,97,0.3)]" />
                   </div>
-                )}
-              </div>
+                </div>
+              )}
 
-              <div className="flex gap-3">
-                <Button onClick={capturarSelfie} className="flex-1" size="lg" disabled={!!error}>
-                  <Camera className="w-4 h-4 mr-2" />
-                  Capturar Selfie
-                </Button>
-                <Button onClick={() => setPaso('seleccion')} variant="outline" size="lg">
-                  Volver
+              <div className="flex gap-3 pt-2">
+                {!error && (
+                  <Button onClick={capturarSelfie} className="flex-1 h-12 bg-[#c9a961] text-black hover:bg-[#b59550] font-bold text-lg shadow-lg">
+                    <Camera className="w-5 h-5 mr-2" />
+                    Capturar
+                  </Button>
+                )}
+                <Button onClick={() => setPaso('seleccion')} variant="outline" className={`h-12 ${error ? 'w-full' : 'px-8'}`}>
+                  Volver al menú
                 </Button>
               </div>
 
@@ -485,7 +479,7 @@ export function RegistroEntradaModal({ isOpen, onClose, modeloEmail, modeloNombr
                   Centra tu rostro en el óvalo y asegúrate de tener buena iluminación
                 </p>
               )}
-            </>
+            </div>
           )}
 
           {/* Paso 2: Preview de la imagen */}
