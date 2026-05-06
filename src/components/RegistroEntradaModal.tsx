@@ -340,7 +340,7 @@ export function RegistroEntradaModal({ isOpen, onClose, modeloEmail, modeloNombr
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl bg-card backdrop-blur-sm border-primary/30">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-card backdrop-blur-sm border-primary/30">
         <DialogHeader>
           <DialogTitle className="text-2xl flex items-center gap-2">
             <Camera className="w-6 h-6 text-primary" />
@@ -415,22 +415,21 @@ export function RegistroEntradaModal({ isOpen, onClose, modeloEmail, modeloNombr
                   
                   {tipoError === 'permiso' ? (
                     <div className="space-y-4">
-                      <div className="text-xs text-gray-300 text-left bg-black/60 p-4 rounded border border-white/5">
-                        <p className="font-semibold mb-2 text-[#c9a961]">Para permitir el acceso a la cámara:</p>
+                      <Button onClick={() => fileInputRef.current?.click()} className="w-full h-14 bg-[#c9a961] text-black hover:bg-[#b59550] font-bold text-lg shadow-[0_0_15px_rgba(201,169,97,0.3)]">
+                        <Upload className="w-6 h-6 mr-2" />
+                        Subir Foto de Galería
+                      </Button>
+                      
+                      <div className="text-xs text-gray-300 text-left bg-black/60 p-4 rounded border border-white/5 mt-4">
+                        <p className="font-semibold mb-2 text-[#c9a961]">Si prefieres reintentar con la cámara:</p>
                         <ul className="list-disc list-inside space-y-2">
-                          <li>Haz clic en el ícono de candado en la barra de direcciones de tu navegador.</li>
-                          <li>Selecciona <strong>"Permitir"</strong> para el acceso a la cámara.</li>
-                          <li>Recarga la página para aplicar los cambios.</li>
+                          <li>Haz clic en el ícono de candado en la barra de direcciones.</li>
+                          <li>Selecciona <strong>"Permitir"</strong>.</li>
+                          <li>Recarga la página.</li>
                         </ul>
-                      </div>
-                      <div className="flex flex-col sm:flex-row gap-3 mt-4">
-                        <Button onClick={iniciarCamara} className="flex-1 h-12 bg-white/10 hover:bg-white/20 text-white border-none">
-                          <RefreshCw className="w-5 h-5 mr-2" />
+                        <Button onClick={iniciarCamara} className="w-full h-10 mt-4 bg-white/10 hover:bg-white/20 text-white border-none">
+                          <RefreshCw className="w-4 h-4 mr-2" />
                           Reintentar Cámara
-                        </Button>
-                        <Button onClick={() => fileInputRef.current?.click()} className="flex-1 h-12 bg-[#c9a961] text-black hover:bg-[#b59550] font-bold">
-                          <Upload className="w-5 h-5 mr-2" />
-                          Subir de Galería
                         </Button>
                       </div>
                     </div>
