@@ -395,9 +395,16 @@ export function ModeloDashboard({ accessToken: _accessToken, userId, userEmail, 
   const [categoriaFiltroBoutique, setCategoriaFiltroBoutique] = useState('Todos');
 
   // Estados Selfie Check-in
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  const [camaraActiva, setCamaraActiva] = useState(false);
   const [selfiePreview, setSelfiePreview] = useState<string | null>(null);
   const [selfieFile, setSelfieFile] = useState<File | null>(null);
   const [subiendo, setSubiendo] = useState(false);
+  const [selfieEnviada, setSelfieEnviada] = useState(false);
+  const [errorCamara, setErrorCamara] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Estados para datos directos de Supabase
@@ -804,12 +811,76 @@ export function ModeloDashboard({ accessToken: _accessToken, userId, userEmail, 
   const nombreDisplay = modeloActual?.nombreArtistico || modeloActual?.nombre || userEmail.split('@')[0];
   const fotoDisplay = modeloActual?.fotoPerfil || '';
   // ── Selfie Check-in ─────────────────────────────────────────────────────────
-  const handleSelfieChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const abrirCamara = async () => {
+    setErrorCamara(null);
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setErrorCamara('Tu navegador no soporta cámara');
+      inputRef.current?.click();
+      return;
+    }
+    try {
+      console.log('📷 Intentando abrir cámara...');
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 640 } },
+        audio: false
+      });
+      console.log('✅ Cámara abierta:', stream);
+      streamRef.current = stream;
+      setCamaraActiva(true);
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play()
+            .then(() => console.log('▶️ Video reproduciendo'))
+            .catch(e => console.error('❌ Error play:', e));
+        }
+      }, 100);
+    } catch (err: any) {
+      console.error('❌ Error cámara:', err.name, err.message);
+      if (err.name === 'NotAllowedError') setErrorCamara('Permiso de cámara denegado. Ve a Configuración y permite el acceso.');
+      else if (err.name === 'NotFoundError') setErrorCamara('No se encontró cámara en este dispositivo.');
+      else if (err.name === 'NotReadableError') setErrorCamara('La cámara está siendo usada por otra app.');
+      else setErrorCamara(`Error: ${err.message}`);
+      setTimeout(() => inputRef.current?.click(), 500);
+    }
+  };
+
+  const tomarFoto = () => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) { console.error('❌ Video o canvas no disponible'); return; }
+    if (video.videoWidth === 0) { toast.error('La cámara aún no está lista, espera un momento'); return; }
+    console.log('📸 Capturando foto...', video.videoWidth, 'x', video.videoHeight);
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, 0, 0);
+    canvas.toBlob((blob) => {
+      if (!blob) { toast.error('Error al capturar imagen'); return; }
+      const file = new File([blob], `selfie_${Date.now()}.jpg`, { type: 'image/jpeg' });
+      setSelfieFile(file);
+      setSelfiePreview(canvas.toDataURL('image/jpeg', 0.85));
+      cerrarCamara();
+      console.log('✅ Foto capturada:', file.size, 'bytes');
+    }, 'image/jpeg', 0.85);
+  };
+
+  const cerrarCamara = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => { t.stop(); console.log('🔴 Track detenido:', t.kind); });
+      streamRef.current = null;
+    }
+    setCamaraActiva(false);
+  };
+
+  const handleGaleria = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.type.startsWith('image/')) { toast.error('Solo se permiten imágenes'); return; }
-    if (file.size > 5 * 1024 * 1024) { toast.error('La imagen es muy grande (máx 5MB)'); return; }
-
+    if (!file.type.startsWith('image/')) { toast.error('Solo imágenes'); return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error('Máximo 5MB'); return; }
     const reader = new FileReader();
     reader.onload = (e) => setSelfiePreview(e.target?.result as string);
     reader.readAsDataURL(file);
@@ -820,30 +891,41 @@ export function ModeloDashboard({ accessToken: _accessToken, userId, userEmail, 
     if (!selfieFile) return;
     setSubiendo(true);
     try {
+      console.log('⬆️ Subiendo selfie...');
       const extension = selfieFile.name.split('.').pop() || 'jpg';
       const safeEmail = userEmail.replace(/[^a-zA-Z0-9]/g, '_');
-      const nombreArchivo = `checkins/${safeEmail}_${Date.now()}.${extension}`;
+      const path = `checkins/${safeEmail}_${Date.now()}.${extension}`;
       const arrayBuffer = await selfieFile.arrayBuffer();
 
-      const { error: uploadError } = await supabase.storage
+      const { error: upError } = await supabase.storage
         .from('fotos-modelos')
-        .upload(nombreArchivo, arrayBuffer, { contentType: selfieFile.type, upsert: false });
+        .upload(path, arrayBuffer, { contentType: 'image/jpeg', upsert: false });
 
-      if (uploadError) throw uploadError;
+      if (upError) {
+        console.error('❌ Upload error:', upError);
+        toast.error(`Error al subir: ${upError.message}`);
+        return;
+      }
 
-      const { data: urlData } = supabase.storage.from('fotos-modelos').getPublicUrl(nombreArchivo);
+      const { data: urlData } = supabase.storage.from('fotos-modelos').getPublicUrl(path);
+      console.log('✅ URL:', urlData.publicUrl);
+
       await crearSolicitudEntrada(userEmail, nombreDisplay, urlData.publicUrl);
       
+      setSelfieEnviada(true);
       toast.success('✅ Selfie enviada — Esperando aprobación');
-      setSelfiePreview(null);
-      setSelfieFile(null);
+      console.log('✅ Todo completado');
     } catch (err: any) {
-      console.error('Error inesperado:', err);
+      console.error('❌ Error inesperado:', err);
       toast.error(`Error: ${err.message}`);
     } finally {
       setSubiendo(false);
     }
   };
+
+  useEffect(() => {
+    return () => cerrarCamara();
+  }, []);
 
   return (
     <div className="min-h-screen w-full bg-background" style={{ fontFamily: 'Montserrat, sans-serif' }}>
@@ -953,38 +1035,97 @@ export function ModeloDashboard({ accessToken: _accessToken, userId, userEmail, 
 
         {/* CASO 1: No ha hecho check-in */}
         {!registroActivo && !solicitudEntrada && !jornadas.find(j => j.modeloEmail === userEmail && j.estado === 'en_curso') && (
-          <div className="rounded-xl p-5 border border-[#c9a961]/40 bg-[#c9a961]/5 shadow-[0_0_15px_rgba(201,169,97,0.1)]">
-            <div className="text-center space-y-4">
-              <div className="text-5xl drop-shadow-md">📸</div>
-              <div>
-                <h3 className="text-[#c9a961] font-bold text-xl font-['Playfair_Display']">Registra tu entrada</h3>
-                <p className="text-[#888] text-sm mt-1">Tómate una selfie para iniciar tu turno</p>
+          <div className="rounded-xl border border-[#c9a961]/40 bg-[#c9a961]/5 overflow-hidden shadow-[0_0_15px_rgba(201,169,97,0.1)]">
+            {/* CÁMARA ACTIVA */}
+            {camaraActiva && (
+              <div className="relative bg-black w-full max-w-md mx-auto aspect-[3/4] sm:aspect-square">
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full h-full object-cover"
+                  style={{ transform: 'scaleX(-1)' }}
+                  onLoadedMetadata={() => console.log('📹 Video metadata cargada')}
+                />
+                <canvas ref={canvasRef} className="hidden" />
+                <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-4 px-4">
+                  <button
+                    onClick={cerrarCamara}
+                    className="px-5 py-3 rounded-xl bg-black/70 text-white border border-white/20 text-sm backdrop-blur-sm"
+                  >
+                    ✕ Cancelar
+                  </button>
+                  <button
+                    onClick={tomarFoto}
+                    className="flex-1 max-w-[200px] py-3 rounded-xl bg-gradient-to-r from-[#B8860B] to-[#FFD700] text-black font-black text-lg shadow-lg hover:opacity-90 transition-all"
+                  >
+                    📸 Capturar
+                  </button>
+                </div>
               </div>
+            )}
 
-              {selfiePreview && (
-                <div className="flex justify-center">
-                  <img src={selfiePreview} alt="Preview selfie" className="w-40 h-40 rounded-full object-cover border-4 border-[#c9a961] shadow-xl" />
-                </div>
-              )}
+            {/* PANTALLA INICIAL O PREVIEW */}
+            {!camaraActiva && (
+              <div className="p-5 text-center space-y-4">
+                {!selfiePreview ? (
+                  <>
+                    <div className="text-5xl drop-shadow-md">📸</div>
+                    <div>
+                      <h3 className="text-[#c9a961] font-bold text-xl font-['Playfair_Display']">Registra tu entrada</h3>
+                      <p className="text-[#888] text-sm mt-1">Tómate una selfie para iniciar tu turno</p>
+                    </div>
 
-              {!selfiePreview ? (
-                <>
-                  <input type="file" accept="image/*" capture="user" onChange={handleSelfieChange} ref={inputRef} className="hidden" />
-                  <button onClick={() => inputRef.current?.click()} className="w-full max-w-sm mx-auto py-3.5 rounded-xl bg-gradient-to-r from-[#B8860B] to-[#FFD700] text-black font-black text-base flex items-center justify-center gap-2 shadow-lg hover:opacity-90 transition-all">
-                    <Camera className="w-5 h-5" /> Tomar selfie
-                  </button>
-                </>
-              ) : (
-                <div className="flex gap-3 max-w-sm mx-auto">
-                  <button onClick={() => { setSelfiePreview(null); setSelfieFile(null); }} className="flex-1 py-3.5 rounded-xl border border-white/10 hover:bg-white/5 text-[#888] font-bold transition-all">
-                    🔄 Repetir
-                  </button>
-                  <button onClick={subirSelfie} disabled={subiendo} className="flex-1 py-3.5 rounded-xl bg-gradient-to-r from-[#B8860B] to-[#FFD700] text-black font-black shadow-lg disabled:opacity-50 hover:opacity-90 transition-all">
-                    {subiendo ? '⏳ Enviando...' : '✅ Enviar'}
-                  </button>
-                </div>
-              )}
-            </div>
+                    {errorCamara && (
+                      <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-red-400 text-xs mx-auto max-w-sm text-left">
+                        ⚠️ {errorCamara}
+                      </div>
+                    )}
+
+                    <div className="max-w-sm mx-auto space-y-3 mt-4">
+                      <button
+                        onClick={abrirCamara}
+                        className="w-full py-3.5 rounded-xl bg-gradient-to-r from-[#B8860B] to-[#FFD700] text-black font-black text-base flex items-center justify-center gap-2 shadow-lg hover:opacity-90 transition-all"
+                      >
+                        <Camera className="w-5 h-5" /> Abrir cámara
+                      </button>
+
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 h-px bg-[#2a2a2a]"/>
+                        <span className="text-[#555] text-xs font-bold uppercase tracking-wider">o subir archivo</span>
+                        <div className="flex-1 h-px bg-[#2a2a2a]"/>
+                      </div>
+
+                      <input ref={inputRef} type="file" accept="image/*" onChange={handleGaleria} className="hidden" />
+                      <button
+                        onClick={() => inputRef.current?.click()}
+                        className="w-full py-3 rounded-xl border border-[#2a2a2a] text-[#888] font-bold hover:bg-white/5 transition-all text-sm"
+                      >
+                        📁 Seleccionar de galería
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <h3 className="text-[#c9a961] font-bold text-xl font-['Playfair_Display']">Vista Previa</h3>
+                    </div>
+                    <div className="flex justify-center">
+                      <img src={selfiePreview} alt="Preview selfie" className="w-48 h-48 rounded-full object-cover border-4 border-[#c9a961] shadow-xl" />
+                    </div>
+                    <div className="flex gap-3 max-w-sm mx-auto mt-4">
+                      <button onClick={() => { setSelfiePreview(null); setSelfieFile(null); }} className="flex-1 py-3.5 rounded-xl border border-white/10 hover:bg-white/5 text-[#888] font-bold transition-all">
+                        🔄 Repetir
+                      </button>
+                      <button onClick={subirSelfie} disabled={subiendo || selfieEnviada} className="flex-1 py-3.5 rounded-xl bg-gradient-to-r from-[#B8860B] to-[#FFD700] text-black font-black shadow-lg disabled:opacity-50 hover:opacity-90 transition-all">
+                        {subiendo ? '⏳ Enviando...' : selfieEnviada ? '✅ Enviado' : '✅ Enviar Selfie'}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         )}
 
