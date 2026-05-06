@@ -407,6 +407,18 @@ export function ModeloDashboard({ accessToken: _accessToken, userId, userEmail, 
   const [errorCamara, setErrorCamara] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const cerrarCamara = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => { t.stop(); console.log('🔴 Track detenido:', t.kind); });
+      streamRef.current = null;
+    }
+    setCamaraActiva(false);
+  };
+
+  useEffect(() => {
+    return () => cerrarCamara();
+  }, []);
+
   // Estados para datos directos de Supabase
   const [liquidaciones, setLiquidaciones] = useState<any[]>([]);
   const [loadingLiquidaciones, setLoadingLiquidaciones] = useState(true);
@@ -868,13 +880,6 @@ export function ModeloDashboard({ accessToken: _accessToken, userId, userEmail, 
     }, 'image/jpeg', 0.85);
   };
 
-  const cerrarCamara = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => { t.stop(); console.log('🔴 Track detenido:', t.kind); });
-      streamRef.current = null;
-    }
-    setCamaraActiva(false);
-  };
 
   const handleGaleria = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -923,9 +928,6 @@ export function ModeloDashboard({ accessToken: _accessToken, userId, userEmail, 
     }
   };
 
-  useEffect(() => {
-    return () => cerrarCamara();
-  }, []);
 
   return (
     <div className="min-h-screen w-full bg-background" style={{ fontFamily: 'Montserrat, sans-serif' }}>
