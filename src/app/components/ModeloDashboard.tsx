@@ -771,19 +771,6 @@ export function ModeloDashboard({ accessToken: _accessToken, userId, userEmail, 
     toast.success('CSV exportado correctamente');
   };
 
-  // ── Estado inicial de carga — mostrar spinner hasta tener el perfil ────────
-  if (loadingPerfilDB) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="w-16 h-16 border-4 border-yellow-500/30 border-t-yellow-500 rounded-full animate-spin mx-auto" />
-          <p className="text-yellow-400 font-semibold">Cargando tu perfil...</p>
-          <p className="text-gray-500 text-sm">{userEmail}</p>
-        </div>
-      </div>
-    );
-  }
-
   // ── NAV TABS ──────────────────────────────────────────────────────────────
   const tabs = [
     { id: 'inicio', label: 'Inicio', icon: <Home className="w-4 h-4" /> },
@@ -932,6 +919,17 @@ export function ModeloDashboard({ accessToken: _accessToken, userId, userEmail, 
   return (
     <div className="min-h-screen w-full bg-background" style={{ fontFamily: 'Montserrat, sans-serif' }}>
 
+      {/* ── LOADING SPINNER ────────────────────────────────────────────── */}
+      {loadingPerfilDB ? (
+        <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black flex items-center justify-center">
+          <div className="text-center space-y-4">
+            <div className="w-16 h-16 border-4 border-yellow-500/30 border-t-yellow-500 rounded-full animate-spin mx-auto" />
+            <p className="text-yellow-400 font-semibold">Cargando tu perfil...</p>
+            <p className="text-gray-500 text-sm">{userEmail}</p>
+          </div>
+        </div>
+      ) : (
+      <>
       {/* ── HEADER PREMIUM ───────────────────────────────────────────────── */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-card/98 backdrop-blur-xl border-b border-primary/20 shadow-[0_4px_30px_rgba(201,168,76,0.08)]">
         <div className="flex items-center justify-between px-4 sm:px-6 py-3 max-w-8xl mx-auto">
@@ -2449,6 +2447,8 @@ export function ModeloDashboard({ accessToken: _accessToken, userId, userEmail, 
           data={calificacionPendiente}
         />
       </Suspense>
+      </>
+      )}
     </div>
   );
 }
