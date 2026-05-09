@@ -3,14 +3,14 @@ import { toast } from 'sonner';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
-import { ModelCard } from './ModelCard';
+// Removed ModelCard import
 import { AppointmentModal } from './AppointmentModal';
 import { VideoShowcase } from './VideoShowcase';
 import { Logo } from './Logo';
 import { TestimoniosSection } from './TestimoniosSection';
 import { AgregarTestimonioModal } from './AgregarTestimonioModal';
 import { ClienteLoginModal } from './ClienteLoginModal';
-import { BoutiqueStreamPlayer } from './BoutiqueStreamPlayer';
+import { BDPremiumStream } from './BDPremiumStream';
 import { TipNotification } from './TipNotification'; // ✅ Agregar TipNotification
 import { SolicitudServicioModal } from './SolicitudServicioModal';
 import { ParticlesBackground } from './ParticlesBackground'; // ✅ Fondo de partículas premium
@@ -53,16 +53,189 @@ function TipNotificationsContainer({ tips, onRemoveTip }: { tips: TipData[], onR
 }
 
 interface LandingPageProps {
-  onAccessSystem: () => void;
+  onAccessSystem: (tipo: 'cliente' | 'sistema') => void;
   currentUser?: { id: string; email: string; nombre?: string; role?: string } | null;
   onLoginSuccess?: (accessToken: string, userId: string, email: string, role: string) => void;
 }
 
+const getPrecioBase = (modelo: any) => {
+  const precios = modelo.servicios_modelo
+    ?.filter((s: any) => s.activo)
+    ?.map((s: any) => s.precio || s.precio_sede || 0)
+    ?.filter((p: number) => p > 0)
+
+  if (!precios?.length) return null
+  return Math.min(...precios)
+}
+
+const ModeloCard = ({ modelo, onAccessSystem }: { modelo: any, onAccessSystem: (tipo: 'cliente' | 'sistema') => void }) => {
+  const [precios, setPrecios] = useState<any[]>([]);
+  const [hovered, setHovered] = useState(false);
+
+  useEffect(() => {
+    const fetchPrecios = async () => {
+      if (!modelo?.id && !modelo?.email) return;
+
+      let query = supabase
+        .from('servicios_modelo')
+        .select('nombre, precio_sede, precio_domicilio, duracion')
+        .eq('activo', true);
+
+      const filters: string[] = [];
+      if (modelo.id) filters.push(`modelo_id.eq.${modelo.id}`);
+      if (modelo.email) filters.push(`modelo_email.eq.${modelo.email}`);
+
+      if (filters.length > 0) {
+        query = query.or(filters.join(','));
+      }
+
+      const { data } = await query.order('precio_sede', { ascending: true });
+      setPrecios(data || []);
+    };
+    fetchPrecios();
+  }, [modelo.id, modelo.email]);
+
+  const fotoUrl = modelo.photo
+    || modelo.modelo_fotos?.find((f: any) => f.es_principal)?.url
+    || modelo.modelo_fotos?.[0]?.url
+    || modelo.fotoPerfil
+    || modelo.foto_perfil;
+  const name = modelo.name || modelo.nombre_artistico || modelo.nombreArtistico || modelo.nombre;
+
+  const precioMin: number | null = precios.length > 0
+    ? Math.min(...precios.map(p => Number(p.precio_sede) || 0).filter(v => v > 0))
+    : (modelo.precioBase || getPrecioBase(modelo));
+
+  const formatCOP = (val: number) => '$' + val.toLocaleString('es-CO');
+
+  return (
+    <div
+      className="rounded-2xl overflow-hidden flex flex-col bg-[#16181c] group"
+      style={{
+        border: hovered ? '1px solid rgba(201,169,97,0.55)' : '1px solid #2a2a2a',
+        boxShadow: hovered ? '0 8px 32px rgba(0,0,0,0.5), 0 0 24px rgba(201,169,97,0.08)' : 'none',
+        transition: 'all 0.35s cubic-bezier(0.165,0.84,0.44,1)',
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+
+      {/* ── FOTO ── */}
+      <div className="relative h-[280px] sm:h-[300px] lg:h-[340px] overflow-hidden flex-shrink-0">
+        {fotoUrl ? (
+          <img
+            src={fotoUrl}
+            alt={name}
+            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+          />
+        ) : (
+          <div className="w-full h-full bg-[#1e1e22] flex items-center justify-center text-6xl font-bold text-[#c9a961]">
+            {name?.[0]}
+          </div>
+        )}
+
+        {/* Gradiente bottom */}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#16181c] via-black/30 to-transparent pointer-events-none" />
+
+        {/* Badge precio mínimo flotante */}
+        {precioMin && (
+          <div className="absolute top-3 right-3 backdrop-blur-md bg-black/60 border border-[#c9a961]/40 rounded-lg px-2.5 py-1.5">
+            <span className="text-[9px] text-[#c9a961]/60 uppercase tracking-widest font-semibold block leading-none mb-0.5">Desde</span>
+            <span className="text-[#c9a961] font-black text-sm leading-none">{formatCOP(precioMin)}</span>
+          </div>
+        )}
+
+        {/* Nombre + disponibilidad */}
+        <div className="absolute bottom-4 left-4 right-4">
+          <h3 className="text-white font-bold text-lg sm:text-xl font-serif drop-shadow-lg truncate">
+            {name}
+          </h3>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-60" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+            </span>
+            <span className="text-[9px] text-green-400 font-bold tracking-widest uppercase">Disponible</span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── CONTENIDO INFERIOR ── */}
+      <div className="flex flex-col flex-1 p-4">
+
+        {/* ── TABLA DE TARIFAS ── */}
+        {precios.length > 0 ? (
+          <div className="mb-4">
+            <p className="text-[9px] text-[#c9a961]/60 uppercase tracking-[0.2em] font-bold mb-2">◆ Tarifas en Sede</p>
+            <div className="rounded-xl overflow-hidden border border-[#c9a961]/10">
+              {precios.slice(0, 5).map((s, i) => (
+                <div
+                  key={s.nombre}
+                  className="flex items-center justify-between px-3 py-2"
+                  style={{
+                    background: i % 2 === 0 ? 'rgba(201,169,97,0.04)' : 'transparent',
+                    borderBottom: i < Math.min(precios.length, 5) - 1 ? '1px solid rgba(201,169,97,0.07)' : 'none',
+                  }}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-[#c9a961]/35 text-[9px] font-mono w-3 flex-shrink-0">{i + 1}</span>
+                    <div className="min-w-0">
+                      <p className="text-white/85 text-xs font-semibold truncate">{s.nombre}</p>
+                      {s.duracion && (
+                        <p className="text-white/35 text-[9px] truncate">{s.duracion}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex-shrink-0 text-right ml-3">
+                    <span className="text-[#c9a961] font-black text-sm tabular-nums">
+                      {formatCOP(Number(s.precio_sede))}
+                    </span>
+                    {s.precio_domicilio && (
+                      <p className="text-white/30 text-[9px] tabular-nums">
+                        Dom: {formatCOP(Number(s.precio_domicilio))}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+            {precios.length > 5 && (
+              <p className="text-center text-[9px] text-white/25 mt-1.5">+{precios.length - 5} tarifas más al ingresar</p>
+            )}
+          </div>
+        ) : (
+          <div className="mb-4 rounded-xl border border-[#c9a961]/10 px-4 py-3 text-center">
+            <p className="text-white/30 text-xs italic">Cargando tarifas...</p>
+          </div>
+        )}
+
+        {/* ── BOTÓN ── */}
+        <button
+          onClick={() => onAccessSystem('cliente')}
+          className="mt-auto w-full py-3 rounded-xl font-black text-[11px] uppercase tracking-[0.15em] active:scale-95"
+          style={{
+            background: hovered
+              ? 'linear-gradient(135deg, #d4b86a 0%, #c9a961 60%, #a07c3a 100%)'
+              : 'linear-gradient(135deg, #c9a961 0%, #a07c3a 100%)',
+            color: '#0f1014',
+            boxShadow: hovered ? '0 6px 20px rgba(201,169,97,0.35)' : '0 2px 8px rgba(0,0,0,0.3)',
+            transition: 'all 0.3s ease',
+          }}
+        >
+          ◆ Ver perfil y agendar
+        </button>
+
+      </div>
+    </div>
+  )
+}
+
 export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLoginSuccess }: LandingPageProps) {
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuAbierto, setMenuAbierto] = useState(false);
+  const { modelos: modelosContext, loading: modelosLoading } = useModelos();
+
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
   const [sedeActual, setSedeActual] = useState('sede-1');
-  const [streamUrl, setStreamUrl] = useState(sedes[0].streamUrl);
   const [loadingStream, setLoadingStream] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
 
@@ -116,8 +289,17 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
   useEffect(() => {
     const checkStream = async () => {
       try {
-        const { data } = await supabase.from('stream_configs').select('is_live').eq('is_live', true).limit(1);
-        setStreamActivo(!!(data && data.length > 0));
+        const { data, error } = await supabase
+          .from('stream_configs')
+          .select('is_live')
+          .order('updated_at', { ascending: false })
+          .limit(1);
+        
+        if (!error && data && data.length > 0) {
+          setStreamActivo(data[0].is_live);
+        } else {
+          setStreamActivo(false);
+        }
       } catch {
         setStreamActivo(false);
       }
@@ -127,8 +309,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
     return () => clearInterval(interval);
   }, []);
 
-  // Hook para modelos desde Supabase
-  const { modelos: modelosSupabase } = useModelos();
+  // Hook para modelos - Eliminado para usar query directa
   
   // Función para convertir modelo de Supabase al formato de ModelCard
   const convertirModeloParaCard = (modelo: any) => {
@@ -138,10 +319,10 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
     
     return {
       id: modelo.id.toString(),
-      name: modelo.nombreArtistico || modelo.nombre,
+      name: modelo.nombre_artistico || modelo.nombreArtistico || modelo.nombre,
       age: modelo.edad,
-      photo: modelo.fotoPerfil,
-      gallery: [modelo.fotoPerfil, ...(modelo.fotosAdicionales || [])],
+      photo: modelo.fotoPerfil || (modelo.modelo_fotos?.find((f: any) => f.es_principal)?.url || modelo.modelo_fotos?.[0]?.url),
+      gallery: [modelo.fotoPerfil, ...(modelo.fotosAdicionales || [])].filter(Boolean),
       rating: 5.0,
       height: modelo.altura || '165 cm',
       measurements: modelo.medidas || '90-60-90',
@@ -183,37 +364,20 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
     return () => window.removeEventListener('scroll', handleScrollNav);
   }, []);
 
-  // Actualizar stream URL cuando cambia la sede (desde sedesData directamente)
-  useEffect(() => {
-    const sede = sedes.find(s => s.id === sedeActual);
-    if (sede) {
-      setStreamUrl(sede.streamUrl);
-    }
-  }, [sedeActual]);
 
-  // Cerrar men al hacer scroll
   useEffect(() => {
-    const handleScroll = () => {
-      if (menuOpen) {
-        setMenuOpen(false);
-      }
-    };
+    const cerrar = () => setMenuAbierto(false)
+    window.addEventListener('scroll', cerrar)
+    return () => window.removeEventListener(
+      'scroll', cerrar
+    )
+  }, [])
 
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [menuOpen]);
-
-  // Prevenir scroll del body cuando el menú está abierto
-  useEffect(() => {
-    if (menuOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'unset';
-    }
-    return () => {
-      document.body.style.overflow = 'unset';
-    };
-  }, [menuOpen]);
+  const links = [
+    { href: '#modelos', label: 'Modelos' },
+    { href: '#servicios', label: 'Servicios' },
+    { href: '#contacto', label: 'Contacto' },
+  ]
 
   // ✨ Intersection Observer — animaciones scroll-reveal
   // Las secciones se "despiertan" al entrar en el viewport
@@ -256,7 +420,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
     element?.scrollIntoView({ behavior: 'smooth' });
-    setMenuOpen(false);
+    setMenuAbierto(false);
   };
 
   // Handler para cambio de sede
@@ -336,7 +500,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
       setMostrarRegistro(false);
       setRegForm({ nombre: '', telefono: '', email: '', password: '' });
       // Abrir el sistema de login directamente después del registro
-      setTimeout(() => onAccessSystem(), 800);
+      setTimeout(() => onAccessSystem('cliente'), 800);
     } catch (err: any) {
       toast.error('Error inesperado. Intenta de nuevo.');
     } finally {
@@ -344,21 +508,21 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
     }
   };
 
-  // Obtener modelos según la sede actual (filtrar por activa y convertir formato)
-  const modelosDisponibles = modelosSupabase
-    .filter((m: any) => m.activa && m.disponible)
+  // Obtener modelos desde el contexto y aplicar filtros
+  const modelosDisponibles = modelosContext
+    .filter((m: any) => m.activa && !m.enPeriodo && m.disponible)
     .map(convertirModeloParaCard);
   
-  const modelosNoDisponibles = modelosSupabase
-    .filter((m: any) => m.activa && !m.disponible)
+  const modelosNoDisponibles = modelosContext
+    .filter((m: any) => m.activa && (m.enPeriodo || !m.disponible))
     .map(convertirModeloParaCard);
   
   // ✅ NUEVO: Modelos inactivas - aparecen al final
-  const modelosInactivas = modelosSupabase
+  const modelosInactivas = modelosContext
     .filter((m: any) => !m.activa)
     .map(convertirModeloParaCard);
     
-  const todosLosModelos = modelosSupabase.map(convertirModeloParaCard); // Para el modal
+  const todosLosModelos = modelosContext.map(convertirModeloParaCard); // Para el modal
 
 
   const handleContactModel = (model: any, service?: any, location?: 'sede' | 'domicilio', price?: string) => {
@@ -446,253 +610,163 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
   return (
     <div className="min-h-screen bg-background w-full max-w-full overflow-x-hidden box-border" style={{ fontFamily: 'Inter, sans-serif' }}>
       {/* Overlay para menú móvil */}
-      {menuOpen && (
+      {menuAbierto && (
         <div 
           className="fixed inset-0 bg-black/60 z-40 lg:hidden backdrop-blur-sm"
-          onClick={() => setMenuOpen(false)}
+          onClick={() => setMenuAbierto(false)}
           aria-hidden="true"
         />
       )}
 
-      {/* Navigation - Solo mostrar si NO hay un usuario del sistema logueado (el dashboard provee su propio nav) */}
-      {!currentUserProp && (
-        <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-          isScrolled 
-            ? 'bg-card/90 backdrop-blur-md border-b border-primary/20 shadow-premium py-1' 
-            : 'bg-transparent border-b border-transparent py-3'
-        }`}>
-        <div className="container mx-auto px-3 sm:px-4 lg:px-6">
-          <div className="flex items-center justify-between gap-2 sm:gap-4">
-            {/* Logo - Responsive size */}
-            <div className="flex items-center flex-shrink-0">
-              <div className="scale-75 sm:scale-90 md:scale-100 origin-left">
-                <Logo variant="horizontal" size="md" className="cursor-pointer hover:scale-105 transition-transform duration-300" />
-              </div>
-            </div>
+      {/* Navigation - Navbar responsivo solicitado */}
+      <nav className="
+        fixed top-0 left-0 right-0 z-50
+        bg-[#0f1014]/95 backdrop-blur-md
+        border-b border-[#2a2a2a]
+      ">
+        <div className="
+          flex items-center justify-between
+          px-4 sm:px-6 lg:px-8
+          py-3 sm:py-4
+          max-w-7xl mx-auto
+        ">
 
-            {/* Desktop Menu - Mayor breakpoint para más espacio */}
-            <div className="hidden lg:flex items-center gap-3 xl:gap-5 flex-1 justify-end">
-              <button onClick={() => scrollToSection('inicio')} className="text-xs xl:text-sm hover:text-primary transition-colors font-medium whitespace-nowrap">
-                {t.nav.home}
-              </button>
-              <button onClick={() => scrollToSection('servicios')} className="text-xs xl:text-sm hover:text-primary transition-colors font-medium whitespace-nowrap">
-                {t.nav.services}
-              </button>
-              <button onClick={() => scrollToSection('modelos')} className="text-xs xl:text-sm hover:text-primary transition-colors font-medium whitespace-nowrap">
-                {t.nav.models}
-              </button>
-              <button onClick={() => scrollToSection('sobre-nosotros')} className="text-xs xl:text-sm hover:text-primary transition-colors font-medium whitespace-nowrap">
-                {t.nav.about}
-              </button>
-              <button onClick={() => scrollToSection('contacto')} className="text-xs xl:text-sm hover:text-primary transition-colors font-medium whitespace-nowrap">
-                {t.nav.contact}
-              </button>
-              
-              <div className="w-px h-6 bg-border/50 flex-shrink-0" />
-              
-              <LanguageSelector />
-              
-              {clienteActual ? (
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className="text-xs xl:text-sm text-primary/80 font-light hidden xl:inline">{clienteActual.nombre}</span>
-                  <Button 
-                    onClick={async (e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      
-                      try {
-                        // ✅ USAR REF para evitar stale closures
-                        if (logoutRef?.current) {
-                          await logoutRef.current();
-                          setClienteActual(null);
-                        }
-                      } catch (error) {
-                        if (process.env.NODE_ENV === 'development') console.error('Error en logout:', error);
-                      }
-                    }}
-                    variant="ghost" 
-                    size="sm"
-                    className="text-red-400 hover:text-red-500 hover:bg-red-950/20 gap-1.5 text-xs xl:text-sm px-2 xl:px-3 h-8 xl:h-9"
-                  >
-                    <LogOut className="w-3.5 h-3.5 xl:w-4 xl:h-4" />
-                    <span className="hidden xl:inline">Cerrar</span>
-                  </Button>
-                  {/* NO mostrar botón Sistema para clientes normales */}
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <Button onClick={() => setShowClienteLogin(true)} variant="outline" size="sm" className="border-primary/50 text-foreground hover:border-primary hover:bg-primary/5 text-xs xl:text-sm px-2 xl:px-3 h-8 xl:h-9 whitespace-nowrap">
-                    <UserIcon className="w-3.5 h-3.5 xl:w-4 xl:h-4 mr-1.5" />
-                    <span className="hidden xl:inline">{t.nav.login}</span>
-                    <span className="xl:hidden">Login</span>
-                  </Button>
-                  <Button onClick={() => setMostrarRegistro(true)} variant="outline" size="sm" className="border-amber-500/60 text-amber-400 hover:bg-amber-500/10 text-xs xl:text-sm px-2 xl:px-3 h-8 xl:h-9 whitespace-nowrap">
-                    Crear cuenta
-                  </Button>
-                  <Button onClick={onAccessSystem} variant="outline" size="sm" className="border-primary text-primary hover:bg-primary hover:text-background text-xs xl:text-sm px-2 xl:px-3 h-8 xl:h-9 whitespace-nowrap">
-                    Sistema
-                  </Button>
-                </div>
-              )}
-            </div>
+          {/* LOGO */}
+          <span className="
+            text-[#c9a961] font-bold
+            text-lg sm:text-xl
+            font-['Playfair_Display']
+            flex-shrink-0
+          ">
+            ◆ Black Diamond
+          </span>
 
-            {/* Mobile/Tablet Menu - Para pantallas < lg */}
-            <div className="lg:hidden flex items-center gap-2 sm:gap-3">
-              {/* Botón Sistema siempre visible sin abrir el menú */}
-              {!clienteActual && (
-                <Button
-                  onClick={onAccessSystem}
-                  size="sm"
-                  className="bg-primary text-black font-semibold text-xs h-8 px-3 whitespace-nowrap"
-                >
-                  Sistema
-                </Button>
-              )}
-
-              {/* Language Selector en móvil */}
-              <LanguageSelector />
-
-              {/* Menu Button */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setMenuOpen(!menuOpen)}
-                className="border-primary/30 hover:bg-primary/10 h-8 sm:h-9 w-8 sm:w-9 p-0 flex-shrink-0"
-                aria-label="Toggle menu"
+          {/* DESKTOP */}
+          <div className="
+            hidden md:flex
+            items-center gap-6 lg:gap-8
+          ">
+            {links.map(l => (
+              <a key={l.href} href={l.href}
+                className="
+                  text-[#888] hover:text-[#c9a961]
+                  text-sm transition-colors
+                "
               >
-                <div className="w-4 h-4 flex flex-col justify-center gap-[3px]">
-                  <span className="block h-[2px] w-full rounded-full" style={{ backgroundColor: '#d4af37' }}></span>
-                  <span className="block h-[2px] w-full rounded-full" style={{ backgroundColor: '#d4af37' }}></span>
-                  <span className="block h-[2px] w-full rounded-full" style={{ backgroundColor: '#d4af37' }}></span>
-                </div>
-              </Button>
-            </div>
-          </div>
+                {l.label}
+              </a>
+            ))}
 
-          {/* Mobile Menu Dropdown */}
-          <div 
-            className={`lg:hidden transition-all duration-300 ease-in-out ${
-              menuOpen ? 'max-h-screen opacity-100 visible' : 'max-h-0 opacity-0 invisible'
-            }`}
-            style={{ 
-              overflow: menuOpen ? 'visible' : 'hidden',
-              transition: 'max-height 0.3s ease-in-out, opacity 0.3s ease-in-out'
-            }}
-          >
-            <div className="mt-3 sm:mt-4 pb-3 sm:pb-4 space-y-2 sm:space-y-3 border-t border-primary/20 pt-3 sm:pt-4"
-              style={{ display: menuOpen ? 'block' : 'none' }}
+            {/* UN SOLO BOTÓN — cliente */}
+            <button
+              onClick={() => onAccessSystem('cliente')}
+              className="
+                px-5 py-2.5 rounded-lg
+                bg-[#c9a961] text-[#0f1014]
+                font-bold text-sm
+                hover:bg-[#d4b86a]
+                transition-colors
+              "
             >
-              <button 
-                onClick={() => { scrollToSection('inicio'); setMenuOpen(false); }} 
-                className="block w-full text-left py-2.5 sm:py-3 px-3 sm:px-4 hover:text-primary hover:bg-primary/10 rounded transition-colors font-medium text-sm sm:text-base"
+              ◆ Iniciar sesión
+            </button>
+          </div>
+
+          {/* HAMBURGUESA MÓVIL */}
+          <button
+            onClick={() => setMenuAbierto(!menuAbierto)}
+            className="
+              md:hidden
+              w-10 h-10 rounded-lg
+              flex items-center justify-center
+              text-[#c9a961] text-2xl
+              hover:bg-[#c9a961]/10
+              transition-colors
+            "
+            aria-label="Menú"
+          >
+            {menuAbierto ? '✕' : '☰'}
+          </button>
+
+        </div>
+
+        {/* MENÚ DESPLEGABLE MÓVIL */}
+        {menuAbierto && (
+          <div className="
+            md:hidden
+            bg-[#16181c]
+            border-t border-[#2a2a2a]
+            px-4 py-4
+            flex flex-col gap-1
+          ">
+            {links.map(l => (
+              <a
+                key={l.href}
+                href={l.href}
+                onClick={() => setMenuAbierto(false)}
+                className="
+                  block py-3 px-2
+                  text-[#888] text-base
+                  border-b border-[#2a2a2a]
+                  hover:text-[#c9a961]
+                  transition-colors
+                "
               >
-                {t.nav.home}
-              </button>
-              <button 
-                onClick={() => { scrollToSection('servicios'); setMenuOpen(false); }} 
-                className="block w-full text-left py-2.5 sm:py-3 px-3 sm:px-4 hover:text-primary hover:bg-primary/10 rounded transition-colors font-medium text-sm sm:text-base"
+                {l.label}
+              </a>
+            ))}
+
+            {/* BOTONES EN MENÚ MÓVIL */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+              <button
+                onClick={() => {
+                  setMenuAbierto(false)
+                  onAccessSystem('cliente')
+                }}
+                style={{
+                  padding: '12px 16px',
+                  background: 'linear-gradient(135deg, #B8860B, #FFD700)',
+                  border: 'none', borderRadius: 8,
+                  color: 'black', fontWeight: 700,
+                  cursor: 'pointer', fontSize: 14,
+                  width: '100%'
+                }}
               >
-                {t.nav.services}
+                👤 Iniciar sesión como Cliente
               </button>
-              <button 
-                onClick={() => { scrollToSection('modelos'); setMenuOpen(false); }} 
-                className="block w-full text-left py-2.5 sm:py-3 px-3 sm:px-4 hover:text-primary hover:bg-primary/10 rounded transition-colors font-medium text-sm sm:text-base"
+
+              <button
+                onClick={() => {
+                  setMenuAbierto(false)
+                  onAccessSystem('sistema')
+                }}
+                className="mt-6 text-[10px] text-white/30 hover:text-white/50 transition-colors uppercase tracking-widest text-center"
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}
               >
-                {t.nav.models}
+                Acceso al sistema
               </button>
-              <button 
-                onClick={() => { scrollToSection('sobre-nosotros'); setMenuOpen(false); }} 
-                className="block w-full text-left py-2.5 sm:py-3 px-3 sm:px-4 hover:text-primary hover:bg-primary/10 rounded transition-colors font-medium text-sm sm:text-base"
-              >
-                {t.nav.about}
-              </button>
-              <button 
-                onClick={() => { scrollToSection('contacto'); setMenuOpen(false); }} 
-                className="block w-full text-left py-2.5 sm:py-3 px-3 sm:px-4 hover:text-primary hover:bg-primary/10 rounded transition-colors font-medium text-sm sm:text-base"
-              >
-                {t.nav.contact}
-              </button>
-              
-              {/* Botones de sesión en móvil */}
-              <div className="space-y-2 pt-3 sm:pt-4 border-t border-primary/20">
-                {clienteActual ? (
-                  <>
-                    <div className="flex items-center gap-2 px-3 py-2 bg-primary/10 rounded-lg border border-primary/30">
-                      <UserIcon className="w-4 h-4 text-primary flex-shrink-0" />
-                      <span className="text-sm font-medium truncate">{clienteActual.nombre}</span>
-                    </div>
-                    <Button 
-                      onClick={() => {
-                        logout();
-                        setClienteActual(null);
-                        setMenuOpen(false);
-                      }}
-                      variant="ghost" 
-                      className="w-full text-red-400 hover:text-red-500 hover:bg-red-950/20 gap-2 justify-center h-10 sm:h-11 text-sm sm:text-base"
-                    >
-                      <LogOut className="w-4 h-4" />
-                      Cerrar Sesión
-                    </Button>
-                    {/* NO mostrar botón Sistema para clientes normales */}
-                  </>
-                ) : (
-                  <>
-                    <Button 
-                      onClick={() => { setShowClienteLogin(true); setMenuOpen(false); }} 
-                      variant="outline" 
-                      className="w-full border-primary/50 text-foreground hover:border-primary hover:bg-primary/5 h-10 sm:h-11 text-sm sm:text-base"
-                    >
-                      <UserIcon className="w-4 h-4 mr-2" />
-                      {t.nav.login}
-                    </Button>
-                    <Button
-                      onClick={() => { setMostrarRegistro(true); setMenuOpen(false); }}
-                      variant="outline"
-                      className="w-full border-amber-500/60 text-amber-400 hover:bg-amber-500/10 h-10 sm:h-11 text-sm sm:text-base"
-                    >
-                      Crear cuenta
-                    </Button>
-                    <Button
-                      onClick={() => { onAccessSystem(); setMenuOpen(false); }}
-                      className="w-full bg-primary text-primary-foreground hover:bg-primary/90 h-10 sm:h-11 text-sm sm:text-base"
-                    >
-                      {t.nav.systemAccess}
-                    </Button>
-                  </>
-                )}
-              </div>
             </div>
           </div>
-        </div>
+        )}
       </nav>
-      )}
 
       {/* Video Showcase Section - Full Screen Hero */}
       <VideoShowcase />
 
       {/* Live Stream Hero Section — siempre visible */}
-      <section id="inicio" className="pt-16 relative overflow-hidden">
-        <ParticlesBackground
-          density="high"
-          showConnections={true}
-          showNebula={true}
-          mouseRadius={160}
-          className="opacity-70"
-        />
-        <div className="w-full h-[calc(100vh-4rem)] flex flex-col lg:flex-row relative" style={{ zIndex: 1 }}>
-          <div className="w-full lg:w-[70%] h-[40vh] lg:h-full relative">
-            <BoutiqueStreamPlayer
-              modelId="hq-stream"
-              modelName="Black Diamond"
-              onTimeExpired={() => setShowAppointmentModal(true)}
-              onTipClick={handleTipClick}
-            />
+      <section id="inicio" className="pt-20 relative overflow-hidden bg-black">
+        <div className="w-full h-[calc(100vh-5rem)] flex flex-col lg:flex-row relative">
+          <div className="w-full lg:w-[70%] h-[45vh] lg:h-full relative border-b lg:border-b-0 lg:border-r border-[#c9a961]/10">
+            <BDPremiumStream />
           </div>
-          <div className="w-full lg:w-[30%] h-[60vh] lg:h-full">
+          <div className="w-full lg:w-[30%] h-[55vh] lg:h-full">
             <LiveChat
               onTipClick={handleTipClick}
               recentTips={recentTips}
-              onLoginClick={() => setShowClienteLogin(true)}
+              onLoginClick={() => {
+                localStorage.setItem('loginRedirect', 'chat');
+                setShowClienteLogin(true);
+              }}
             />
           </div>
         </div>
@@ -725,7 +799,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
             <div className="bd-shimmer-line max-w-xs mx-auto mt-6" />
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
             {/* Servicio 1 */}
             <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/5 hover:shadow-lg hover:shadow-primary/10 transition-all group bd-animate-scale-in bd-delay-0 bd-card-hover">
               <CardContent className="p-6">
@@ -868,82 +942,37 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
           </div>
 
           {/* Modelos Disponibles - Grid Vertical */}
-          <div className="mb-8">
-            <h3 className="text-2xl font-bold mb-6 text-center" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-              💎 {t.models.available} en {sedes[0].name}
-            </h3>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-              {modelosDisponibles.length > 0 ? (
-                modelosDisponibles.map((modelo) => (
-                  <div key={modelo.id} className="relative">
-                    <ModelCard model={modelo} onContact={handleContactModel} />
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-12 bg-gradient-to-br from-card to-primary/5 rounded-2xl border border-primary/20">
-                  <Clock className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-50" />
-                  <p className="text-muted-foreground text-lg">
-                    No hay modelos disponibles en esta sede en este momento
-                  </p>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Por favor, selecciona otra sede o contáctanos para verificar disponibilidad
-                  </p>
-                </div>
-              )}
-            </div>
+          <div className="
+            grid
+            grid-cols-1
+            sm:grid-cols-2
+            lg:grid-cols-3
+            xl:grid-cols-4
+            gap-4 sm:gap-5 lg:gap-6
+            px-4 sm:px-6 lg:px-8
+            max-w-7xl mx-auto
+            pb-24 md:pb-8
+          ">
+            {modelosLoading ? (
+              // SKELETON LOADING
+              [...Array(4)].map((_, i) => (
+                <div key={i} className="h-[400px] bg-[#1a1c21] animate-pulse rounded-xl border border-white/5" />
+              ))
+            ) : modelosDisponibles.length > 0 ? (
+              modelosDisponibles.map(modelo => (
+                <ModeloCard
+                  key={modelo.id}
+                  modelo={modelo}
+                  onAccessSystem={onAccessSystem}
+                />
+              ))
+            ) : (
+              <div className="col-span-full py-20 text-center text-muted-foreground">
+                <p className="text-xl">No hay modelos disponibles en este momento.</p>
+                <p className="text-sm mt-2">Vuelve a consultarnos pronto.</p>
+              </div>
+            )}
           </div>
-
-          {/* Modelos NO Disponibles (Ocupadas) */}
-          {modelosNoDisponibles.length > 0 && (
-            <div className="mt-16">
-              <div className="text-center mb-8">
-                <h3 className="text-2xl font-bold mb-3" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-                  ⏰ Otras Modelos - Sede Norte
-                </h3>
-                <p className="text-muted-foreground max-w-2xl mx-auto">
-                  Modelos que trabajan en nuestra sede pero no están disponibles en este momento. 
-                  <span className="text-primary font-medium"> Contáctanos para conocer su próxima disponibilidad.</span>
-                </p>
-              </div>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 opacity-75 hover:opacity-100 transition-opacity">
-                {modelosNoDisponibles.map((modelo) => (
-                  <div key={modelo.id} className="relative">
-                    <ModelCard 
-                      model={{...modelo, available: false}} 
-                      onContact={handleContactModel} 
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Modelos Inactivas - Otras Modelos de la Sede */}
-          {modelosInactivas.length > 0 && (
-            <div className="mt-16">
-              <div className="text-center mb-8">
-                <h3 className="text-2xl font-bold mb-3" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-                  💫 Otras Modelos de la Sede
-                </h3>
-                <p className="text-muted-foreground max-w-2xl mx-auto">
-                  Modelos que hacen parte de nuestro equipo. 
-                  <span className="text-primary font-medium"> Contáctanos para consultar su disponibilidad.</span>
-                </p>
-              </div>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 opacity-60 hover:opacity-90 transition-opacity">
-                {modelosInactivas.map((modelo) => (
-                  <ModelCard 
-                    key={modelo.id} 
-                    model={{...modelo, available: false}} 
-                    onContact={handleContactModel} 
-                  />
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </section>
 
@@ -1140,7 +1169,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
                     <Phone className="w-5 h-5" />
                     {t.contact.reserveNow}
                   </Button>
-                  <Button onClick={onAccessSystem} variant="outline" size="lg" className="border-primary text-primary hover:bg-primary/10 text-lg px-8">
+                  <Button onClick={() => onAccessSystem('sistema')} variant="outline" size="lg" className="border-primary text-primary hover:bg-primary/10 text-lg px-8">
                     {t.contact.systemAccess}
                   </Button>
                 </div>
@@ -1160,7 +1189,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
           className="opacity-30"
         />
         <div className="container mx-auto px-4 py-12 relative" style={{ zIndex: 1 }}>
-          <div className="grid md:grid-cols-4 gap-8 mb-8">
+          <div className="flex flex-col md:grid md:grid-cols-4 gap-8 mb-8 text-center md:text-left">
             {/* Logo & Description */}
             <div className="md:col-span-2">
               <Logo variant="horizontal" size="md" className="mb-4" />
@@ -1300,30 +1329,30 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
               ].map(({ key, label, type, placeholder }) => (
                 <div key={key} className="space-y-1">
                   <label className="text-xs text-white/60">{label}</label>
-                  <input
-                    type={type}
+                  <input 
+                    type={type} 
+                    className="w-full bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white placeholder-white/20 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
                     placeholder={placeholder}
                     value={(regForm as any)[key]}
-                    onChange={e => setRegForm(p => ({ ...p, [key]: e.target.value }))}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-amber-500/50"
+                    onChange={(e) => setRegForm({ ...regForm, [key]: e.target.value })}
                   />
                 </div>
               ))}
-            </div>
-            <div className="flex gap-2 mt-5">
-              <button
-                onClick={registrarCliente}
-                disabled={registrando}
-                className="flex-1 py-2.5 bg-amber-500 text-black text-sm font-medium rounded-lg hover:bg-amber-400 transition-colors disabled:opacity-60"
-              >
-                {registrando ? 'Creando cuenta...' : 'Crear cuenta'}
-              </button>
-              <button
-                onClick={() => setMostrarRegistro(false)}
-                className="px-4 py-2.5 bg-white/10 text-sm rounded-lg hover:bg-white/20 transition-colors"
-              >
-                Cancelar
-              </button>
+              <div className="flex gap-2 mt-5">
+                <button
+                  onClick={registrarCliente}
+                  disabled={registrando}
+                  className="flex-1 py-2.5 bg-amber-500 text-black text-sm font-medium rounded-lg hover:bg-amber-400 transition-colors disabled:opacity-60"
+                >
+                  {registrando ? 'Creando cuenta...' : 'Crear cuenta'}
+                </button>
+                <button
+                  onClick={() => setMostrarRegistro(false)}
+                  className="px-4 py-2.5 bg-white/10 text-sm rounded-lg hover:bg-white/20 transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
             </div>
             <p className="text-xs text-white/30 text-center mt-3">
               ¿Ya tienes cuenta?{' '}
@@ -1337,6 +1366,8 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
           </div>
         </div>
       )}
+
+
 
       {/* ✨ Cursor personalizado dorado — solo desktop */}
       <GoldenCursor />

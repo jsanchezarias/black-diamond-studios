@@ -383,46 +383,10 @@ export function CrearModeloModal({ open, onClose }: CrearModeloModalProps) {
       // Paso 2: Crear usuario vía Edge Function (evita desloguear al admin)
       const { data: fnData, error: fnError } = await supabase.functions.invoke('server', {
         method: 'POST',
-        headers: { 'x-invoke-path': '/make-server-9dadc017/administrador/crear-usuario' },
+        headers: { 'x-invoke-path': '/make-server-9dadc017/administrador/crear-modelo' },
         body: {
           email: email,
           password: password,
-          nombre: nombre,
-          role: 'modelo',
-          _path: '/make-server-9dadc017/administrador/crear-usuario'
-        }
-      });
-
-      const responseError = fnError || (fnData?.error ? new Error(fnData.error) : null);
-
-      if (responseError) {
-        if (process.env.NODE_ENV === 'development') console.error('❌ Error creando usuario en Auth:', responseError);
-        toast.error(`Error al crear usuario: ${responseError.message}`);
-        setLoading(false);
-        return;
-      }
-
-      // Recuperar el ID del usuario recién creado
-      const { data: newUser, error: findError } = await supabase
-        .from('usuarios')
-        .select('id')
-        .eq('email', email)
-        .single();
-
-      if (findError || !newUser) {
-        if (process.env.NODE_ENV === 'development') console.error('❌ No se pudo encontrar el usuario recién creado');
-        toast.error('Error al recuperar los datos del usuario en el sistema');
-        setLoading(false);
-        return;
-      }
-
-      const userId = newUser.id;
-
-      // Paso 3: Insertar datos completos en tabla usuarios
-
-      const { error: updateError } = await supabase
-        .from('usuarios')
-        .update({
           nombre: nombre,
           nombreArtistico: nombreArtistico || nombre,
           telefono: telefono || null,
@@ -435,20 +399,36 @@ export function CrearModeloModal({ open, onClose }: CrearModeloModalProps) {
           altura: altura || null,
           medidas: medidas || null,
           sede: sede || null,
-          estado: 'activo',
+          activa: activa,
           disponible: disponible,
           domicilio: domicilio,
-          politica_tarifa: politicaTarifa,
-          documento_frente: documentoFrenteUrl,
-          documento_reverso: documentoReversoUrl
-        })
-        .eq('id', userId);
+          politicaTarifa: politicaTarifa,
+          documentoFrente: documentoFrenteUrl,
+          documentoReverso: documentoReversoUrl,
+          role: 'modelo',
+          _path: '/make-server-9dadc017/administrador/crear-modelo'
+        }
+      });
 
-      if (updateError) {
-        if (process.env.NODE_ENV === 'development') console.error('❌ Error actualizando datos de modelo:', updateError);
-        toast.error(`Error guardando datos: ${updateError.message}`);
-        setLoading(false);
-        return;
+      const responseError = fnError || (fnData?.error ? new Error(fnData.error) : null);
+
+      if (responseError) {
+        console.error('❌ Error detallado de la Edge Function:', fnData);
+        throw responseError;
+      }
+
+      // Paso 3: Opcional - Reforzar actualización si es necesario (ya lo hace la Edge Function)
+      // Pero lo mantenemos para asegurar que todos los campos locales se sincronizan
+      const userId = fnData.userId;
+      if (userId) {
+        await supabase
+          .from('usuarios')
+          .update({
+            nombre_artistico: nombreArtistico || nombre,
+            foto_url: fotoPerfilUrl,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', userId);
       }
 
       // Paso 4: Recargar lista de modelos
@@ -466,9 +446,15 @@ export function CrearModeloModal({ open, onClose }: CrearModeloModalProps) {
       // Resetear formulario
       resetForm();
       
-    } catch (error: any) {
-      if (process.env.NODE_ENV === 'development') console.error('❌ Error inesperado:', error);
-      toast.error(error.message || 'Error al crear la modelo');
+    } catch (err: any) {
+      console.error('ERROR CREAR MODELO completo:', err);
+      console.error('Mensaje:', err.message);
+      console.error('Código:', err.code);
+      console.error('Detalles:', err.details);
+      console.error('Hint:', err.hint);
+      
+      const mensaje = err?.message || err?.details || JSON.stringify(err);
+      toast.error('Error al crear la modelo: ' + mensaje);
     } finally {
       setLoading(false);
     }

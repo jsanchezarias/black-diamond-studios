@@ -36,7 +36,7 @@ export interface Notificacion {
 }
 
 // 📝 TIPOS DE NOTIFICACIÓN
-export type TipoNotificacion = 
+export type TipoNotificacion =
   | 'agendamiento_nuevo'          // Nuevo agendamiento creado
   | 'agendamiento_confirmado'     // Agendamiento confirmado
   | 'agendamiento_cancelado'      // Agendamiento cancelado
@@ -52,7 +52,12 @@ export type TipoNotificacion =
   | 'adelanto_aprobado'           // Adelanto aprobado
   | 'adelanto_rechazado'          // Adelanto rechazado
   | 'sistema'                     // Notificación del sistema
-  | 'marketing';                  // Mensaje promocional
+  | 'marketing'                   // Mensaje promocional
+  | 'solicitud_entrada'           // Modelo solicita entrada (para admin)
+  | 'entrada_aprobada'            // Admin aprobó la entrada (para modelo)
+  | 'solicitud_entrada_rechazada' // Admin rechazó la entrada (para modelo)
+  | 'servicio_directo_iniciado'   // Modelo inició servicio directo (para admin)
+  | 'servicio_directo_registrado'; // Modelo registró servicio directo (para admin)
 
 // 🎯 ACCIÓN DE NOTIFICACIÓN
 export interface AccionNotificacion {
@@ -612,7 +617,12 @@ export function obtenerIconoNotificacion(tipo: TipoNotificacion): string {
     'adelanto_aprobado': '✅',
     'adelanto_rechazado': '❌',
     'sistema': '⚙️',
-    'marketing': '📢'
+    'marketing': '📢',
+    'solicitud_entrada': '📸',
+    'entrada_aprobada': '✅',
+    'solicitud_entrada_rechazada': '❌',
+    'servicio_directo_iniciado': '🟢',
+    'servicio_directo_registrado': '📋'
   };
 
   return iconos[tipo] || '🔔';

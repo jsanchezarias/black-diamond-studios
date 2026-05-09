@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Bell, Settings, Trash2, CheckCheck, Search } from 'lucide-react';
-import { useNotificaciones, TipoNotificacion, obtenerIconoNotificacion, obtenerColorPrioridad } from './NotificacionesContext';
+import { useNotificaciones, Notificacion, TipoNotificacion, obtenerIconoNotificacion, obtenerColorPrioridad } from './NotificacionesContext';
+import { SolicitudEntradaModal } from './SolicitudEntradaModal';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
@@ -30,6 +31,15 @@ export function NotificacionesPanel() {
   const [filtroTipo, setFiltroTipo] = useState<TipoNotificacion | 'todas'>('todas');
   const [filtroEstado, setFiltroEstado] = useState<'todas' | 'leidas' | 'no_leidas'>('todas');
   const [busqueda, setBusqueda] = useState('');
+  const [solicitudModalId, setSolicitudModalId] = useState<string | null>(null);
+
+  const handleNotificacionClick = async (notif: Notificacion) => {
+    if (!notif.leida) await marcarComoLeida(notif.id);
+    const tipo = notif.tipo as string;
+    if (tipo === 'solicitud_entrada' && notif.referencia_id) {
+      setSolicitudModalId(notif.referencia_id);
+    }
+  };
 
   // Filtrar notificaciones
   const notificacionesFiltradas = (listadoNotificaciones || []).filter(notif => {
@@ -233,12 +243,17 @@ export function NotificacionesPanel() {
                 </div>
               ) : (
                 <div className="divide-y divide-border/50">
-                  {notificacionesFiltradas.map((notif) => (
+                  {notificacionesFiltradas.map((notif) => {
+                    const tipo = notif.tipo as string;
+                    const esAccionRequerida = tipo === 'solicitud_entrada' && !notif.leida;
+                    const esClickeable = tipo === 'solicitud_entrada';
+                    return (
                     <div
                       key={notif.id}
-                      className={`p-4 hover:bg-primary/5 transition-colors ${
+                      onClick={() => esClickeable && handleNotificacionClick(notif)}
+                      className={`p-4 transition-colors ${
                         !notif.leida ? 'bg-primary/10' : ''
-                      }`}
+                      } ${esClickeable ? 'cursor-pointer hover:bg-primary/15 active:scale-[0.99]' : 'hover:bg-primary/5'}`}
                     >
                       <div className="flex gap-4">
                         {/* Icono */}
@@ -255,6 +270,11 @@ export function NotificacionesPanel() {
                               }`}>
                                 {notif.titulo}
                               </h3>
+                              {esAccionRequerida && (
+                                <span className="inline-block mb-1 text-[10px] px-2 py-0.5 rounded-full bg-[#c9a961] text-[#0f1014] font-bold">
+                                  Acción requerida — Toca para responder
+                                </span>
+                              )}
                               <p className={`text-sm ${
                                 !notif.leida ? 'text-foreground/90' : 'text-muted-foreground'
                               }`}>
@@ -306,7 +326,8 @@ export function NotificacionesPanel() {
                         </div>
                       </div>
                     </div>
-                  ))}
+                  );
+                  })}
                 </div>
               )}
             </ScrollArea>
@@ -461,6 +482,14 @@ export function NotificacionesPanel() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Modal de solicitud de entrada */}
+      {solicitudModalId && (
+        <SolicitudEntradaModal
+          solicitudId={solicitudModalId}
+          onClose={() => setSolicitudModalId(null)}
+        />
+      )}
     </div>
   );
 }

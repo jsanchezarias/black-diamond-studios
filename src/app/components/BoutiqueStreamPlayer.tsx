@@ -38,8 +38,8 @@ interface BoutiqueStreamPlayerProps {
   onTipClick?: () => void;
 }
 
-const WATCH_TIME_LIMIT = 4 * 60; // 4 minutes
-const COOLDOWN_TIME = 60 * 60 * 1000; // 1 hour
+const WATCH_TIME_LIMIT = 999 * 60; // Desactivado para pruebas (999 min)
+const COOLDOWN_TIME = 0; // Sin tiempo de espera
 
 export function BoutiqueStreamPlayer({ 
   modelId, 
@@ -86,19 +86,30 @@ export function BoutiqueStreamPlayer({
       const { data, error } = await supabase
         .from('stream_configs')
         .select('stream_url, is_live, viewers')
-        .eq('is_live', true)
+        .order('updated_at', { ascending: false })
         .limit(1);
 
       if (!error && data && data.length > 0) {
         const streamData = data[0];
-        setSession({ streamUrl: streamData.stream_url, isLive: true });
-        setIsLive(true);
+        console.log("Stream record found in Supabase:", streamData);
+        setSession({ 
+          streamUrl: streamData.stream_url || 'https://stream.blackdiamondscorts.com/live/stream1/index.m3u8',
+          isLive: streamData.is_live 
+        });
+        setIsLive(streamData.is_live);
+        if (streamData.is_live) setIsPlaying(true); // Autostart si está vivo
         setViewers(streamData.viewers || Math.floor(Math.random() * 50) + 10);
       } else {
-        setIsLive(false);
-        setSession(null);
+        console.log("No active stream record found, using fallback for dev");
+        setSession({ 
+          streamUrl: 'https://stream.blackdiamondscorts.com/live/stream1/index.m3u8',
+          isLive: true
+        });
+        setIsLive(true);
+        setIsPlaying(true); // Autostart fallback
       }
-    } catch {
+    } catch (err) {
+      if (process.env.NODE_ENV === 'development') console.error("Error checking session:", err);
       setIsLive(false);
       setSession(null);
     }
@@ -149,24 +160,63 @@ export function BoutiqueStreamPlayer({
     });
   };
 
-  // 3. Setup HLS Video
+  // 3. Setup HLS Video with robust pattern
   useEffect(() => {
     if (isPlaying && session?.streamUrl && videoRef.current) {
+      const video = videoRef.current;
+      
+      // Construir URL correcta (.m3u8)
+      const hlsUrl = session.streamUrl.includes('.m3u8') 
+        ? session.streamUrl 
+        : session.streamUrl.replace(/\/$/, '') + '/index.m3u8';
+      
+      console.log("Attempting to play stream URL:", hlsUrl);
+
       if (Hls.isSupported()) {
         const hls = new Hls({
+          debug: true, 
           enableWorker: true,
           lowLatencyMode: true,
+          backBufferLength: 90,
+          maxLoadingRetries: 10,
+          manifestLoadingTimeOut: 20000,
+          xhrSetup: (xhr) => {
+            xhr.setRequestHeader('ngrok-skip-browser-warning', 'true');
+          }
         });
-        hls.loadSource(session.streamUrl);
-        hls.attachMedia(videoRef.current);
+        
+        hls.loadSource(hlsUrl);
+        hls.attachMedia(video);
+        
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          videoRef.current?.play().catch(e => process.env.NODE_ENV === 'development' && console.error("Playback prevented", e));
+          console.log("HLS Manifest parsed successfully");
+          video.play().catch(e => console.error("Autoplay prevented:", e));
+        });
+
+        hls.on(Hls.Events.ERROR, (event, data) => {
+          console.error("HLS Error:", data);
+          if (data.fatal) {
+            switch (data.type) {
+              case Hls.ErrorTypes.NETWORK_ERROR:
+                console.error("Fatal network error encountered, trying to recover");
+                hls.startLoad();
+                break;
+              case Hls.ErrorTypes.MEDIA_ERROR:
+                console.error("Fatal media error encountered, trying to recover");
+                hls.recoverMediaError();
+                break;
+              default:
+                hls.destroy();
+                break;
+            }
+          }
         });
 
         return () => hls.destroy();
-      } else if (videoRef.current.canPlayType('application/vnd.apple.mpegurl')) {
-        videoRef.current.src = session.streamUrl;
-        videoRef.current.play().catch(e => process.env.NODE_ENV === 'development' && console.error("Playback prevented", e));
+      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        // Soporte nativo (Safari)
+        video.src = hlsUrl;
+        video.play().catch(e => console.error("Native playback error:", e));
       }
     }
   }, [isPlaying, session?.streamUrl]);
@@ -203,16 +253,6 @@ export function BoutiqueStreamPlayer({
   }, [canWatch, cooldownRemaining]);
 
   const checkCooldown = () => {
-    const lastWatchTime = localStorage.getItem('lastStreamWatch');
-    if (lastWatchTime) {
-      const elapsed = Date.now() - parseInt(lastWatchTime);
-      const remaining = COOLDOWN_TIME - elapsed;
-      if (remaining > 0) {
-        setCanWatch(false);
-        setCooldownRemaining(remaining);
-        return false;
-      }
-    }
     setCanWatch(true);
     return true;
   };
@@ -351,6 +391,8 @@ export function BoutiqueStreamPlayer({
                   playsInline
                   autoPlay
                   muted={isMuted}
+                  controls
+                  crossOrigin="anonymous"
                 />
                 
                 {isBlurred && (

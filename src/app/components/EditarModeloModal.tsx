@@ -196,27 +196,29 @@ export function EditarModeloModal({ open, onClose, modelo }: EditarModeloModalPr
     setLoading(true);
 
     try {
-      // Preparar datos de actualización
+      console.log('📝 Datos del formulario antes de procesar:', formData);
+
+      // Preparar datos de actualización (Garantizar tipos correctos - Causa D)
       const updateData: Partial<Modelo> = {
-        nombre: formData.nombre,
-        nombreArtistico: formData.nombreArtistico,
-        cedula: formData.cedula,
-        telefono: formData.telefono,
-        direccion: formData.direccion,
-        email: formData.email,
+        nombre: formData.nombre?.trim(),
+        nombreArtistico: formData.nombreArtistico?.trim(),
+        cedula: formData.cedula?.trim(),
+        telefono: formData.telefono?.trim(),
+        direccion: formData.direccion?.trim(),
+        email: formData.email?.trim(),
         fotoPerfil: formData.fotoPerfil,
-        edad: formData.edad,
-        altura: formData.altura,
-        medidas: formData.medidas,
-        descripcion: formData.descripcion,
+        edad: parseInt(String(formData.edad)) || 21,
+        altura: formData.altura?.trim(),
+        medidas: formData.medidas?.trim(),
+        descripcion: formData.descripcion?.trim(),
         sede: formData.sede,
         activa: formData.activa,
         disponible: formData.disponible,
         domicilio: formData.domicilio,
-        politicaTarifa: formData.politicaTarifa,
-        porcentajeComision: formData.porcentajeComision,
+        politicaTarifa: parseInt(String(formData.politicaTarifa)) || 1,
+        porcentajeComision: parseFloat(String(formData.porcentajeComision)) || 50,
         documento_tipo: formData.documento_tipo,
-        documento_numero: formData.documento_numero,
+        documento_numero: formData.documento_numero?.trim(),
         documentoFrente: formData.documentoFrente || undefined,
         documentoReverso: formData.documentoReverso || undefined,
         documento_verificado: formData.documento_verificado,
@@ -225,20 +227,25 @@ export function EditarModeloModal({ open, onClose, modelo }: EditarModeloModalPr
           : undefined,
       };
 
-      // Only update password if changing
-      if (changePassword) {
-        updateData.password = formData.password;
+      // Solo incluir password si se marcó para cambio
+      if (changePassword && formData.password) {
+        (updateData as any).password = formData.password;
       }
+
+      console.log('📡 Llamando a actualizarModelo con:', { id: modelo.id, updateData });
 
       // Actualizar modelo en la base de datos
       await actualizarModelo(modelo.id, updateData);
 
+      console.log('✅ Actualización finalizada con éxito');
       toast.success('Modelo actualizada exitosamente', {
         description: `${formData.nombre} ha sido actualizada correctamente.`
       });
 
       handleClose();
     } catch (error: any) {
+      console.error('🔥 Error en el submit del modal:', error);
+      
       // Mostrar error específico en español
       if (error.code === '42501') {
         toast.error('Error al actualizar', { description: 'Sin permisos para actualizar. Contacta al programador.' });

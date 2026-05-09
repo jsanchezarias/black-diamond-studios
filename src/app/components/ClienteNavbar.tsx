@@ -359,7 +359,6 @@ export function ClienteNavbar({ currentUser, onLogout }: ClienteNavbarProps) {
         </div>
       )}
 
-      <div style={{ height: 56 }} />
     </>
   );
 }

@@ -121,9 +121,9 @@ export function SolicitudServicioModal({ isOpen, onClose, data, currentUser }: S
         }
       }
 
-      const modeloIdValido = modelo.id && String(modelo.id).includes('-') ? modelo.id : null;
+      const modeloIdValido = modelo.id || null;
       // 2. USAR EL ID DEL CLIENTE CORRECTO
-      const clienteIdValido = cliente_id_final && String(cliente_id_final).includes('-') ? cliente_id_final : null;
+      const clienteIdValido = cliente_id_final || null;
 
       const insertData = {
           cliente_id: clienteIdValido,

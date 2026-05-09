@@ -46,6 +46,7 @@ export function MultasProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase
         .from('multas')
         .select('*')
+        .or('eliminado.is.null,eliminado.eq.false')
         .order('created_at', { ascending: false });
       
       if (error) throw error;
@@ -115,7 +116,7 @@ export function MultasProvider({ children }: { children: ReactNode }) {
   const eliminarMulta = async (id: string) => {
     const { error } = await supabase
       .from('multas')
-      .delete()
+      .update({ eliminado: true, eliminado_en: new Date().toISOString() })
       .eq('id', id);
     if (error) toast.error('Error al eliminar multa');
   };

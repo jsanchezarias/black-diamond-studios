@@ -5,7 +5,7 @@ import { CacheSystem } from '../../utils/cache';
 
 // Interfaz de modelo con campos de archivo
 export interface Modelo {
-  id: number;
+  id: string; // ✅ Cambiado de number a string (UUID de Supabase)
   nombre: string;
   nombreArtistico: string;
   cedula: string;
@@ -39,6 +39,8 @@ export interface Modelo {
   fechaRechazo?: string;
   videos?: string[];
   serviciosDisponibles?: { name: string, duration: string, price: string, priceHome?: string, description: string }[];
+  enPeriodo?: boolean; // ✅ NUEVO: Indica si la modelo está en un período activo
+  servicios_modelo?: any[]; // ✅ NUEVO: Servicios específicos de la modelo
 }
 
 // Tipo para crear una nueva modelo (sin campos auto-generados)
@@ -70,10 +72,10 @@ interface ModelosContextType {
   modelos: Modelo[];
   modelosArchivadas: Modelo[];
   agregarModelo: (modelo: ModeloData) => void;
-  eliminarModelo: (id: number) => void;
-  archivarModelo: (id: number, motivo?: string) => void;
-  restaurarModelo: (id: number) => void;
-  actualizarModelo: (id: number, datos: Partial<Modelo>) => void;
+  eliminarModelo: (id: string) => void;
+  archivarModelo: (id: string, motivo?: string) => void;
+  restaurarModelo: (id: string) => void;
+  actualizarModelo: (id: string, datos: Partial<Modelo>) => void;
   obtenerModeloPorEmail: (email: string) => Modelo | undefined;
   validarCredenciales: (email: string, password: string) => Modelo | null;
   recargarModelos: () => Promise<void>;
@@ -150,7 +152,12 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
     try {
       const { data: usuarios, error } = await supabase
         .from('usuarios')
-        .select('*')
+        .select(`
+          *,
+          servicios_modelo!servicios_modelo_modelo_id_fkey (
+            id, nombre, precio_sede, precio_domicilio, activo, duracion
+          )
+        `)
         .eq('role', 'modelo')
         .limit(200);
 
@@ -242,6 +249,24 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
           // silently ignore — tablas pueden no existir aún
         }
         
+        // 🌸 OPTIMIZADO: Cargar modelos en período activo hoy
+        let modelosEnPeriodo = new Set<string>();
+        try {
+          const hoy = new Date().toISOString().split('T')[0];
+          const { data: periodosActivos } = await supabase
+            .from('periodos_modelo')
+            .select('modelo_id')
+            .eq('activo', true)
+            .gte('fecha_fin', hoy)
+            .lte('fecha_inicio', hoy);
+            
+          if (periodosActivos) {
+            periodosActivos.forEach(p => modelosEnPeriodo.add(p.modelo_id));
+          }
+        } catch {
+          // silently ignore
+        }
+
         // Convertir datos de Supabase al formato del contexto
         const modelosData: Modelo[] = usuarios.map((usuario, index) => {
           // ✅ OPTIMIZADO: Reducir logs en producción
@@ -263,7 +288,7 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
           
           // Manejar tanto snake_case como camelCase para compatibilidad
           const modelo: Modelo = {
-            id: index + 1, // ID secuencial local
+            id: usuario.id, // ✅ ID real de la base de datos (UUID)
             nombre: usuario.nombre || 'Sin nombre',
             nombreArtistico: usuario.nombreArtistico || usuario.nombre_artistico || usuario.nombreartistico || usuario.nombre || 'Sin nombre',
             cedula: usuario.cedula || '',
@@ -286,6 +311,7 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
             servicios: 0,
             ingresos: 0,
             serviciosDisponibles: serviciosFormateados, // ✅ NUEVO: Servicios desde política tarifaria
+            enPeriodo: modelosEnPeriodo.has(usuario.id), // 🌸
             // ✅ Campos de archivado
             fechaArchivado: usuario.fecha_archivado || undefined,
             motivoArchivo: usuario.motivo_archivo || undefined,
@@ -296,6 +322,7 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
             documento_numero: usuario.documento_numero || undefined,
             documento_verificado: usuario.documento_verificado || false,
             documento_fecha_subida: usuario.documento_fecha_subida || undefined,
+            servicios_modelo: usuario.servicios_modelo || usuario['servicios_modelo!servicios_modelo_modelo_id_fkey'] || [], // ✅ Pasar servicios modelo
           };
           
           return modelo;
@@ -326,7 +353,7 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
   };
 
   const agregarModelo = (modelo: ModeloData) => {
-    const newId = Math.max(...modelos.map(m => m.id), 0) + 1;
+    const newId = crypto.randomUUID();
     setModelos(prev => [
       ...prev,
       {
@@ -343,7 +370,7 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
     ]);
   };
 
-  const eliminarModelo = async (id: number) => {
+  const eliminarModelo = async (id: string) => {
     const modelo = modelos.find(m => m.id === id);
     if (!modelo) return;
 
@@ -371,7 +398,7 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const archivarModelo = async (id: number, motivo?: string) => {
+  const archivarModelo = async (id: string, motivo?: string) => {
     const modelo = modelos.find(m => m.id === id);
     if (!modelo) return;
 
@@ -407,7 +434,7 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const restaurarModelo = async (id: number) => {
+  const restaurarModelo = async (id: string) => {
     try {
       const modelo = modelosArchivadas.find(m => m.id === id);
       if (!modelo) return;
@@ -438,89 +465,98 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const actualizarModelo = async (id: number, datos: Partial<Modelo>) => {
+  const actualizarModelo = async (id: string, datos: Partial<Modelo>) => {
     const modelo = modelos.find(m => m.id === id);
-    if (!modelo) return;
+    if (!modelo) {
+      console.warn('⚠️ No se encontró la modelo localmente con ID:', id);
+      return;
+    }
+
+    console.log('🔄 Iniciando actualización de modelo:', { id, nombre: modelo.nombre });
 
     try {
       // PASO 1: Obtener el UUID del usuario en la tabla pública
-      const { data: usuarioDB } = await supabase
+      // Usamos el email como identificador único confiable
+      const { data: usuarioDB, error: findError } = await supabase
         .from('usuarios')
-        .select('id')
+        .select('id, email, role')
         .eq('email', modelo.email)
-        .eq('role', 'modelo')
         .single();
 
-      if (!usuarioDB) throw new Error('Usuario no encontrado en BD');
+      if (findError || !usuarioDB) {
+        console.error('❌ Error buscando usuario en BD:', findError);
+        throw new Error('Usuario no encontrado en la base de datos pública.');
+      }
 
       const targetUserId = usuarioDB.id;
+      console.log('🎯 UUID encontrado:', targetUserId);
 
       // PASO 2: Separar authData (email/pass) de publicData (resto de campos)
       const authData: Record<string, string> = {};
       const publicData: Record<string, any> = {};
 
       const cambioEmail = datos.email && datos.email !== modelo.email;
-      const cambioPassword = datos.password && datos.password !== modelo.password;
+      const cambioPassword = datos.password && datos.password !== (modelo as any).password;
+      
       if (cambioEmail) authData.email = datos.email!;
       if (cambioPassword) authData.password = datos.password!;
 
+      // Mapeo estandarizado a snake_case (según Causa D)
       if (datos.nombre !== undefined) publicData.nombre = datos.nombre;
-      if (datos.nombreArtistico !== undefined) publicData.nombreArtistico = datos.nombreArtistico;
+      if (datos.nombreArtistico !== undefined) publicData.nombre_artistico = datos.nombreArtistico;
       if (datos.cedula !== undefined) publicData.cedula = datos.cedula;
       if (datos.telefono !== undefined) publicData.telefono = datos.telefono;
       if (datos.direccion !== undefined) publicData.direccion = datos.direccion;
-      if (datos.fotoPerfil !== undefined) publicData.fotoPerfil = datos.fotoPerfil;
-      if (datos.fotosAdicionales !== undefined) publicData.fotosAdicionales = datos.fotosAdicionales;
+      
+      // Foto de perfil - actualizamos todos los campos por compatibilidad
+      if (datos.fotoPerfil !== undefined) {
+        publicData.foto_url = datos.fotoPerfil;
+        publicData.foto_perfil = datos.fotoPerfil;
+        publicData.fotoperfil = datos.fotoPerfil;
+        publicData.fotoPerfil = datos.fotoPerfil;
+      }
+
+      if (datos.fotosAdicionales !== undefined) publicData.fotosadicionales = datos.fotosAdicionales;
+      
       if (datos.documentoFrente !== undefined) publicData.documento_frente = datos.documentoFrente;
       if (datos.documentoReverso !== undefined) publicData.documento_reverso = datos.documentoReverso;
       if (datos.documento_tipo !== undefined) publicData.documento_tipo = datos.documento_tipo;
       if (datos.documento_numero !== undefined) publicData.documento_numero = datos.documento_numero;
       if (datos.documento_verificado !== undefined) publicData.documento_verificado = datos.documento_verificado;
       if (datos.documento_fecha_subida !== undefined) publicData.documento_fecha_subida = datos.documento_fecha_subida;
-      if (datos.edad !== undefined) publicData.edad = datos.edad;
-      if (datos.altura !== undefined) publicData.altura = datos.altura;
+      
+      if (datos.edad !== undefined) publicData.edad = parseInt(String(datos.edad)) || null;
+      if (datos.altura !== undefined) publicData.estatura = datos.altura; // Mapeo altura -> estatura
       if (datos.medidas !== undefined) publicData.medidas = datos.medidas;
       if (datos.descripcion !== undefined) publicData.descripcion = datos.descripcion;
       if (datos.sede !== undefined) publicData.sede = datos.sede;
       if (datos.videos !== undefined) publicData.videos = datos.videos;
+      
       if (datos.activa !== undefined) {
         publicData.estado = datos.activa ? 'activo' : 'inactivo';
       } else if (cambioEmail) {
-        // ✅ REQUERIMIENTO: Si se cambia el correo, habilitar de una vez el dashboard
         publicData.estado = 'activo';
       }
       
       if (datos.disponible !== undefined) publicData.disponible = datos.disponible;
       if (datos.domicilio !== undefined) publicData.domicilio = datos.domicilio;
-      if (datos.politicaTarifa !== undefined) publicData.politica_tarifa = datos.politicaTarifa;
-      if (datos.porcentajeComision !== undefined) publicData.porcentaje_comision = datos.porcentajeComision;
+      if (datos.politicaTarifa !== undefined) publicData.politica_tarifa = parseInt(String(datos.politicaTarifa)) || 1;
+      if (datos.porcentajeComision !== undefined) publicData.porcentaje_comision = parseFloat(String(datos.porcentajeComision)) || 50;
 
-      // Asegurar que el rol se mantenga como modelo
+      publicData.updated_at = new Date().toISOString();
       publicData.role = 'modelo';
 
-      // PASO 3: Llamar Edge Function admin-update-user (usa service_role, bypass RLS)
-      // IMPORTANTE: Refrescar la sesión para garantizar que el access_token no esté expirado
-      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-      const session = refreshData?.session;
-      
-      if (refreshError || !session) {
-        // Fallback: intentar con sesión actual si el refresh falla
-        const { data: { session: currentSession } } = await supabase.auth.getSession();
-        if (!currentSession) throw new Error('No hay sesión activa. Por favor cierra sesión y vuelve a entrar.');
-      }
-      
-      const accessToken = session?.access_token || (await supabase.auth.getSession()).data.session?.access_token;
-      if (!accessToken) throw new Error('No se pudo obtener el token de autenticación.');
+      console.log('📡 Enviando actualización a Edge Function...', { authData: Object.keys(authData), publicData: Object.keys(publicData) });
 
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🎫 Token enviado (primeros 20 chars):', accessToken.substring(0, 20) + '...');
-      }
+      // PASO 3: Llamar Edge Function admin-update-user
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('No hay sesión activa.');
 
       const response = await fetch('https://kzdjravwcjummegxxrkd.supabase.co/functions/v1/admin-update-user', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`,
+          'Authorization': `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({ targetUserId, authData, publicData }),
       });
@@ -529,15 +565,19 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
 
       if (!response.ok) {
         console.error('❌ Error en Edge Function:', result);
-        throw new Error(result.error || result.message || `Error del servidor (${response.status})`);
+        throw new Error(result.error || result.message || 'Error al actualizar el usuario');
       }
 
-      console.log('✅ Usuario actualizado exitosamente vía Edge Function');
+      console.log('✅ Actualización exitosa:', result);
 
       // Actualizar estado local
       setModelos(prev => prev.map(m => (m.id === id ? { ...m, ...datos } : m)));
+      
+      // Invalidar caché para forzar recarga en otros componentes
+      CacheSystem.clear('modelos_v3');
+      
     } catch (error: any) {
-      if (process.env.NODE_ENV === 'development') console.error('❌ Error actualizando modelo:', error);
+      console.error('🔥 Error fatal en actualizarModelo:', error);
       throw error;
     }
   };

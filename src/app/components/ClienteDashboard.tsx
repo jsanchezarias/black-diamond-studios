@@ -108,15 +108,17 @@ function PremiumModelCard({ modelo, index, onAgendar }: PremiumModelCardProps) {
   
   const precios = (modelo.services || [])
     .map((s: any) => {
-      if (!s.price) return 0;
+      if (!s.price && s.price !== 0) return 0;
+      // Soporta tanto "80.000" (es-CO) como "80,000" (en) como 80000 (number)
       const cleanPrice = String(s.price).replace(/[^0-9]/g, '');
-      return parseInt(cleanPrice) || 0;
+      return cleanPrice.length > 0 ? (parseInt(cleanPrice) || 0) : 0;
     })
     .filter((p: number) => p > 0);
-  
-  const precioBase = precios.length > 0 
-    ? Math.min(...precios).toLocaleString('es-CO') 
-    : (modelo.services?.[0]?.price || null);
+
+  // Precio mínimo formateado; si no hay datos muestra null → card muestra "Consultar"
+  const precioBase: string | null = precios.length > 0
+    ? Math.min(...precios).toLocaleString('es-CO')
+    : null;
 
   return (
     <div
@@ -146,10 +148,12 @@ function PremiumModelCard({ modelo, index, onAgendar }: PremiumModelCardProps) {
             }}
           />
         ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center gap-3"
-            style={{ background: 'linear-gradient(135deg, #1a1c20 0%, #0f1014 100%)' }}>
-            <Sparkles className="w-8 h-8 opacity-20" style={{ color: C.gold }} />
-            <span className="text-[10px] uppercase tracking-widest opacity-30" style={{ color: C.text }}>Sin Imagen</span>
+          <div className="
+            w-full h-full bg-[#1a1a1a]
+            flex items-center justify-center
+            text-[#c9a961] text-6xl font-bold
+          ">
+            {modelo.name?.[0]}
           </div>
         )}
 
@@ -225,21 +229,25 @@ function PremiumModelCard({ modelo, index, onAgendar }: PremiumModelCardProps) {
 
         {/* Footer: Precio + Botón - SIEMPRE VISIBLE */}
         <div className="mt-auto pt-4 border-t border-white/5 space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex flex-col bg-white/10 p-2 px-3 rounded-xl border border-white/10 shadow-inner">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-col bg-[#c9a961]/5 p-2 px-3 rounded-xl border border-[#c9a961]/20 shadow-sm min-w-0 flex-1">
               <span className="text-[10px] uppercase tracking-[0.2em] font-black mb-1" style={{ color: C.gold }}>
-                Desde
+                {precioBase ? 'Desde' : 'Tarifa'}
               </span>
-              <div className="flex items-baseline gap-1">
-                <span className="text-sm font-bold" style={{ color: C.gold }}>$</span>
-                <span className="text-2xl font-black tracking-tighter" style={{ color: 'white' }}>
-                  {precioBase || 'Ver tarifas'}
-                </span>
-                <span className="text-[10px] font-bold ml-1" style={{ color: C.gold }}>COP</span>
-              </div>
+              {precioBase ? (
+                <div className="flex items-baseline gap-1 flex-wrap">
+                  <span className="text-sm font-bold flex-shrink-0" style={{ color: C.gold }}>$</span>
+                  <span className="text-xl sm:text-2xl font-black tracking-tighter leading-none" style={{ color: 'white' }}>
+                    {precioBase}
+                  </span>
+                  <span className="text-[10px] font-bold ml-0.5 flex-shrink-0" style={{ color: C.gold }}>COP</span>
+                </div>
+              ) : (
+                <span className="text-sm font-bold" style={{ color: 'white' }}>Consultar</span>
+              )}
             </div>
-            
-            <div className="flex flex-col items-end gap-1">
+
+            <div className="flex flex-col items-end gap-1 flex-shrink-0">
               <div className="flex items-center gap-1">
                 <span className="text-sm font-black text-white">5.0</span>
                 <Star className="w-4 h-4" style={{ fill: C.gold, color: C.gold }} />
@@ -535,7 +543,7 @@ export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboa
     measurements: m.medidas || '90-60-90',
     languages: m.idiomas || ['Español'],
     location: m.sede || 'Sede Norte',
-    available: !!(m.activa && m.disponible),
+    available: !!(m.activa && m.disponible && !m.enPeriodo),
     description: m.descripcion || 'Modelo profesional',
     services: m.serviciosDisponibles || m.services || m.servicios || [],
     specialties: m.especialidades || m.specialties || [],
@@ -544,7 +552,7 @@ export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboa
   });
 
   const modelosActivos = Array.isArray(modelos)
-    ? modelos.filter((m: any) => m?.activa).map(convertirModelo)
+    ? modelos.filter((m: any) => m?.activa && !m?.enPeriodo).map(convertirModelo)
     : [];
 
   // ── Abrir modal ───────────────────────────────────────────────────────────
@@ -594,7 +602,7 @@ export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboa
 
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen pb-20"
+    <div className="min-h-screen"
       style={{ background: C.bg, color: C.text, fontFamily: "'Inter', sans-serif" }}>
 
       {/* CSS keyframes inyectados inline para no depender de globals */}

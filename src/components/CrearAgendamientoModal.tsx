@@ -241,9 +241,14 @@ export function CrearAgendamientoModal({
                       <div className="flex items-center gap-2">
                         <User className="w-4 h-4" style={{ color: '#c9a961' }} />
                         <span>{modelo.nombreArtistico || modelo.nombre}</span>
-                        {modelo.disponible && (
+                        {modelo.disponible && !modelo.enPeriodo && (
                           <span className="ml-2 px-2 py-0.5 rounded text-xs" style={{ backgroundColor: '#2d5f2e', color: '#90ee90' }}>
                             Disponible
+                          </span>
+                        )}
+                        {modelo.enPeriodo && (
+                          <span className="ml-2 px-2 py-0.5 rounded text-xs bg-red-500/20 text-red-400 border border-red-500/30">
+                            🌸 En Período
                           </span>
                         )}
                       </div>

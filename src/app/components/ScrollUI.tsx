@@ -45,43 +45,6 @@ export function ScrollUI() {
         aria-hidden="true"
       />
 
-      {/* ── Back-to-top button ── */}
-      <button
-        onClick={scrollToTop}
-        aria-label="Volver al inicio"
-        style={{
-          position: 'fixed',
-          bottom: '2rem',
-          right: '1.5rem',
-          zIndex: 100000,
-          width: '48px',
-          height: '48px',
-          borderRadius: '50%',
-          border: '1.5px solid rgba(212,175,55,0.6)',
-          background: 'rgba(10,10,8,0.85)',
-          backdropFilter: 'blur(12px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: showBtn
-            ? '0 0 20px rgba(212,175,55,0.25), 0 4px 16px rgba(0,0,0,0.6)'
-            : 'none',
-          opacity: showBtn ? 1 : 0,
-          pointerEvents: showBtn ? 'auto' : 'none',
-          transform: showBtn ? 'translateY(0) scale(1)' : 'translateY(12px) scale(0.9)',
-          transition: 'opacity 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease',
-          cursor: 'pointer',
-        }}
-      >
-        <ArrowUp
-          style={{
-            width: '18px',
-            height: '18px',
-            color: '#d4af37',
-            transition: 'transform 0.2s ease',
-          }}
-        />
-      </button>
     </>
   );
 }

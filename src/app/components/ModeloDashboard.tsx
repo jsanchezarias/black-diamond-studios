@@ -66,7 +66,6 @@ import type { CalificacionData } from '../../components/CalificarClienteModal';
 // const AgendamientosMetrics = lazy(() => import('./AgendamientosMetrics').then(m => ({ default: m.AgendamientosMetrics })));
 const RegistroEntradaModal = lazy(() => import('../../components/RegistroEntradaModal').then(m => ({ default: m.RegistroEntradaModal })));
 const IniciarServicioModal = lazy(() => import('../../components/IniciarServicioModal').then(m => ({ default: m.IniciarServicioModal })));
-const ServicioDirectoModal = lazy(() => import('./ServicioDirectoModal').then(m => ({ default: m.ServicioDirectoModal })));
 const ServicioActivoCard = lazy(() => import('../../components/ServicioActivoCard').then(m => ({ default: m.ServicioActivoCard })));
 const CarritoBoutiqueModal = lazy(() => import('../../components/CarritoBoutiqueModal').then(m => ({ default: m.CarritoBoutiqueModal })));
 const CheckoutBoutiqueModal = lazy(() => import('../../components/CheckoutBoutiqueModal').then(m => ({ default: m.CheckoutBoutiqueModal })));
@@ -374,7 +373,6 @@ export function ModeloDashboard({ accessToken: _accessToken, userId, userEmail, 
   const [menuOpen, setMenuOpen] = useState(false);
   const [mostrarRegistroEntrada, setMostrarRegistroEntrada] = useState(false);
   const [mostrarIniciarServicio, setMostrarIniciarServicio] = useState(false);
-  const [mostrarServicioDirecto, setMostrarServicioDirecto] = useState(false);
   const [mostrarCarritoBoutique, setMostrarCarritoBoutique] = useState(false);
   const [mostrarCheckoutBoutique, setMostrarCheckoutBoutique] = useState(false);
   const [citaSeleccionada, setCitaSeleccionada] = useState<any>(null);
@@ -434,9 +432,20 @@ export function ModeloDashboard({ accessToken: _accessToken, userId, userEmail, 
 
   // Paginación servicios
   const [paginaServicios, setPaginaServicios] = useState(1);
-  const [filtroServicios, setFiltroServicios] = useState<'mes' | '3meses' | 'todo' | 'directos'>('mes');
+  const [filtroServicios, setFiltroServicios] = useState<'mes' | '3meses' | 'todo'>('mes');
   const [busquedaServicios, setBusquedaServicios] = useState('');
   
+  // 🌸 Estados Mi Período
+  const [periodoActual, setPeriodoActual] = useState<any>(null);
+  const [historialPeriodos, setHistorialPeriodos] = useState<any[]>([]);
+  const [mostrarModalPeriodo, setMostrarModalPeriodo] = useState(false);
+  const [periodoForm, setPeriodoForm] = useState({
+    fechaInicio: new Date().toISOString().split('T')[0],
+    fechaFin: new Date().toISOString().split('T')[0],
+    notas: ''
+  });
+  const [registrandoPeriodo, setRegistrandoPeriodo] = useState(false);
+
   // Boutique: Mis Pedidos
   const [misPedidos, setMisPedidos] = useState<any[]>([]);
   const [loadingPedidos, setLoadingPedidos] = useState(true);
@@ -455,6 +464,92 @@ export function ModeloDashboard({ accessToken: _accessToken, userId, userEmail, 
     recargarServicios();
     recargarProductos();
   }, []);
+
+  // 🌸 Cargar Períodos
+  const cargarPeriodoActual = async () => {
+    if (!userId) return;
+    const hoy = new Date().toISOString().split('T')[0];
+    const { data } = await supabase
+      .from('periodos_modelo')
+      .select('*')
+      .eq('modelo_id', userId)
+      .eq('activo', true)
+      .gte('fecha_fin', hoy)
+      .order('fecha_inicio', { ascending: true })
+      .maybeSingle();
+
+    setPeriodoActual(data);
+  };
+
+  const cargarHistorialPeriodos = async () => {
+    if (!userId) return;
+    const { data } = await supabase
+      .from('periodos_modelo')
+      .select('*')
+      .eq('modelo_id', userId)
+      .order('fecha_inicio', { ascending: false });
+
+    setHistorialPeriodos(data || []);
+  };
+
+  useEffect(() => {
+    if (userId) {
+      cargarPeriodoActual();
+      cargarHistorialPeriodos();
+    }
+  }, [userId]);
+
+  const registrarPeriodo = async () => {
+    if (!userId) return;
+    setRegistrandoPeriodo(true);
+    try {
+      const hoy = new Date().toISOString().split('T')[0];
+      const { data: periodoActivo } = await supabase
+        .from('periodos_modelo')
+        .select('id')
+        .eq('modelo_id', userId)
+        .eq('activo', true)
+        .gte('fecha_fin', hoy)
+        .maybeSingle();
+
+      if (periodoActivo) {
+        toast.error('Ya tienes un período activo registrado');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('periodos_modelo')
+        .insert({
+          modelo_id: userId,
+          fecha_inicio: periodoForm.fechaInicio,
+          fecha_fin: periodoForm.fechaFin,
+          registrado_por: userId,
+          notas: periodoForm.notas || null,
+          activo: true
+        });
+
+      if (error) throw error;
+
+      await supabase
+        .from('notificaciones')
+        .insert({
+          para_rol: 'administrador',
+          titulo: '🌸 Modelo en período',
+          mensaje: `${modeloActual?.nombreArtistico || userEmail} registró período\n📅 Del ${periodoForm.fechaInicio} al ${periodoForm.fechaFin}\nNo estará disponible esos días`,
+          tipo: 'periodo_modelo',
+          leida: false
+        });
+
+      toast.success('✅ Período registrado correctamente');
+      setMostrarModalPeriodo(false);
+      cargarPeriodoActual();
+      cargarHistorialPeriodos();
+    } catch (error: any) {
+      toast.error('Error al registrar período: ' + error.message);
+    } finally {
+      setRegistrandoPeriodo(false);
+    }
+  };
 
   // ── PERFIL DIRECTO DESDE SUPABASE (fuente más confiable) ──────────────────
   useEffect(() => {
@@ -721,8 +816,7 @@ export function ModeloDashboard({ accessToken: _accessToken, userId, userEmail, 
         const ok = isValid(d) && d >= desde;
         const busq = busquedaServicios.toLowerCase();
         const matchBusq = !busq || (s.clienteNombre || '').toLowerCase().includes(busq);
-        const matchDirecto = filtroServicios !== 'directos' || s.creadoPorRol === 'modelo';
-        return ok && matchBusq && matchDirecto;
+        return ok && matchBusq;
       })
       .sort((a, b) => b.fecha?.localeCompare(a.fecha || '') ?? 0);
   };
@@ -1172,26 +1266,6 @@ export function ModeloDashboard({ accessToken: _accessToken, userId, userEmail, 
                     <Play className="w-4 h-4" /> Iniciar Servicio
                   </Button>
                 )}
-                {registroActivo && (
-                  <button
-                    onClick={() => setMostrarServicioDirecto(true)}
-                    style={{
-                      background: 'linear-gradient(135deg, #B8860B, #FFD700)',
-                      border: 'none',
-                      borderRadius: 10,
-                      padding: '8px 16px',
-                      cursor: 'pointer',
-                      fontWeight: 700,
-                      fontSize: 13,
-                      color: 'black',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 6
-                    }}
-                  >
-                    ➕ Servicio Directo
-                  </button>
-                )}
               </div>
             </div>
 
@@ -1401,13 +1475,13 @@ export function ModeloDashboard({ accessToken: _accessToken, userId, userEmail, 
             {/* Filtros */}
             <div className="flex flex-wrap gap-3 items-center">
               <div className="flex rounded-lg overflow-hidden border border-white/10">
-                {(['mes', '3meses', 'todo', 'directos'] as const).map(f => (
+                {(['mes', '3meses', 'todo'] as const).map(f => (
                   <button
                     key={f}
                     onClick={() => { setFiltroServicios(f); setPaginaServicios(1); }}
                     className={`px-4 py-2 text-xs font-medium transition-colors ${filtroServicios === f ? 'bg-primary text-black' : 'bg-card text-muted-foreground hover:text-white'}`}
                   >
-                    {f === 'mes' ? 'Este mes' : f === '3meses' ? 'Últimos 3 meses' : f === 'todo' ? 'Todo' : 'Directos'}
+                    {f === 'mes' ? 'Este mes' : f === '3meses' ? 'Últimos 3 meses' : 'Todo'}
                   </button>
                 ))}
               </div>
@@ -1452,11 +1526,6 @@ export function ModeloDashboard({ accessToken: _accessToken, userId, userEmail, 
                           <td className="px-4 py-3 text-white font-medium">{s.clienteNombre}</td>
                           <td className="px-4 py-3 text-muted-foreground capitalize">
                             {s.tipoServicio || '—'}
-                            {s.creadoPorRol === 'modelo' && (
-                              <span className="ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'linear-gradient(135deg, #B8860B, #FFD700)', color: 'black' }}>
-                                ⚡ Directo
-                              </span>
-                            )}
                           </td>
                           <td className="px-4 py-3 text-muted-foreground">{s.duracionEstimadaMinutos ? `${s.duracionEstimadaMinutos}min` : '—'}</td>
                           <td className="px-4 py-3 text-right text-green-400 font-semibold">{formatCOP(s.montoPagado ?? s.montoPactado ?? 0)}</td>
@@ -2185,6 +2254,70 @@ export function ModeloDashboard({ accessToken: _accessToken, userId, userEmail, 
                 </CardContent>
               </Card>
             )}
+
+            {/* 🌸 MI PERÍODO */}
+            <Card>
+              <CardHeader className="pb-3 border-b border-white/5">
+                <CardTitle className="flex items-center gap-2">
+                  <span>🌸</span> Mi Período
+                </CardTitle>
+                <CardDescription>Gestiona tus días de período para ocultar tu disponibilidad automáticamente.</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-6 space-y-6">
+                <div>
+                  <h3 className="text-sm font-semibold text-white/60 mb-3 uppercase tracking-wider">Estado Actual</h3>
+                  {periodoActual ? (
+                    <div className="flex items-center justify-between bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xl">🔴</span>
+                        <div>
+                          <p className="text-red-400 font-bold">En período</p>
+                          <p className="text-xs text-red-400/80 mt-0.5">
+                            Termina el {new Date(periodoActual.fecha_fin + 'T12:00:00').toLocaleDateString('es-CO', { day: 'numeric', month: 'long' })}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between bg-green-500/10 border border-green-500/30 rounded-xl px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xl">🟢</span>
+                        <p className="text-green-400 font-bold">Disponible</p>
+                      </div>
+                      <button
+                        onClick={() => setMostrarModalPeriodo(true)}
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg border border-[#c9a961]/30 text-[#c9a961] text-sm hover:bg-[#c9a961]/10 transition-colors font-medium"
+                      >
+                        <Calendar className="w-4 h-4" />
+                        Registrar período
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {historialPeriodos.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-white/60 mb-3 uppercase tracking-wider">Historial Reciente</h3>
+                    <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                      {historialPeriodos.map(p => (
+                        <div key={p.id} className="flex items-center justify-between bg-black/40 border border-white/5 rounded-lg p-3">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="w-4 h-4 text-muted-foreground" />
+                            <p className="text-sm text-white/80">
+                              {new Date(p.fecha_inicio + 'T12:00:00').toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })} —{' '}
+                              {new Date(p.fecha_fin + 'T12:00:00').toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })}
+                            </p>
+                          </div>
+                          <Badge variant="outline" className={p.activo ? 'border-primary/50 text-primary' : 'border-white/20 text-muted-foreground'}>
+                            {p.activo ? 'Activo' : 'Completado'}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         )}
 
@@ -2381,7 +2514,7 @@ export function ModeloDashboard({ accessToken: _accessToken, userId, userEmail, 
             isOpen={mostrarRegistroEntrada}
             onClose={() => setMostrarRegistroEntrada(false)}
             modeloEmail={emailModelo}
-            modeloNombre={modeloActual.nombre}
+            modeloNombre={modeloActual.nombreArtistico || modeloActual.nombre}
           />
         )}
         {modeloActual && mostrarIniciarServicio && (
@@ -2389,19 +2522,7 @@ export function ModeloDashboard({ accessToken: _accessToken, userId, userEmail, 
             isOpen={mostrarIniciarServicio}
             onClose={() => setMostrarIniciarServicio(false)}
             modeloEmail={emailModelo}
-            modeloNombre={modeloActual.nombre}
-          />
-        )}
-        {modeloActual && mostrarServicioDirecto && (
-          <ServicioDirectoModal
-            isOpen={mostrarServicioDirecto}
-            onClose={() => setMostrarServicioDirecto(false)}
-            currentUser={{ id: String(modeloActual.id || ''), email: emailModelo, nombre: modeloActual.nombre || '' }}
-            onSuccess={() => {
-              // Recargar datos
-              recargarAgendamientos();
-              recargarServicios();
-            }}
+            modeloNombre={modeloActual.nombreArtistico || modeloActual.nombre}
           />
         )}
         <CarritoBoutiqueModal
@@ -2438,6 +2559,79 @@ export function ModeloDashboard({ accessToken: _accessToken, userId, userEmail, 
           />
         )}
       </Suspense>
+
+      {/* 🌸 MODAL REGISTRAR PERÍODO */}
+      {mostrarModalPeriodo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-[#1a1c23] border border-[#c9a961]/30 rounded-2xl p-6 w-full max-w-md shadow-2xl relative">
+            <button 
+              onClick={() => setMostrarModalPeriodo(false)}
+              className="absolute top-4 right-4 text-white/50 hover:text-white"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
+              <span>🌸</span> Registrar Período
+            </h3>
+            <p className="text-sm text-white/60 mb-6">
+              Durante estos días no aparecerás disponible para los clientes en la plataforma.
+            </p>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-white/80">Fecha Inicio</label>
+                  <input
+                    type="date"
+                    min={new Date().toISOString().split('T')[0]}
+                    value={periodoForm.fechaInicio}
+                    onChange={e => setPeriodoForm({ ...periodoForm, fechaInicio: e.target.value })}
+                    className="w-full bg-black/40 border border-white/10 rounded-lg p-2.5 text-sm text-white focus:border-[#c9a961] focus:outline-none"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-white/80">Fecha Fin</label>
+                  <input
+                    type="date"
+                    min={periodoForm.fechaInicio}
+                    value={periodoForm.fechaFin}
+                    onChange={e => setPeriodoForm({ ...periodoForm, fechaFin: e.target.value })}
+                    className="w-full bg-black/40 border border-white/10 rounded-lg p-2.5 text-sm text-white focus:border-[#c9a961] focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-white/80">Notas (Opcional)</label>
+                <textarea
+                  value={periodoForm.notas}
+                  onChange={e => setPeriodoForm({ ...periodoForm, notas: e.target.value })}
+                  placeholder="Ej. Cólicos muy fuertes, descansaré."
+                  rows={2}
+                  className="w-full bg-black/40 border border-white/10 rounded-lg p-2.5 text-sm text-white focus:border-[#c9a961] focus:outline-none resize-none"
+                />
+              </div>
+
+              <div className="pt-4 flex gap-3">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setMostrarModalPeriodo(false)}
+                  className="flex-1 bg-white/5 border-white/10 hover:bg-white/10 text-white"
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  onClick={registrarPeriodo}
+                  disabled={registrandoPeriodo || !periodoForm.fechaInicio || !periodoForm.fechaFin || periodoForm.fechaFin < periodoForm.fechaInicio}
+                  className="flex-1 bg-gradient-to-r from-[#c9a84c] to-[#a07830] text-black font-bold hover:brightness-110"
+                >
+                  {registrandoPeriodo ? 'Registrando...' : 'Confirmar'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal de calificación de cliente — aparece tras cerrar el reporte */}
       <Suspense fallback={null}>

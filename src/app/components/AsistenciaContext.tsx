@@ -237,6 +237,7 @@ export function AsistenciaProvider({ children }: { children: ReactNode }) {
       titulo: '📸 Solicitud de entrada',
       mensaje: `${modeloNombre} quiere registrar su entrada al turno`,
       tipo: 'solicitud_entrada',
+      referencia_id: data.id,
       leida: false,
     });
   };
@@ -303,7 +304,7 @@ export function AsistenciaProvider({ children }: { children: ReactNode }) {
       para_usuario_id: solicitud.modeloId,
       titulo: '✅ Entrada aprobada',
       mensaje: comentarios ?? '¡Tu entrada fue aprobada! Tu jornada de 8 horas ha comenzado.',
-      tipo: 'solicitud_entrada_aprobada',
+      tipo: 'entrada_aprobada',
       datos: { jornada_id: jornadaData.id },
       leida: false,
     });

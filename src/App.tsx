@@ -21,7 +21,7 @@ import { BalanceFinancieroProvider } from './app/components/BalanceFinancieroCon
 import { ErrorMonitorProvider, triggerGlobalError } from './app/components/ErrorMonitorContext';
 import { ErrorBoundary } from './app/components/ErrorBoundary';
 import { LoginForm } from './app/components/LoginForm';
-import { Toaster } from 'sonner';
+import { Toaster, toast } from 'sonner';
 
 // Lazy loading de dashboards — solo se cargan cuando el usuario los necesita
 const LandingPage = lazy(() => import('./app/components/LandingPage').then(m => ({ default: m.LandingPage })));
@@ -196,6 +196,7 @@ function clearLocalSession() {
 
 export default function App() {
   const [showLogin, setShowLogin] = useState(false);
+  const [tipoLogin, setTipoLogin] = useState<'cliente' | 'sistema'>('cliente');
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [verifyingSession, setVerifyingSession] = useState(true);
 
@@ -523,12 +524,15 @@ export default function App() {
     // Forzar actualización de estado con limpieza previa
     localStorage.setItem('blackDiamondUser', JSON.stringify({ userId, email, role: roleLimpio }));
     
+    const redirectTo = localStorage.getItem('loginRedirect');
+    localStorage.removeItem('loginRedirect');
+
     // Usar una transición limpia
     setCurrentUser(null);
     setTimeout(() => {
       setShowLogin(false);
       setCurrentUser(user);
-      console.log('🚀 [UI-FORCE] Dashboard activado con éxito.');
+      console.log(`🚀 [UI-FORCE] Dashboard activado con éxito. RedirectTo: ${redirectTo}`);
     }, 50);
   };
 
@@ -665,13 +669,14 @@ export default function App() {
         <div className="min-h-screen w-full" style={{ backgroundColor: '#0f1014', color: '#e8e6e3' }}>
           {showLogin ? (
             <LoginForm
+              tipo={tipoLogin}
               onLogin={handleLogin}
               onBackToLanding={() => setShowLogin(false)}
             />
           ) : (
             <Suspense fallback={<GlobalLoadingScreen />}>
-              <LandingPage 
-                onAccessSystem={() => setShowLogin(true)} 
+              <LandingPage
+                onAccessSystem={(tipo: 'cliente' | 'sistema') => { setTipoLogin(tipo); setShowLogin(true); }}
                 onLoginSuccess={handleLogin}
                 currentUser={currentUser}
               />

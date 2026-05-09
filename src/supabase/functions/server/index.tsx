@@ -17,13 +17,25 @@ app.use(
   "/*",
   cors({
     origin: "*",
-    allowHeaders: ["Content-Type", "Authorization", "apikey", "x-client-info"],
+    allowHeaders: ["Content-Type", "Authorization", "apikey", "x-client-info", "x-invoke-path"],
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     exposeHeaders: ["Content-Length", "Content-Type"],
     maxAge: 600,
     credentials: true,
   }),
 );
+
+// 🔀 Middleware para soportar routing vía x-invoke-path (usado por el frontend)
+app.use('*', async (c, next) => {
+  const invokePath = c.req.header('x-invoke-path');
+  if (invokePath && (c.req.path === '/' || c.req.path === '')) {
+    console.log(`🔀 Re-enrutando petición '/' -> '${invokePath}' vía x-invoke-path`);
+    const url = new URL(c.req.url);
+    url.pathname = invokePath;
+    return app.fetch(new Request(url.toString(), c.req.raw));
+  }
+  await next();
+});
 
 // Health check endpoint
 app.get("/make-server-9dadc017/health", (c) => {
@@ -1874,14 +1886,14 @@ app.post("/make-server-9dadc017/modelos/crear", async (c) => {
         id: userId,
         email: email,
         nombre: nombre,
-        nombreArtistico: nombreArtistico || nombre,
+        nombre_artistico: nombreArtistico || nombre,
         role: 'modelo',
         telefono: telefono || null,
         cedula: cedula || null,
         edad: edad || 21,
         direccion: direccion || null,
-        fotoPerfil: fotoPerfil || null,
-        fotosAdicionales: fotosAdicionales || [],
+        foto_url: fotoPerfil || null,
+        fotosadicionales: fotosAdicionales || [],
         descripcion: descripcion || null,
         altura: altura || null,
         medidas: medidas || null,
@@ -2019,14 +2031,14 @@ app.post("/make-server-9dadc017/administrador/crear-modelo", async (c) => {
         id: userId,
         email: email,
         nombre: nombre,
-        nombreArtistico: nombreArtistico || nombre,
+        nombre_artistico: nombreArtistico || nombre,
         role: 'modelo',
         telefono: telefono || null,
         cedula: cedula || null,
         edad: edad || 21,
         direccion: direccion || null,
-        fotoPerfil: fotoPerfil || null,
-        fotosAdicionales: fotosAdicionales || [],
+        foto_url: fotoPerfil || null,
+        fotosadicionales: fotosAdicionales || [],
         descripcion: descripcion || null,
         altura: altura || null,
         medidas: medidas || null,

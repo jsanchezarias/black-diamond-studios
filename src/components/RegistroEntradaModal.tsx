@@ -174,38 +174,35 @@ export function RegistroEntradaModal({ isOpen, onClose, modeloEmail, modeloNombr
     try {
       let selfieUrl = imagenCapturada; // Fallback: usar base64
 
-      // Intentar subir a Supabase Storage
+      // Intentar subir a Supabase Storage — si falla, se usa base64 como fallback
       try {
         const blob = await fetch(imagenCapturada).then(r => r.blob());
         const arrayBuffer = await blob.arrayBuffer();
-        
-        // Limpiar el email para usarlo en el path sin caracteres problemáticos
+
         const safeEmail = modeloEmail.replace(/[^a-zA-Z0-9]/g, '_');
         const fileName = `checkins/${safeEmail}_${Date.now()}.jpg`;
-        
+
         const { data, error: uploadError } = await supabase.storage
-          .from('fotos-modelos') // Usamos el bucket correcto
+          .from('selfies-entrada')
           .upload(fileName, arrayBuffer, {
             contentType: 'image/jpeg',
-            upsert: false
+            upsert: false,
           });
 
         if (uploadError) {
-          console.error('Upload error:', uploadError);
-          throw uploadError; // Lanza el error para ser capturado en el catch principal
+          // No re-throw: continuar con base64 como fallback
+          if (process.env.NODE_ENV === 'development') console.warn('Storage upload falló, usando base64:', uploadError.message);
         } else if (data) {
-          // Obtener URL pública
           const { data: urlData } = supabase.storage
-            .from('fotos-modelos')
+            .from('selfies-entrada')
             .getPublicUrl(fileName);
-          
           if (urlData?.publicUrl) {
             selfieUrl = urlData.publicUrl;
           }
         }
       } catch (storageError: any) {
-        console.error('Error en storage:', storageError);
-        throw new Error(`Error al subir la foto: ${storageError.message || 'Desconocido'}`);
+        // No re-throw: continuar con base64 como fallback
+        if (process.env.NODE_ENV === 'development') console.warn('Storage error, usando base64:', storageError.message);
       }
 
       // Crear la solicitud de entrada en Supabase

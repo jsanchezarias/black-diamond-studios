@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { X, User, Mail, Phone, MapPin, CreditCard, DollarSign, Clock, Edit, AlertTriangle, BarChart3, FileText, CheckCircle, Archive } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, User, Mail, Phone, MapPin, CreditCard, DollarSign, Clock, Edit, AlertTriangle, BarChart3, FileText, CheckCircle, Archive, Calendar, Trash } from 'lucide-react';
+import { supabase } from '../utils/supabase/info';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -35,6 +36,94 @@ export function DetalleModeloPanel({ modelo, onClose, onEdit }: DetalleModeloPan
   const { archivarModelo } = useModelos();
   const [mostrarArchivarDialog, setMostrarArchivarDialog] = useState(false);
   const [motivoArchivado, setMotivoArchivado] = useState('');
+
+  // 🌸 Estados para Períodos
+  const [periodos, setPeriodos] = useState<any[]>([]);
+  const [loadingPeriodos, setLoadingPeriodos] = useState(true);
+  const [mostrarModalPeriodo, setMostrarModalPeriodo] = useState(false);
+  const [periodoForm, setPeriodoForm] = useState({
+    fechaInicio: new Date().toISOString().split('T')[0],
+    fechaFin: new Date().toISOString().split('T')[0],
+    notas: ''
+  });
+  const [procesandoPeriodo, setProcesandoPeriodo] = useState(false);
+
+  const cargarPeriodos = async () => {
+    try {
+      setLoadingPeriodos(true);
+      const { data } = await supabase
+        .from('periodos_modelo')
+        .select('*')
+        .eq('modelo_id', modelo.id)
+        .order('fecha_inicio', { ascending: false });
+      setPeriodos(data || []);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingPeriodos(false);
+    }
+  };
+
+  useEffect(() => {
+    if (modelo.id) cargarPeriodos();
+  }, [modelo.id]);
+
+  const registrarPeriodo = async () => {
+    try {
+      setProcesandoPeriodo(true);
+      const hoy = new Date().toISOString().split('T')[0];
+      const { data: periodoActivo } = await supabase
+        .from('periodos_modelo')
+        .select('id')
+        .eq('modelo_id', modelo.id)
+        .eq('activo', true)
+        .gte('fecha_fin', hoy)
+        .maybeSingle();
+
+      if (periodoActivo) {
+        toast.error('La modelo ya tiene un período activo');
+        return;
+      }
+
+      const { data: { user } } = await supabase.auth.getUser();
+
+      const { error } = await supabase
+        .from('periodos_modelo')
+        .insert({
+          modelo_id: modelo.id,
+          fecha_inicio: periodoForm.fechaInicio,
+          fecha_fin: periodoForm.fechaFin,
+          registrado_por: user?.id,
+          notas: periodoForm.notas || null,
+          activo: true
+        });
+
+      if (error) throw error;
+      toast.success('Período registrado correctamente');
+      setMostrarModalPeriodo(false);
+      cargarPeriodos();
+    } catch (error: any) {
+      toast.error('Error al registrar período: ' + error.message);
+    } finally {
+      setProcesandoPeriodo(false);
+    }
+  };
+
+  const cancelarPeriodo = async (id: string) => {
+    if (!confirm('¿Seguro que deseas cancelar este período? La modelo volverá a estar disponible.')) return;
+    try {
+      const { error } = await supabase
+        .from('periodos_modelo')
+        .update({ activo: false })
+        .eq('id', id);
+      
+      if (error) throw error;
+      toast.success('Período cancelado');
+      cargarPeriodos();
+    } catch (e: any) {
+      toast.error('Error: ' + e.message);
+    }
+  };
 
   // Filtrar datos de esta modelo por email
   const serviciosModelo = serviciosFinalizados.filter(s => s.modeloEmail === modelo.email);
@@ -236,7 +325,7 @@ export function DetalleModeloPanel({ modelo, onClose, onEdit }: DetalleModeloPan
         {/* Tabs Content */}
         <div className="flex-1 overflow-y-auto p-3 sm:p-6">
           <Tabs defaultValue="historial" className="w-full">
-            <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5 bg-secondary text-xs sm:text-sm">
+            <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 bg-secondary text-xs sm:text-sm">
               <TabsTrigger value="historial" className="px-2">
                 <FileText className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
                 <span className="hidden sm:inline">Historial</span>
@@ -258,6 +347,11 @@ export function DetalleModeloPanel({ modelo, onClose, onEdit }: DetalleModeloPan
               <TabsTrigger value="documentos" className="px-2">
                 <User className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
                 <span className="hidden sm:inline">Documentos</span>
+              </TabsTrigger>
+              <TabsTrigger value="periodos" className="px-2">
+                <Calendar className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Períodos</span>
+                <span className="sm:hidden">({periodos.filter(p => p.activo).length})</span>
               </TabsTrigger>
             </TabsList>
 
@@ -567,6 +661,63 @@ export function DetalleModeloPanel({ modelo, onClose, onEdit }: DetalleModeloPan
                 </CardContent>
               </Card>
             </TabsContent>
+
+            {/* 🌸 Períodos */}
+            <TabsContent value="periodos" className="space-y-4 mt-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <span>🌸</span> Registro de Períodos
+                </h3>
+                <Button 
+                  size="sm" 
+                  onClick={() => setMostrarModalPeriodo(true)}
+                  className="bg-[#c9a961] hover:bg-[#a07830] text-black"
+                >
+                  <Calendar className="w-4 h-4 mr-2" />
+                  Registrar Período
+                </Button>
+              </div>
+
+              {loadingPeriodos ? (
+                <div className="text-center py-8">Cargando...</div>
+              ) : periodos.length > 0 ? (
+                <div className="space-y-3">
+                  {periodos.map(p => (
+                    <Card key={p.id} className={`border ${p.activo ? 'border-[#c9a961]/30 bg-[#c9a961]/5' : 'border-border/50 bg-secondary/20'}`}>
+                      <CardContent className="p-4 flex items-center justify-between">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-bold text-white">
+                              {new Date(p.fecha_inicio + 'T12:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })} —{' '}
+                              {new Date(p.fecha_fin + 'T12:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })}
+                            </span>
+                            <Badge variant={p.activo ? "default" : "outline"} className={p.activo ? 'bg-[#c9a961] text-black' : ''}>
+                              {p.activo ? 'Activo' : 'Completado/Cancelado'}
+                            </Badge>
+                          </div>
+                          {p.notas && <p className="text-sm text-muted-foreground">{p.notas}</p>}
+                        </div>
+                        {p.activo && (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => cancelarPeriodo(p.id)}
+                            className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+                          >
+                            <Trash className="w-4 h-4 mr-2" /> Cancelar
+                          </Button>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <Calendar className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground">No hay períodos registrados</p>
+                </div>
+              )}
+            </TabsContent>
           </Tabs>
         </div>
       </div>
@@ -598,6 +749,76 @@ export function DetalleModeloPanel({ modelo, onClose, onEdit }: DetalleModeloPan
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Modal Registrar Período */}
+      {mostrarModalPeriodo && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-[#1a1c23] border border-[#c9a961]/30 rounded-2xl p-6 w-full max-w-md shadow-2xl relative">
+            <button 
+              onClick={() => setMostrarModalPeriodo(false)}
+              className="absolute top-4 right-4 text-white/50 hover:text-white"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
+              <span>🌸</span> Registrar Período
+            </h3>
+            <p className="text-sm text-white/60 mb-6">
+              Ocultar temporalmente a la modelo de la plataforma.
+            </p>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-white/80">Inicio</Label>
+                  <Input
+                    type="date"
+                    min={new Date().toISOString().split('T')[0]}
+                    value={periodoForm.fechaInicio}
+                    onChange={e => setPeriodoForm({ ...periodoForm, fechaInicio: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-white/80">Fin</Label>
+                  <Input
+                    type="date"
+                    min={periodoForm.fechaInicio}
+                    value={periodoForm.fechaFin}
+                    onChange={e => setPeriodoForm({ ...periodoForm, fechaFin: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-white/80">Notas / Motivo (Opcional)</Label>
+                <textarea
+                  value={periodoForm.notas}
+                  onChange={e => setPeriodoForm({ ...periodoForm, notas: e.target.value })}
+                  rows={2}
+                  className="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-sm text-white focus:border-[#c9a961]"
+                />
+              </div>
+
+              <div className="pt-4 flex gap-3">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setMostrarModalPeriodo(false)}
+                  className="flex-1 border-white/10 text-white hover:bg-white/10"
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  onClick={registrarPeriodo}
+                  disabled={procesandoPeriodo || !periodoForm.fechaInicio || !periodoForm.fechaFin || periodoForm.fechaFin < periodoForm.fechaInicio}
+                  className="flex-1 bg-gradient-to-r from-[#c9a84c] to-[#a07830] text-black font-bold hover:brightness-110"
+                >
+                  {procesandoPeriodo ? 'Guardando...' : 'Confirmar'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

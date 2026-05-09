@@ -10,12 +10,13 @@ import { translateSupabaseError } from '../../utils/supabase/errors';
 import { toast } from 'sonner';
 
 interface LoginFormProps {
+  tipo: 'cliente' | 'sistema';
   onLogin: (accessToken: string, userId: string, email: string, role: string) => void;
   onBackToLanding?: () => void;
 }
 
 // Formulario de login con Supabase Auth
-export function LoginForm({ onLogin, onBackToLanding }: LoginFormProps) {
+export function LoginForm({ tipo, onLogin, onBackToLanding }: LoginFormProps) {
   const [identificador, setIdentificador] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -155,16 +156,26 @@ export function LoginForm({ onLogin, onBackToLanding }: LoginFormProps) {
         return;
       }
 
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🔑 [LoginForm] ROL RECIBIDO:', role);
+      // Validar que el rol corresponde al tipo de acceso
+      const rolesCliente = ['cliente'];
+      const rolesSistema = ['administrador', 'owner', 'programador', 'modelo'];
+
+      if (tipo === 'cliente' && !rolesCliente.includes(role)) {
+        const msg = 'Esta entrada es solo para clientes. Usa "Acceso al sistema" si eres personal.';
+        setError(msg);
+        toast.error(msg);
+        await supabase.auth.signOut();
+        setLoading(false);
+        return;
       }
 
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🔑 [LoginForm] ROL RECIBIDO:', role);
-      }
-
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🔑 [LoginForm] ROL RECIBIDO:', role);
+      if (tipo === 'sistema' && !rolesSistema.includes(role)) {
+        const msg = 'Esta entrada es para el personal. Usa "Reservar cita" si eres cliente.';
+        setError(msg);
+        toast.error(msg);
+        await supabase.auth.signOut();
+        setLoading(false);
+        return;
       }
 
       onLogin(
@@ -212,10 +223,12 @@ export function LoginForm({ onLogin, onBackToLanding }: LoginFormProps) {
               </div>
               <div className="text-center space-y-2">
                 <CardTitle className="text-3xl font-['Cormorant_Garamond'] text-foreground">
-                  Acceso al Sistema
+                  {tipo === 'cliente' ? '◆ Bienvenido' : '🔒 Acceso al Sistema'}
                 </CardTitle>
                 <CardDescription className="text-base text-muted-foreground">
-                  Ingresa tus credenciales para continuar
+                  {tipo === 'cliente'
+                    ? 'Inicia sesión para reservar tu cita'
+                    : 'Solo personal autorizado'}
                 </CardDescription>
               </div>
             </CardHeader>
@@ -276,8 +289,10 @@ export function LoginForm({ onLogin, onBackToLanding }: LoginFormProps) {
                       <Loader2 className="w-4 h-4 animate-spin" />
                       Iniciando sesión...
                     </div>
+                  ) : tipo === 'cliente' ? (
+                    '◆ Entrar'
                   ) : (
-                    'Iniciar Sesión'
+                    '🔒 Acceder'
                   )}
                 </Button>
 
