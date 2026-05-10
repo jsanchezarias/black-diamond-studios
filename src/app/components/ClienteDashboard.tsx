@@ -138,21 +138,45 @@ function CitaCard({
             </span>
           </div>
 
-          <div className="mt-2 space-y-1" style={{ fontSize: '0.8rem', color: C.muted }}>
-            <div className="flex items-center gap-2">
+          <div className="mt-2" style={{ fontSize: '0.8rem', color: C.muted }}>
+            <div className="flex items-center gap-2 mb-2">
               <span>📅</span>
               <span>{formatFecha(cita.fecha)} · {cita.hora || '--:--'}</span>
             </div>
-            <div className="flex items-center gap-2">
-              <span>💆</span>
-              <span>{cita.tarifaNombre || cita.servicio || cita.tipoServicio || 'Servicio'}</span>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+              <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 6, padding: '8px 10px' }}>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>SERVICIO</div>
+                <div style={{ fontSize: 12, fontWeight: 500, color: 'white', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {cita.tarifaNombre || cita.servicio || cita.tipoServicio || 'N/A'}
+                </div>
+              </div>
+              <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 6, padding: '8px 10px' }}>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>DURACIÓN</div>
+                <div style={{ fontSize: 12, fontWeight: 500, color: 'white' }}>
+                  {cita.duracion_minutos
+                    ? cita.duracion_minutos < 60
+                      ? cita.duracion_minutos + ' min'
+                      : cita.duracion_minutos === 60
+                        ? '1 hora'
+                        : (cita.duracion_minutos / 60) + ' horas'
+                    : 'N/A'}
+                </div>
+              </div>
+              <div style={{ background: 'rgba(255,215,0,0.06)', border: '0.5px solid rgba(255,215,0,0.2)', borderRadius: 6, padding: '8px 10px' }}>
+                <div style={{ fontSize: 10, color: 'rgba(255,215,0,0.5)', marginBottom: 2 }}>PRECIO</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#FFD700' }}>
+                  {(cita.montoPago || cita.monto_pago)
+                    ? '$' + parseInt(cita.montoPago || cita.monto_pago).toLocaleString('es-CO')
+                    : 'N/A'}
+                </div>
+              </div>
             </div>
-            {(cita.montoPago > 0 || cita.monto_pago > 0) && (
-              <div className="flex items-center gap-2">
-                <span>💰</span>
-                <span style={{ color: C.gold, fontWeight: 600 }}>
-                  ${(cita.montoPago || cita.monto_pago || 0).toLocaleString('es-CO')} COP
-                </span>
+            {cita.ubicacion && (
+              <div style={{ marginTop: 8, fontSize: 12, color: 'rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                📍 {cita.ubicacion}
+                {cita.habitacion && cita.habitacion !== 'Por asignar' && (
+                  <span> — {cita.habitacion}</span>
+                )}
               </div>
             )}
           </div>

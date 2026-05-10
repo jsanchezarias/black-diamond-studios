@@ -1,227 +1,165 @@
 import React, { useState } from 'react';
 
-export const ModeloCard = ({ modelo, onAgendar }: { modelo: any, onAgendar?: (m: any) => void }) => {
-  const [idx, setIdx] = useState(0);
+export const ModeloCard = ({ modelo, onAgendar }: { modelo: any; onAgendar?: (m: any) => void }) => {
+  const [fotoActual, setFotoActual] = useState(0);
 
-  // Ordenar fotos: principal primero
-  const fotos = [...(modelo.modelo_fotos || [])]
-    .sort((a: any, b: any) => 
-      (b.es_principal ? 1 : 0) - (a.es_principal ? 1 : 0)
-    );
+  const fotos = modelo.fotos?.length > 0
+    ? modelo.fotos
+    : modelo.foto_url ? [{ url: modelo.foto_url }] : [];
 
-  const fotoUrl = fotos[idx]?.url || modelo.foto_url;
+  // Precios reales desde servicios_modelo
+  const serviciosActivos = (modelo.servicios_modelo || []).filter((s: any) => s.activo);
+  const preciosReales = serviciosActivos
+    .map((s: any) => ({ nombre: s.nombre, precio: s.precio_sede || s.precio_domicilio || 0 }))
+    .filter((s: any) => s.precio > 0)
+    .slice(0, 6);
 
-  // Precio mínimo — solo precio_sede y precio_domicilio
-  const precios = (modelo.servicios_modelo || [])
-    .filter((s: any) => s.activo)
-    .map((s: any) => s.precio_sede || s.precio_domicilio || 0)
-    .filter((p: number) => p > 0);
-    
-  const precioBase = precios.length > 0
-    ? Math.min(...precios)
-    : null;
+  // Fallback si no hay precios en la BD
+  const preciosFallback = [
+    { nombre: 'Rato', precio: 130000 },
+    { nombre: '30 Min', precio: 160000 },
+    { nombre: '1 Hora', precio: 190000 },
+    { nombre: '2 Horas', precio: 360000 },
+    { nombre: '3 Horas', precio: 520000 },
+    { nombre: '6 Horas', precio: 1000000 },
+  ];
 
-  const servicios = (modelo.servicios_modelo || [])
-    .filter((s: any) => s.activo)
-    .slice(0, 3);
-
-  const prev = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIdx(i => i === 0 ? fotos.length - 1 : i - 1);
-  };
-  
-  const next = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIdx(i => i === fotos.length - 1 ? 0 : i + 1);
-  };
+  const preciosVisibles = preciosReales.length > 0 ? preciosReales : preciosFallback;
 
   return (
     <div style={{
-      borderRadius: 12,
-      overflow: 'hidden',
-      background: '#16181c',
-      border: '1px solid #2a2a2a',
-      display: 'flex',
-      flexDirection: 'column',
-      transition: 'border-color 0.3s'
+      background: 'rgba(0,0,0,0.4)',
+      border: '0.5px solid rgba(255,215,0,0.2)',
+      borderRadius: 12, overflow: 'hidden',
+      transition: 'border-color 0.2s, transform 0.2s',
     }}
-    onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'rgba(201,169,97,0.5)')}
-    onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#2a2a2a')}
+      onMouseEnter={e => {
+        (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,215,0,0.5)';
+        (e.currentTarget as HTMLElement).style.transform = 'translateY(-3px)';
+      }}
+      onMouseLeave={e => {
+        (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,215,0,0.2)';
+        (e.currentTarget as HTMLElement).style.transform = 'translateY(0)';
+      }}
     >
-
-      {/* ══ FOTO CON CARRUSEL ══ */}
-      <div style={{
-        position: 'relative',
-        height: 280,
-        background: '#111',
-        flexShrink: 0
-      }}>
-
-        {fotoUrl ? (
+      {/* ── FOTO GRANDE ── */}
+      <div style={{ position: 'relative', height: 360 }}>
+        {fotos.length > 0 ? (
           <img
-            key={fotoUrl}
-            src={fotoUrl}
-            alt={modelo.nombre_artistico}
-            loading='lazy'
-            style={{
-              width: '100%', height: '100%',
-              objectFit: 'cover',
-              display: 'block',
-              transition: 'opacity 0.3s'
-            }}
-            onError={(e) => {
-              // Si falla, intenta la siguiente foto
-              if (idx < fotos.length - 1)
-                setIdx(i => i + 1);
-            }}
+            key={fotos[fotoActual]?.url}
+            src={fotos[fotoActual]?.url}
+            alt={modelo.nombre_artistico || 'Modelo'}
+            loading="lazy"
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+            onError={e => ((e.target as HTMLImageElement).style.display = 'none')}
           />
         ) : (
           <div style={{
-            width:'100%', height:'100%',
-            display:'flex', alignItems:'center',
-            justifyContent:'center',
-            background:'#1a1c21'
+            width: '100%', height: '100%', background: '#111',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            <span style={{
-              fontSize:48, color:'#c9a961', opacity:0.3
-            }}>◆</span>
+            <span style={{ fontSize: 56, color: '#FFD700', opacity: 0.15 }}>◆</span>
           </div>
         )}
 
-        {/* Gradiente nombre */}
+        {/* Gradiente + nombre + badge */}
         <div style={{
-          position:'absolute', inset:0,
-          background:
-            'linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 55%)',
-          pointerEvents: 'none'
-        }}/>
-
-        {/* Nombre sobre foto */}
-        <p style={{
-          position:'absolute', bottom:12, left:12,
-          margin:0, color:'#c9a961',
-          fontWeight:'bold', fontSize:16,
-          fontFamily:'"Playfair Display", serif',
-          textShadow:'0 2px 6px rgba(0,0,0,0.9)',
-          zIndex:2
+          position: 'absolute', bottom: 0, left: 0, right: 0,
+          background: 'linear-gradient(transparent, rgba(0,0,0,0.9))',
+          padding: '32px 14px 14px',
         }}>
-          {modelo.nombre_artistico}
-        </p>
-
-        {/* Flechas — solo si hay más de 1 foto */}
-        {fotos.length > 1 && (
-          <>
-            <button onClick={prev} style={{
-              position:'absolute', left:8, top:'45%',
-              transform:'translateY(-50%)',
-              background:'rgba(0,0,0,0.65)',
-              color:'#fff', border:'none',
-              borderRadius:'50%', width:34, height:34,
-              fontSize:20, cursor:'pointer',
-              display:'flex', alignItems:'center',
-              justifyContent:'center', zIndex:3
-            }}>‹</button>
-
-            <button onClick={next} style={{
-              position:'absolute', right:8, top:'45%',
-              transform:'translateY(-50%)',
-              background:'rgba(0,0,0,0.65)',
-              color:'#fff', border:'none',
-              borderRadius:'50%', width:34, height:34,
-              fontSize:20, cursor:'pointer',
-              display:'flex', alignItems:'center',
-              justifyContent:'center', zIndex:3
-            }}>›</button>
-
-            {/* Puntos indicadores */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
             <div style={{
-              position:'absolute', bottom:38,
-              left:0, right:0,
-              display:'flex', justifyContent:'center',
-              gap:5, zIndex:3
-            }}>
-              {fotos.map((_: any, i: number) => (
-                <div
-                  key={i}
-                  onClick={e => { e.stopPropagation(); setIdx(i); }}
-                  style={{
-                    width: i === idx ? 18 : 6,
-                    height: 6, borderRadius: 3,
-                    background: i === idx
-                      ? '#c9a961'
-                      : 'rgba(255,255,255,0.35)',
-                    transition: 'all 0.3s',
-                    cursor: 'pointer'
-                  }}
-                />
-              ))}
-            </div>
-          </>
-        )}
+              width: 7, height: 7, borderRadius: '50%',
+              background: '#4CAF50', boxShadow: '0 0 6px #4CAF50',
+            }} />
+            <span style={{ fontSize: 11, color: '#4CAF50', fontWeight: 500 }}>Disponible</span>
+          </div>
+          <h3 style={{ fontSize: 22, fontWeight: 700, color: 'white', margin: 0 }}>
+            {modelo.nombre_artistico || modelo.nombre}
+          </h3>
+        </div>
       </div>
 
-      {/* ══ CONTENIDO ══ */}
-      <div style={{
-        padding: '14px 14px 16px',
-        display:'flex', flexDirection:'column',
-        gap:10, flex:1
-      }}>
-
-        {/* PRECIO — siempre visible */}
+      {/* ── MINIATURAS ── */}
+      {fotos.length > 1 && (
         <div style={{
-          display:'flex', alignItems:'baseline', gap:4
+          display: 'flex', gap: 4, padding: '8px',
+          background: 'rgba(0,0,0,0.6)',
         }}>
-          {precioBase ? (
-            <>
-              <span style={{color:'#888', fontSize:11}}>
-                Desde
-              </span>
-              <span style={{
-                color:'#c9a961', fontWeight:'bold',
-                fontSize:18
-              }}>
-                ${precioBase.toLocaleString('es-CO')}
-              </span>
-              <span style={{color:'#888', fontSize:11}}>
-                COP
-              </span>
-            </>
-          ) : (
-            <span style={{color:'#666', fontSize:12}}>
-              Consultar precio
-            </span>
+          {fotos.slice(0, 5).map((foto: any, i: number) => (
+            <div
+              key={i}
+              onClick={() => setFotoActual(i)}
+              style={{
+                width: 48, height: 48, borderRadius: 6,
+                overflow: 'hidden', cursor: 'pointer', flexShrink: 0,
+                border: fotoActual === i ? '2px solid #FFD700' : '2px solid transparent',
+                opacity: fotoActual === i ? 1 : 0.6,
+                transition: 'all 0.15s',
+              }}
+            >
+              <img
+                src={foto.url}
+                alt=""
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            </div>
+          ))}
+          {fotos.length > 5 && (
+            <div style={{
+              width: 48, height: 48, borderRadius: 6,
+              background: 'rgba(255,215,0,0.1)',
+              border: '2px solid rgba(255,215,0,0.3)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0, color: '#FFD700', fontSize: 11, fontWeight: 600,
+            }}>
+              +{fotos.length - 5}
+            </div>
           )}
         </div>
+      )}
 
-        {/* Chips de servicios */}
-        {servicios.length > 0 && (
-          <div style={{display:'flex', flexWrap:'wrap', gap:5}}>
-            {servicios.map((s: any) => (
-              <span key={s.id} style={{
-                fontSize:11, padding:'3px 10px',
-                borderRadius:20,
-                background:'rgba(201,169,97,0.1)',
-                color:'#c9a961',
-                border:'1px solid rgba(201,169,97,0.2)'
-              }}>
+      {/* ── PRECIOS + BOTÓN ── */}
+      <div style={{ padding: '12px 14px' }}>
+        <div style={{
+          fontSize: 11, color: 'rgba(255,255,255,0.4)',
+          letterSpacing: '0.08em', marginBottom: 8,
+        }}>
+          PRECIOS DESDE
+        </div>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: `repeat(${Math.min(preciosVisibles.length, 3)}, 1fr)`,
+          gap: 6, marginBottom: 12,
+        }}>
+          {preciosVisibles.map((s: any) => (
+            <div key={s.nombre} style={{
+              background: 'rgba(255,215,0,0.05)',
+              border: '0.5px solid rgba(255,215,0,0.15)',
+              borderRadius: 6, padding: '6px 8px', textAlign: 'center',
+            }}>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>
                 {s.nombre}
-              </span>
-            ))}
-          </div>
-        )}
+              </div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#FFD700' }}>
+                ${Math.round(s.precio / 1000)}k
+              </div>
+            </div>
+          ))}
+        </div>
 
-        {/* Botón */}
         <button
           onClick={() => onAgendar && onAgendar(modelo)}
           style={{
-            marginTop:'auto', padding:'11px 0',
-            borderRadius:10, background:'#c9a961',
-            color:'#0f1014', fontWeight:'bold',
-            fontSize:13, border:'none',
-            cursor:'pointer', width:'100%'
+            width: '100%', padding: '12px',
+            background: 'linear-gradient(135deg, #B8860B, #FFD700)',
+            border: 'none', borderRadius: 8,
+            color: 'black', fontWeight: 700,
+            fontSize: 14, cursor: 'pointer',
           }}
         >
-          ◆ Ver perfil y agendar
+          Reservar ahora
         </button>
       </div>
     </div>

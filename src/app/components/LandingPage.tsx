@@ -14,6 +14,7 @@ import { ClienteLoginModal } from './ClienteLoginModal';
 import { StreamConPaywall } from './StreamConPaywall';
 import { TipNotification } from './TipNotification'; // ✅ Agregar TipNotification
 import { SolicitudServicioModal } from './SolicitudServicioModal';
+import { PerfilModeloPublico } from './PerfilModeloPublico';
 import { ParticlesBackground } from './ParticlesBackground'; // ✅ Fondo de partículas premium
 import { GoldenCursor } from './GoldenCursor'; // ✅ Cursor personalizado dorado
 import { ScrollUI } from './ScrollUI'; // ✅ Barra de progreso y back-to-top
@@ -145,6 +146,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
   
   // Estado para Solicitud de Servicio
   const [solicitudData, setSolicitudData] = useState<{model: any, service?: any, location?: 'sede' | 'domicilio', price?: string} | null>(null);
+  const [perfilVisibleId, setPerfilVisibleId] = useState<string | null>(null);
 
   const [streamActivo, setStreamActivo] = useState(false);
 
@@ -883,7 +885,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
                 <ModeloCard 
                   key={modelo.id} 
                   modelo={modelo} 
-                  onAgendar={() => onAccessSystem('cliente')} 
+                  onAgendar={() => setPerfilVisibleId(modelo.id)} 
                 />
               ))}
             </div>
@@ -1189,6 +1191,19 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
         data={solicitudData}
         currentUser={currentUserProp}
       />
+
+      {/* Modal de Perfil Público */}
+      {perfilVisibleId && (
+        <PerfilModeloPublico
+          modeloId={perfilVisibleId}
+          onClose={() => setPerfilVisibleId(null)}
+          currentUser={currentUserProp}
+          onLoginRequired={() => {
+            setPerfilVisibleId(null);
+            setShowClienteLogin(true);
+          }}
+        />
+      )}
 
       {/* Modal de Registro de Clientes */}
       {mostrarRegistro && (
