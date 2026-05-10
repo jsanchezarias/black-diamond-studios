@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { ClienteNavbar } from './ClienteNavbar';
 import { useAgendamientos } from './AgendamientosContext';
 import { useModelos } from './ModelosContext';
-import { ClienteAgendarModal } from './ClienteAgendarModal';
 import { BDPremiumStream, BDWalletProvider } from './BDPremiumStream';
 import { createClient } from '@supabase/supabase-js';
 import { supabase, projectId, publicAnonKey } from '../../utils/supabase/info';
@@ -93,26 +92,312 @@ function SkeletonCard({ delay = 0 }: { delay?: number }) {
   );
 }
 
-// Old ModeloCard removed to use shared ModeloCard
+// ─── Servicios con precios fijos ─────────────────────────────────────────────
+const SERVICIOS_FIJOS = [
+  { nombre: 'Rato',      duracion: '15 minutos', duracion_minutos: 15,   precio_sede: 130000,  precio_domicilio: 150000 },
+  { nombre: '30 Min',    duracion: '30 minutos', duracion_minutos: 30,   precio_sede: 160000,  precio_domicilio: 180000 },
+  { nombre: '1 Hora',    duracion: '1 hora',     duracion_minutos: 60,   precio_sede: 190000,  precio_domicilio: 220000 },
+  { nombre: '2 Horas',   duracion: '2 horas',    duracion_minutos: 120,  precio_sede: 360000,  precio_domicilio: 400000 },
+  { nombre: '3 Horas',   duracion: '3 horas',    duracion_minutos: 180,  precio_sede: 520000,  precio_domicilio: 580000 },
+  { nombre: '6 Horas',   duracion: '6 horas',    duracion_minutos: 360,  precio_sede: 1000000, precio_domicilio: 1100000 },
+  { nombre: '8 Horas',   duracion: '8 horas',    duracion_minutos: 480,  precio_sede: 1300000, precio_domicilio: 1400000 },
+  { nombre: '12 Horas',  duracion: '12 horas',   duracion_minutos: 720,  precio_sede: 1800000, precio_domicilio: 1900000 },
+  { nombre: '24 Horas',  duracion: '24 horas',   duracion_minutos: 1440, precio_sede: 2300000, precio_domicilio: 2500000 },
+];
+
+const HORAS_DISPONIBLES = ['10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00','22:00'];
+
+// ─── Modal de Reserva ─────────────────────────────────────────────────────────
+function ModalReserva({
+  modelo, currentUser, onClose, onExito,
+}: { modelo: any; currentUser: { id: string; email: string }; onClose: () => void; onExito?: () => void }) {
+  const [servicioSel, setServicioSel] = useState<typeof SERVICIOS_FIJOS[0] | null>(null);
+  const [sede, setSede] = useState<'sede_norte' | 'domicilio'>('sede_norte');
+  const [direccion, setDireccion] = useState('');
+  const [fecha, setFecha] = useState('');
+  const [hora, setHora] = useState('');
+  const [obs, setObs] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const hoy = new Date().toISOString().split('T')[0];
+  const precioActual = servicioSel ? (sede === 'sede_norte' ? servicioSel.precio_sede : servicioSel.precio_domicilio) : 0;
+  const completo = servicioSel && fecha && hora && (sede === 'sede_norte' || direccion.trim());
+
+  const enviar = async () => {
+    if (!completo || !servicioSel) return;
+    setLoading(true);
+    try {
+      const { data: perfil } = await supabase.from('clientes').select('nombre, telefono').eq('user_id', currentUser.id).maybeSingle();
+      const { data: usuario } = await supabase.from('usuarios').select('nombre').eq('id', currentUser.id).maybeSingle();
+      const nombreCliente = perfil?.nombre || usuario?.nombre || currentUser.email.split('@')[0];
+
+      const isUUID = (s: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+
+      const { data: ag, error } = await supabase.from('agendamientos').insert({
+        cliente_id: isUUID(currentUser.id) ? currentUser.id : null,
+        cliente_nombre: nombreCliente,
+        cliente_telefono: perfil?.telefono || null,
+        modelo_id: modelo.id && isUUID(modelo.id) ? modelo.id : null,
+        modelo_email: modelo.email || null,
+        modelo_nombre: modelo.nombre_artistico || modelo.nombre,
+        tipo_servicio: sede === 'sede_norte' ? 'sede' : 'domicilio',
+        servicio: servicioSel.nombre,
+        tarifa_nombre: servicioSel.nombre,
+        duracion_minutos: servicioSel.duracion_minutos,
+        precio: precioActual,
+        monto_pago: precioActual,
+        fecha,
+        hora,
+        ubicacion: sede === 'sede_norte' ? 'Sede Norte' : 'Domicilio',
+        habitacion: sede === 'domicilio' ? direccion : 'Por asignar',
+        notas: obs || null,
+        estado: 'pendiente',
+        estado_pago: 'pendiente',
+        creado_por: currentUser.email,
+        archivado: false,
+        fecha_creacion: new Date().toISOString(),
+      }).select().single();
+
+      if (error) { toast.error('Error al reservar: ' + error.message); setLoading(false); return; }
+
+      // Notificaciones (fire-and-forget, errores no bloquean el flujo)
+      try {
+        await supabase.from('notificaciones').insert({
+          usuario_id: currentUser.id, para_usuario_id: currentUser.id,
+          tipo: 'agendamiento_pendiente', titulo: '📅 Solicitud enviada',
+          mensaje: `Tu reserva con ${modelo.nombre_artistico || modelo.nombre} para el ${fecha} a las ${hora} está pendiente.`,
+          leida: false, referencia_id: ag.id,
+        });
+        const { data: progs } = await supabase.from('usuarios').select('id').in('role', ['programador', 'administrador', 'owner']);
+        if (progs?.length) {
+          await supabase.from('notificaciones').insert(progs.map((p: any) => ({
+            usuario_id: p.id, para_usuario_id: p.id, para_rol: 'programador',
+            tipo: 'agendamiento_nuevo', titulo: '📅 Nueva solicitud de cita',
+            mensaje: `${nombreCliente} solicita cita con ${modelo.nombre_artistico || modelo.nombre} el ${fecha} a las ${hora} — ${servicioSel.nombre} (${sede === 'sede_norte' ? 'Sede Norte' : 'Domicilio'})`,
+            leida: false, referencia_id: ag.id,
+          })));
+        }
+      } catch (_) { /* notificaciones no críticas */ }
+
+      toast.success('✅ Reserva enviada correctamente');
+      onExito?.();
+      onClose();
+    } catch (e: any) {
+      toast.error('Error inesperado: ' + (e?.message || 'intenta de nuevo'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16, overflowY: 'auto' }}>
+      <div style={{ background: '#111', border: '0.5px solid rgba(255,215,0,0.3)', borderRadius: 16, padding: 24, maxWidth: 500, width: '100%', maxHeight: '95vh', overflowY: 'auto' }}>
+
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+          {modelo.foto_url && (
+            <img src={modelo.foto_url} style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+          )}
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 16, color: 'white' }}>{modelo.nombre_artistico || modelo.nombre}</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,215,0,0.7)' }}>Nueva reserva</div>
+          </div>
+          <button onClick={onClose} style={{ marginLeft: 'auto', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 22, cursor: 'pointer' }}>×</button>
+        </div>
+
+        {/* Aviso política */}
+        <div style={{ background: 'rgba(255,165,0,0.08)', border: '0.5px solid rgba(255,165,0,0.3)', borderRadius: 8, padding: '10px 14px', marginBottom: 20, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+          <span style={{ fontSize: 16, flexShrink: 0 }}>⚠️</span>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6 }}>
+            <strong style={{ color: '#FFA500' }}>Política de cancelación:</strong>{' '}
+            Puedes modificar o cancelar tu reserva hasta <strong style={{ color: 'white' }}>12 horas antes</strong> del servicio.
+          </div>
+        </div>
+
+        {/* 1. Servicio */}
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.1em', marginBottom: 10 }}>1. SELECCIONA EL SERVICIO</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+            {SERVICIOS_FIJOS.map(s => (
+              <div key={s.nombre} onClick={() => setServicioSel(s)}
+                style={{
+                  padding: '10px 8px', borderRadius: 8, cursor: 'pointer', textAlign: 'center',
+                  border: servicioSel?.nombre === s.nombre ? '1.5px solid #FFD700' : '0.5px solid rgba(255,255,255,0.1)',
+                  background: servicioSel?.nombre === s.nombre ? 'rgba(255,215,0,0.1)' : 'rgba(255,255,255,0.03)',
+                }}
+              >
+                <div style={{ fontWeight: 700, fontSize: 13, color: servicioSel?.nombre === s.nombre ? '#FFD700' : 'white' }}>{s.nombre}</div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', margin: '3px 0' }}>⏱ {s.duracion}</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#4CAF50' }}>
+                  ${(sede === 'sede_norte' ? s.precio_sede : s.precio_domicilio).toLocaleString('es-CO')}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 2. Lugar */}
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.1em', marginBottom: 10 }}>2. LUGAR DEL SERVICIO</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {[{ value: 'sede_norte', label: '🏢 Sede Norte' }, { value: 'domicilio', label: '🏠 A Domicilio' }].map(op => (
+              <button key={op.value} onClick={() => setSede(op.value as any)}
+                style={{
+                  flex: 1, padding: 10, borderRadius: 8, cursor: 'pointer',
+                  border: sede === op.value ? '1.5px solid #FFD700' : '0.5px solid rgba(255,255,255,0.1)',
+                  background: sede === op.value ? 'rgba(255,215,0,0.1)' : 'transparent',
+                  color: sede === op.value ? '#FFD700' : 'rgba(255,255,255,0.6)',
+                  fontWeight: sede === op.value ? 700 : 400, fontSize: 13,
+                }}
+              >{op.label}</button>
+            ))}
+          </div>
+          {sede === 'domicilio' && (
+            <input placeholder="Dirección completa" value={direccion} onChange={e => setDireccion(e.target.value)}
+              style={{ width: '100%', marginTop: 8, padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '0.5px solid rgba(255,255,255,0.15)', color: 'white', fontSize: 13, boxSizing: 'border-box' }} />
+          )}
+        </div>
+
+        {/* 3. Fecha */}
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.1em', marginBottom: 10 }}>3. FECHA</div>
+          <input type="date" value={fecha} min={hoy} onChange={e => setFecha(e.target.value)}
+            style={{ width: '100%', padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '0.5px solid rgba(255,255,255,0.15)', color: 'white', fontSize: 13, boxSizing: 'border-box', colorScheme: 'dark' }} />
+          {fecha && (
+            <div style={{ fontSize: 12, color: '#FFD700', marginTop: 6 }}>
+              📅 {new Date(fecha + 'T12:00:00').toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+            </div>
+          )}
+        </div>
+
+        {/* 4. Hora */}
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.1em', marginBottom: 10 }}>4. HORA</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+            {HORAS_DISPONIBLES.map(h => (
+              <button key={h} onClick={() => setHora(h)}
+                style={{
+                  padding: '9px 4px', borderRadius: 6, cursor: 'pointer',
+                  border: hora === h ? '1.5px solid #FFD700' : '0.5px solid rgba(255,255,255,0.1)',
+                  background: hora === h ? 'rgba(255,215,0,0.15)' : 'rgba(255,255,255,0.03)',
+                  color: hora === h ? '#FFD700' : 'rgba(255,255,255,0.6)',
+                  fontWeight: hora === h ? 700 : 400, fontSize: 12,
+                }}
+              >{h}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* 5. Observaciones */}
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.1em', marginBottom: 10 }}>5. OBSERVACIONES (opcional)</div>
+          <textarea placeholder="Preferencias, solicitudes especiales..." value={obs} onChange={e => setObs(e.target.value)} rows={3}
+            style={{ width: '100%', padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '0.5px solid rgba(255,255,255,0.15)', color: 'white', fontSize: 13, resize: 'none', boxSizing: 'border-box' }} />
+        </div>
+
+        {/* Resumen */}
+        {completo && servicioSel && (
+          <div style={{ background: 'rgba(255,215,0,0.06)', border: '0.5px solid rgba(255,215,0,0.25)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+            <div style={{ fontSize: 12, color: '#FFD700', fontWeight: 700, marginBottom: 12 }}>📋 Resumen de tu reserva</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 13, color: 'white' }}>
+              <div><div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>MODELO</div><div style={{ fontWeight: 600 }}>{modelo.nombre_artistico || modelo.nombre}</div></div>
+              <div><div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>SERVICIO</div><div style={{ fontWeight: 600 }}>{servicioSel.nombre}</div></div>
+              <div><div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>DURACIÓN</div><div style={{ fontWeight: 600 }}>⏱ {servicioSel.duracion}</div></div>
+              <div><div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>FECHA Y HORA</div><div style={{ fontWeight: 600 }}>{new Date(fecha + 'T12:00:00').toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })} · {hora}</div></div>
+              <div><div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>LUGAR</div><div style={{ fontWeight: 600 }}>{sede === 'sede_norte' ? '🏢 Sede Norte' : '🏠 ' + direccion}</div></div>
+              <div><div style={{ fontSize: 10, color: 'rgba(255,215,0,0.6)' }}>TOTAL A PAGAR</div><div style={{ fontWeight: 700, fontSize: 18, color: '#FFD700' }}>${precioActual.toLocaleString('es-CO')}</div></div>
+            </div>
+            {obs && <div style={{ marginTop: 8, fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>📝 {obs}</div>}
+          </div>
+        )}
+
+        {/* Botón confirmar */}
+        <button onClick={enviar} disabled={!completo || loading}
+          style={{
+            width: '100%', padding: 14, border: 'none', borderRadius: 10,
+            background: !completo ? 'rgba(255,215,0,0.2)' : 'linear-gradient(135deg, #B8860B, #FFD700)',
+            color: !completo ? 'rgba(0,0,0,0.3)' : 'black',
+            fontWeight: 700, fontSize: 15,
+            cursor: !completo || loading ? 'not-allowed' : 'pointer',
+          }}
+        >
+          {loading ? '⏳ Enviando...' : completo ? '✅ Confirmar reserva' : 'Completa todos los campos'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Modal Cancelar Cita ──────────────────────────────────────────────────────
+function ModalCancelarCita({ cita, userEmail, onClose, onCancelado }: { cita: any; userEmail: string; onClose: () => void; onCancelado: () => void }) {
+  const [loading, setLoading] = useState(false);
+
+  const cancelar = async () => {
+    setLoading(true);
+    const { error } = await supabase.from('agendamientos').update({
+      estado: 'cancelado',
+      motivo_cancelacion: 'Cancelado por el cliente',
+      cancelado_por: userEmail,
+      fecha_cancelacion: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }).eq('id', cita.id);
+
+    if (error) { toast.error('Error al cancelar'); setLoading(false); return; }
+
+    // Notificar programadores
+    try {
+      const { data: progs } = await supabase.from('usuarios').select('id, email').in('role', ['programador', 'administrador', 'owner']);
+      if (progs?.length) {
+        await supabase.from('notificaciones').insert(progs.map((p: any) => ({
+          usuario_id: p.id, para_usuario_id: p.id, para_rol: 'programador',
+          titulo: '❌ Cita cancelada por el cliente',
+          mensaje: `${cita.cliente_nombre || 'Cliente'} canceló su cita con ${cita.modelo_nombre} del ${(cita.fecha || '').split('T')[0]} a las ${cita.hora}`,
+          tipo: 'agendamiento_cancelado',
+          referencia_id: cita.id, leida: false,
+          created_at: new Date().toISOString(),
+        })));
+      }
+    } catch (_) { /* notificación no crítica */ }
+
+    toast.success('Cita cancelada');
+    setLoading(false);
+    onCancelado();
+    onClose();
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1001, padding: 16 }}>
+      <div style={{ background: '#111', border: '0.5px solid rgba(255,0,0,0.3)', borderRadius: 12, padding: 24, maxWidth: 380, width: '100%', textAlign: 'center' }}>
+        <div style={{ fontSize: 40, marginBottom: 12 }}>⚠️</div>
+        <h3 style={{ color: 'white', margin: '0 0 8px', fontSize: 18 }}>¿Cancelar esta cita?</h3>
+        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginBottom: 16, lineHeight: 1.6 }}>
+          {cita.modelo_nombre} · {cita.servicio || cita.tipo_servicio}<br />
+          {(cita.fecha || '').split('T')[0]} · {cita.hora}
+        </p>
+        <div style={{ background: 'rgba(255,165,0,0.08)', border: '0.5px solid rgba(255,165,0,0.3)', borderRadius: 8, padding: 12, marginBottom: 20 }}>
+          <p style={{ fontSize: 12, color: '#FFA500', margin: 0 }}>Esta acción no se puede deshacer. Si tienes dudas contáctanos antes de cancelar.</p>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={onClose} style={{ flex: 1, padding: 10, background: 'transparent', border: '0.5px solid rgba(255,255,255,0.2)', borderRadius: 8, color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}>Volver</button>
+          <button onClick={cancelar} disabled={loading} style={{ flex: 1, padding: 10, background: '#FF4444', border: 'none', borderRadius: 8, color: 'white', fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}>
+            {loading ? '⏳...' : 'Sí, cancelar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 interface CitaCardProps {
   cita: any;
   cfg: { label: string; bg: string; color: string; icon: string };
   locked: boolean;
   esActiva: boolean;
-  cancelando: boolean;
-  confirmCancel: boolean;
   onModificar: () => void;
   onCancelar: () => void;
-  onConfirmCancel: () => void;
-  onAbortCancel: () => void;
 }
 
-function CitaCard({
-  cita, cfg, locked, esActiva,
-  cancelando, confirmCancel,
-  onModificar, onCancelar, onConfirmCancel, onAbortCancel,
-}: CitaCardProps) {
+function CitaCard({ cita, cfg, locked, esActiva, onModificar, onCancelar }: CitaCardProps) {
   return (
     <div
       className="rounded-2xl p-5 transition-all duration-200"
@@ -186,33 +471,9 @@ function CitaCard({
       {/* Acciones solo para citas activas */}
       {esActiva && (
         <div className="mt-4 pt-4" style={{ borderTop: `1px solid ${C.border}` }}>
-          {confirmCancel ? (
-            <div className="flex items-center gap-3">
-              <p className="text-xs flex-1" style={{ color: '#ef4444' }}>
-                ¿Confirmar cancelación?
-              </p>
-              <button
-                onClick={onAbortCancel}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:opacity-80"
-                style={{ border: `1px solid ${C.border}`, color: C.muted, background: 'transparent' }}
-              >
-                No
-              </button>
-              <button
-                onClick={onConfirmCancel}
-                disabled={cancelando}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all hover:opacity-80"
-                style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)' }}
-              >
-                {cancelando && <Loader2 className="w-3 h-3 animate-spin" />}
-                Sí, cancelar
-              </button>
-            </div>
-          ) : locked ? (
-            <div className="flex items-center gap-2 text-xs p-3 rounded-xl"
-              style={{ background: 'rgba(255,255,255,0.03)', color: C.muted, border: `1px solid ${C.border}` }}>
-              <Lock style={{ width: 13, height: 13, flexShrink: 0 }} />
-              <span>No modificable — faltan menos de 12 horas</span>
+          {locked ? (
+            <div style={{ background: 'rgba(255,165,0,0.08)', border: '0.5px solid rgba(255,165,0,0.2)', borderRadius: 6, padding: '8px 12px', fontSize: 11, color: 'rgba(255,165,0,0.8)', textAlign: 'center' }}>
+              ⚠️ Ya no puedes modificar esta cita — faltan menos de 12 horas
             </div>
           ) : (
             <div className="flex gap-2">
@@ -332,8 +593,7 @@ function PerfilTab({ userEmail, nombreMostrado, perfilCliente, misCitas, citasAc
 export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboardProps) {
   const [activeTab, setActiveTab] = useState<Tab>('explorar');
   const [modalData, setModalData] = useState<{ modelo: any; modeloEmail: string } | null>(null);
-  const [cancelando, setCancelando] = useState<string | null>(null);
-  const [confirmCancel, setConfirmCancel] = useState<string | null>(null);
+  const [modalCancelar, setModalCancelar] = useState<any | null>(null);
   const [perfilCliente, setPerfilCliente] = useState<any | null>(null);
   const [loadingPerfil, setLoadingPerfil] = useState(false);
   const [modelos, setModelos] = useState<any[]>([]);
@@ -437,28 +697,6 @@ export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboa
       modeloEmail: modelo.email || '',
     });
   }, []);
-
-  // ── Cancelar cita ─────────────────────────────────────────────────────────
-  const cancelarCita = async (citaId: string) => {
-    setCancelando(citaId);
-    const { error } = await supabase
-      .from('agendamientos')
-      .update({
-        estado: 'cancelado',
-        motivo_cancelacion: 'Cancelado por el cliente',
-        cancelado_por: userEmail,
-        fecha_cancelacion: new Date().toISOString(),
-      })
-      .eq('id', citaId);
-
-    if (error) {
-      toast.error('No se pudo cancelar la cita');
-    } else {
-      toast.success('✦ Cita cancelada correctamente');
-    }
-    setCancelando(null);
-    setConfirmCancel(null);
-  };
 
   // ── Nombre para mostrar ───────────────────────────────────────────────────
   const nombreMostrado = (() => {
@@ -741,15 +979,11 @@ export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboa
                       cfg={cfg}
                       locked={locked}
                       esActiva={esActiva}
-                      cancelando={cancelando === cita.id}
-                      confirmCancel={confirmCancel === cita.id}
                       onModificar={() => {
                         if (modeloParaModal) abrirModal(modeloParaModal);
                         else toast.error('No se encontró la modelo para modificar la cita');
                       }}
-                      onCancelar={() => setConfirmCancel(cita.id)}
-                      onConfirmCancel={() => cancelarCita(cita.id)}
-                      onAbortCancel={() => setConfirmCancel(null)}
+                      onCancelar={() => setModalCancelar(cita)}
                     />
                   );
                 })}
@@ -789,15 +1023,23 @@ export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboa
 
       </main>
 
-      {/* Modal de agendamiento */}
+      {/* Modal de reserva */}
       {modalData && (
-        <ClienteAgendarModal
+        <ModalReserva
           modelo={modalData.modelo}
-          modeloEmail={modalData.modeloEmail}
-          clienteId={userId}
-          clienteEmail={userEmail}
+          currentUser={{ id: userId, email: userEmail }}
           onClose={() => setModalData(null)}
-          onSuccess={() => setModalData(null)}
+          onExito={() => setModalData(null)}
+        />
+      )}
+
+      {/* Modal cancelar cita */}
+      {modalCancelar && (
+        <ModalCancelarCita
+          cita={modalCancelar}
+          userEmail={userEmail}
+          onClose={() => setModalCancelar(null)}
+          onCancelado={() => setModalCancelar(null)}
         />
       )}
     </div>
