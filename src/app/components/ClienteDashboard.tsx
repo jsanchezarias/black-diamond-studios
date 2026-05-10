@@ -487,7 +487,7 @@ export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboa
             url,
             es_principal
           ),
-          servicios_modelo (
+          servicios_modelo!servicios_modelo_modelo_id_fkey (
             id,
             nombre,
             precio,
