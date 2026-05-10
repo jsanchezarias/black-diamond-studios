@@ -3,6 +3,7 @@ import { ClienteNavbar } from './ClienteNavbar';
 import { useAgendamientos } from './AgendamientosContext';
 import { useModelos } from './ModelosContext';
 import { ClienteAgendarModal } from './ClienteAgendarModal';
+import { BDPremiumStream, BDWalletProvider } from './BDPremiumStream';
 import { createClient } from '@supabase/supabase-js';
 import { supabase, projectId, publicAnonKey } from '../../utils/supabase/info';
 import { toast } from 'sonner';
@@ -108,7 +109,7 @@ const ModeloCard = ({ modelo, onAgendar }: ModeloCardProps) => {
 
   const precioBase = serviciosActivos.length > 0
     ? Math.min(...serviciosActivos.map(
-        (s: any) => s.precio || s.precio_sede || 0
+        (s: any) => s.precio_sede || s.precio_domicilio || 0
       ).filter((p: number) => p > 0))
     : null;
 
@@ -505,7 +506,7 @@ export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboa
             nombre_artistico,
             estado,
             descripcion,
-            modelo_fotos (
+            modelo_fotos!modelo_fotos_modelo_id_fkey (
               id, url, es_principal
             ),
             servicios_modelo!servicios_modelo_modelo_id_fkey (
@@ -542,20 +543,20 @@ export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboa
     cargarModelos()
   }, [])
 
-  // ── Cargar perfil cuando el tab se activa ────────────────────────────────
+  // ── Cargar perfil (y balance de diamantes) ────────────────────────────────
   useEffect(() => {
-    if (activeTab !== 'perfil' || !userId) return;
+    if (!userId && !userEmail) return;
     setLoadingPerfil(true);
     supabase
       .from('clientes')
-      .select('nombre, email, telefono, created_at, nombre_usuario')
+      .select('nombre, email, telefono, created_at, nombre_usuario, diamantes')
       .or(`user_id.eq.${userId},email.eq.${userEmail}`)
       .maybeSingle()
       .then(({ data }) => {
         setPerfilCliente(data);
         setLoadingPerfil(false);
       });
-  }, [activeTab, userId, userEmail]);
+  }, [userId, userEmail]);
 
   // ── Mis citas ─────────────────────────────────────────────────────────────
   const misCitas = Array.isArray(agendamientos)
@@ -728,6 +729,18 @@ export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboa
         {/* TAB: EXPLORAR */}
         {activeTab === 'explorar' && (
           <div style={{ animation: 'bdFadeInUp 0.3s ease' }}>
+            
+            {/* ── Reproductor Premium Stream ── */}
+            <div className="mb-8 px-4 sm:px-6">
+              <div className="w-full h-[260px] sm:h-[450px] lg:h-[550px] shadow-2xl rounded-lg overflow-hidden border border-[#2a2a2a]">
+                <BDWalletProvider 
+                  balance={perfilCliente?.diamantes || 0} 
+                  onRecargar={() => toast('💎 Funcionalidad de recarga en construcción', { style: { background: '#16181c', color: '#c9a961', border: '1px solid #c9a961' } })}
+                >
+                  <BDPremiumStream />
+                </BDWalletProvider>
+              </div>
+            </div>
             <div className="mb-8">
               <h2 style={{
                 fontFamily: "'Playfair Display', serif",
@@ -813,7 +826,7 @@ export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboa
                     ?.filter((s: any) => s.activo) || []
 
                   const precios = servicios
-                    .map((s: any) => s.precio || s.precio_sede || 0)
+                    .map((s: any) => s.precio_sede || s.precio_domicilio || 0)
                     .filter((p: number) => p > 0)
 
                   const precioBase = precios.length > 0

@@ -10,7 +10,6 @@ import { Logo } from './Logo';
 import { TestimoniosSection } from './TestimoniosSection';
 import { AgregarTestimonioModal } from './AgregarTestimonioModal';
 import { ClienteLoginModal } from './ClienteLoginModal';
-import { BDPremiumStream } from './BDPremiumStream';
 import { StreamConPaywall } from './StreamConPaywall';
 import { TipNotification } from './TipNotification'; // ✅ Agregar TipNotification
 import { SolicitudServicioModal } from './SolicitudServicioModal';
@@ -62,7 +61,7 @@ interface LandingPageProps {
 const getPrecioBase = (modelo: any) => {
   const precios = modelo.servicios_modelo
     ?.filter((s: any) => s.activo)
-    ?.map((s: any) => s.precio || s.precio_sede || 0)
+    ?.map((s: any) => s.precio_sede || s.precio_domicilio || 0)
     ?.filter((p: number) => p > 0)
 
   if (!precios?.length) return null
@@ -293,7 +292,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
             nombre_artistico,
             estado,
             descripcion,
-            modelo_fotos (
+            modelo_fotos!modelo_fotos_modelo_id_fkey (
               id, url, es_principal
             ),
             servicios_modelo!servicios_modelo_modelo_id_fkey (
@@ -1101,7 +1100,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
                   ?.filter((s: any) => s.activo) || []
 
                 const precios = servicios
-                  .map((s: any) => s.precio || s.precio_sede || 0)
+                  .map((s: any) => s.precio_sede || s.precio_domicilio || 0)
                   .filter((p: number) => p > 0)
 
                 const precioBase = precios.length > 0
