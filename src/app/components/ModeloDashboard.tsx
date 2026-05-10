@@ -1024,121 +1024,106 @@ export function ModeloDashboard({ accessToken: _accessToken, userId, userEmail, 
         </div>
       ) : (
       <>
-      {/* ── HEADER BDS ───────────────────────────────────────────────── */}
-      <header style={{
-        position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50,
-        background: 'linear-gradient(180deg, #0f0f0f 0%, #080808 100%)',
-        borderBottom: '0.5px solid rgba(201,168,76,0.15)',
-        height: 60, display: 'flex', alignItems: 'center', padding: '0 20px',
-        justifyContent: 'space-between',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{
-            fontSize: 20, fontWeight: 900,
-            fontFamily: 'var(--font-display)',
-            background: 'linear-gradient(135deg, #C9A84C, #E8C96B)',
-            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text', letterSpacing: '0.06em',
-          }}>BDS</span>
-          <div style={{ width: 1, height: 28, background: 'rgba(201,168,76,0.2)' }} />
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--gold)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>
-              {nombreDisplay || 'Modelo'}
+      {/* ── HEADER PREMIUM ───────────────────────────────────────────────── */}
+      <header className="fixed top-0 left-0 right-0 z-50 bg-card/98 backdrop-blur-xl border-b border-primary/20 shadow-[0_4px_30px_rgba(201,168,76,0.08)]">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 max-w-8xl mx-auto">
+
+          {/* Perfil a la izquierda */}
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="relative">
+              <Avatar className="w-12 h-12 border-2 border-primary/50 ring-2 ring-primary/20">
+                <AvatarImage src={fotoDisplay} />
+                <AvatarFallback className="bg-primary/20 text-primary text-lg font-bold">
+                  {nombreDisplay.charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-card ${registroActivo ? 'bg-green-400' : 'bg-blue-400'}`} />
             </div>
-            <div style={{ fontSize: 10, color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>{userEmail}</div>
+            <div className="hidden sm:block min-w-0">
+              <h1 className="text-base font-bold text-white truncate" style={{ fontFamily: 'Playfair Display, serif' }}>
+                {nombreDisplay}
+              </h1>
+              <div className="flex items-center gap-2">
+                <Badge className={`text-[10px] h-4 px-2 border ${estadoBadge.cls}`}>
+                  {estadoBadge.label}
+                </Badge>
+                <span className="text-[11px] text-muted-foreground truncate max-w-[180px]">{userEmail}</span>
+              </div>
+            </div>
           </div>
-        </div>
 
-        {/* Nav desktop */}
-        <nav style={{ display: 'flex', alignItems: 'center', gap: 4 }} className="hidden xl:flex">
-          {tabs.map(t => (
-            <button
-              key={t.id}
-              onClick={() => setSelectedTab(t.id)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '6px 12px', borderRadius: 6, border: 'none',
-                cursor: 'pointer', fontSize: 12,
-                background: selectedTab === t.id ? 'rgba(201,168,76,0.15)' : 'transparent',
-                color: selectedTab === t.id ? 'var(--gold)' : 'var(--text-secondary)',
-                borderBottom: selectedTab === t.id ? '1px solid var(--gold)' : '1px solid transparent',
-              }}
-            >
-              {t.icon}
-              <span>{t.label}</span>
-            </button>
-          ))}
-        </nav>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button
-            onClick={onLogout}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              background: 'none', border: '0.5px solid rgba(255,0,51,0.3)',
-              borderRadius: 6, padding: '6px 12px', cursor: 'pointer',
-              color: '#FF6680', fontSize: 12, letterSpacing: '0.05em',
-            }}
-            className="hidden sm:flex"
-          >
-            <LogOut size={14} /> Salir
-          </button>
-          <button
-            onClick={() => setMenuOpen(!menuOpen)}
-            style={{
-              background: 'none', border: '0.5px solid rgba(201,168,76,0.2)',
-              borderRadius: 6, width: 36, height: 36, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: 'var(--gold)',
-            }}
-            className="xl:hidden"
-          >
-            {menuOpen ? <X size={16} /> : <Menu size={16} />}
-          </button>
-        </div>
-      </header>
-
-      {/* Mobile nav dropdown */}
-      {menuOpen && (
-        <div style={{
-          position: 'fixed', top: 60, left: 0, right: 0, zIndex: 49,
-          background: 'rgba(15,15,15,0.97)', backdropFilter: 'blur(12px)',
-          borderBottom: '0.5px solid rgba(201,168,76,0.15)',
-        }} className="xl:hidden">
-          <nav style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, padding: '12px 16px' }}>
+          {/* Nav desktop */}
+          <nav className="hidden xl:flex items-center gap-1">
             {tabs.map(t => (
               <button
                 key={t.id}
-                onClick={() => { setSelectedTab(t.id); setMenuOpen(false); }}
-                style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-                  padding: '10px 8px', borderRadius: 8, border: 'none',
-                  cursor: 'pointer', fontSize: 11,
-                  background: selectedTab === t.id ? 'rgba(201,168,76,0.1)' : 'transparent',
-                  color: selectedTab === t.id ? 'var(--gold)' : 'var(--text-secondary)',
-                }}
+                onClick={() => setSelectedTab(t.id)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  selectedTab === t.id
+                    ? 'bg-primary text-black'
+                    : 'text-muted-foreground hover:text-white hover:bg-white/5'
+                }`}
               >
                 {t.icon}
                 <span>{t.label}</span>
               </button>
             ))}
-            <button
-              onClick={onLogout}
-              style={{
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-                padding: '10px 8px', borderRadius: 8, border: 'none',
-                cursor: 'pointer', fontSize: 11, background: 'transparent', color: '#FF6680',
-              }}
-            >
-              <LogOut size={16} />
-              Salir
-            </button>
           </nav>
+
+          {/* Acciones a la derecha */}
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={onLogout}
+              variant="ghost"
+              size="sm"
+              className="hidden sm:flex text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-red-500/20 gap-2"
+            >
+              <LogOut className="w-4 h-4" />
+              Salir
+            </Button>
+            <Button
+              onClick={() => setMenuOpen(!menuOpen)}
+              variant="outline"
+              size="sm"
+              className="xl:hidden border-primary/30 hover:bg-primary/10 h-9 w-9 p-0"
+            >
+              {menuOpen ? <X className="w-4 h-4 text-primary" /> : <Menu className="w-4 h-4 text-primary" />}
+            </Button>
+          </div>
         </div>
-      )}
+
+        {/* Mobile nav dropdown */}
+        {menuOpen && (
+          <div className="xl:hidden bg-card/97 backdrop-blur-md border-t border-primary/10">
+            <nav className="grid grid-cols-3 gap-2 px-4 py-3">
+              {tabs.map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => { setSelectedTab(t.id); setMenuOpen(false); }}
+                  className={`flex flex-col items-center gap-1 px-2 py-3 rounded-xl text-xs font-medium transition-all ${
+                    selectedTab === t.id
+                      ? 'bg-primary text-black'
+                      : 'text-muted-foreground hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  {t.icon}
+                  <span>{t.label}</span>
+                </button>
+              ))}
+              <button
+                onClick={onLogout}
+                className="flex flex-col items-center gap-1 px-2 py-3 rounded-xl text-xs font-medium text-red-400 hover:bg-red-500/10"
+              >
+                <LogOut className="w-4 h-4" />
+                Salir
+              </button>
+            </nav>
+          </div>
+        )}
+      </header>
 
       {/* ── MAIN CONTENT ─────────────────────────────────────────────────── */}
-      <main className="pb-16 px-4 max-w-7xl mx-auto space-y-6" style={{ paddingTop: 80 }}>
+      <main className="pt-[88px] pb-16 px-4 max-w-7xl mx-auto space-y-6">
 
         {/* ━━━ SIEMPRE VISIBLE ARRIBA ━━━ */}
 

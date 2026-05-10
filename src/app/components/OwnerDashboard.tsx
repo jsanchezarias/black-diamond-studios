@@ -27,6 +27,7 @@ import {
 import { NotificacionBell } from './NotificacionBell';
 import { BalanceDashboard } from './BalanceDashboard';
 import { ResumenFinancieroPanel } from './ResumenFinancieroPanel';
+import { LogoIsotipo } from './LogoIsotipo';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
@@ -265,105 +266,87 @@ export function OwnerDashboard({ accessToken, userId, userEmail = '', onLogout }
 
   return (
     <div className="min-h-screen w-full bg-background" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-      {/* Header BDS */}
-      <header style={{
-        position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50,
-        background: 'linear-gradient(180deg, #0f0f0f 0%, #080808 100%)',
-        borderBottom: '0.5px solid rgba(201,168,76,0.15)',
-        height: 60, display: 'flex', alignItems: 'center', padding: '0 20px',
-        justifyContent: 'space-between',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{
-            fontSize: 20, fontWeight: 900,
-            fontFamily: 'var(--font-display)',
-            background: 'linear-gradient(135deg, #C9A84C, #E8C96B)',
-            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text', letterSpacing: '0.06em',
-          }}>BDS</span>
-          <div style={{ width: 1, height: 28, background: 'rgba(201,168,76,0.2)' }} />
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--gold)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>
-              Owner
+      {/* Header Premium Fijo */}
+      <header className="fixed top-0 left-0 right-0 z-50 bg-card/98 backdrop-blur-premium border-b border-primary/15 shadow-premium border-t-4 border-t-purple-500">
+        <div className="flex items-center justify-between px-3 sm:px-6 py-3 max-w-7xl mx-auto">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <LogoIsotipo size="sm" />
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-base sm:text-lg font-bold text-primary uppercase tracking-wide truncate" style={{ fontFamily: 'Playfair Display, serif' }}>
+                  OWNER DASHBOARD
+                </h1>
+                <Badge className="hidden sm:flex bg-purple-500/10 text-purple-400 border-purple-500/30 px-2 py-0">
+                  👑 PROPIETARIO
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground hidden sm:block truncate max-w-[200px]">{userEmail}</p>
             </div>
-            <div style={{ fontSize: 10, color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>{userEmail}</div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {onLogout && (
+              <Button 
+                onClick={onLogout}
+                variant="ghost" 
+                size="sm"
+                className="flex border-primary/20 hover:bg-primary/10 text-red-400 hover:text-red-500 px-2 sm:px-3"
+              >
+                <LogOut className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Salir</span>
+              </Button>
+            )}
+            
+            <NotificacionBell />
+            
+            <Button
+              onClick={() => setMenuOpen(!menuOpen)}
+              variant="outline"
+              size="sm"
+              className="border-primary/30 hover:bg-primary/10 h-9 w-9 p-0"
+            >
+              {menuOpen ? <X className="w-4 h-4 text-primary" /> : <Menu className="w-4 h-4 text-primary" />}
+            </Button>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {onLogout && (
-            <button
-              onClick={onLogout}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                background: 'none', border: '0.5px solid rgba(255,0,51,0.3)',
-                borderRadius: 6, padding: '6px 12px', cursor: 'pointer',
-                color: '#FF6680', fontSize: 12, letterSpacing: '0.05em',
-              }}
-            >
-              <LogOut size={14} /> Salir
-            </button>
-          )}
-          <NotificacionBell />
-          <button
-            onClick={() => setMenuOpen(!menuOpen)}
-            style={{
-              background: 'none', border: '0.5px solid rgba(201,168,76,0.2)',
-              borderRadius: 6, width: 36, height: 36, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: 'var(--gold)',
-            }}
-          >
-            {menuOpen ? <X size={16} /> : <Menu size={16} />}
-          </button>
-        </div>
+
+        {/* Mobile Navigation Dropdown */}
+        {menuOpen && (
+          <div className="bg-card/95 backdrop-blur-md border-t border-primary/10 shadow-lg lg:hidden">
+            <nav className="flex flex-col px-4 py-3 space-y-1 max-w-7xl mx-auto max-h-[70vh] overflow-y-auto">
+              {modulos.map((modulo) => (
+                <Button 
+                  key={modulo.id}
+                  onClick={() => {
+                    setModuloActivo(modulo.id);
+                    setMenuOpen(false);
+                  }}
+                  variant={moduloActivo === modulo.id ? 'default' : 'ghost'}
+                  className="justify-start h-10 text-sm"
+                >
+                  <span className="mr-3">{modulo.icono}</span>
+                  {modulo.nombre}
+                </Button>
+              ))}
+              {onLogout && (
+                <>
+                  <div className="h-px bg-border my-2" />
+                  <Button 
+                    onClick={() => { setMenuOpen(false); onLogout?.(); }} 
+                    variant="ghost" 
+                    className="justify-start h-10 text-sm text-red-400 hover:text-red-500"
+                  >
+                    <LogOut className="w-4 h-4 mr-3" />
+                    Cerrar Sesión
+                  </Button>
+                </>
+              )}
+            </nav>
+          </div>
+        )}
       </header>
 
-      {/* Mobile Navigation Dropdown */}
-      {menuOpen && (
-        <div style={{
-          position: 'fixed', top: 60, left: 0, right: 0, zIndex: 49,
-          background: 'rgba(15,15,15,0.97)', backdropFilter: 'blur(12px)',
-          borderBottom: '0.5px solid rgba(201,168,76,0.15)',
-        }}>
-          <nav style={{ display: 'flex', flexDirection: 'column', padding: '8px 16px', gap: 4, maxHeight: '70vh', overflowY: 'auto' }}>
-            {modulos.map((modulo) => (
-              <button
-                key={modulo.id}
-                onClick={() => { setModuloActivo(modulo.id); setMenuOpen(false); }}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 12,
-                  padding: '10px 12px', borderRadius: 6, border: 'none',
-                  cursor: 'pointer', fontSize: 13, textAlign: 'left',
-                  background: moduloActivo === modulo.id ? 'rgba(201,168,76,0.1)' : 'transparent',
-                  color: moduloActivo === modulo.id ? 'var(--gold)' : 'var(--text-secondary)',
-                  borderLeft: moduloActivo === modulo.id ? '2px solid var(--gold)' : '2px solid transparent',
-                }}
-              >
-                <span>{modulo.icono}</span>
-                {modulo.nombre}
-              </button>
-            ))}
-            {onLogout && (
-              <>
-                <div style={{ height: 1, background: 'rgba(201,168,76,0.1)', margin: '4px 0' }} />
-                <button
-                  onClick={() => { setMenuOpen(false); onLogout?.(); }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 12,
-                    padding: '10px 12px', borderRadius: 6, border: 'none',
-                    cursor: 'pointer', fontSize: 13, textAlign: 'left',
-                    background: 'transparent', color: '#FF6680',
-                  }}
-                >
-                  <LogOut size={14} /> Cerrar Sesión
-                </button>
-              </>
-            )}
-          </nav>
-        </div>
-      )}
-
-      <main className="pb-12 px-4 max-w-7xl mx-auto space-y-6" style={{ paddingTop: 80 }}>
+      <main className="pt-24 pb-12 px-4 max-w-7xl mx-auto space-y-6">
 
       {/* Overview Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
