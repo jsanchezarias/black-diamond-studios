@@ -1092,9 +1092,12 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
             ">
               {modelos.map(modelo => {
 
-                const foto = modelo.modelo_fotos
-                  ?.find((f: any) => f.es_principal)?.url
-                  || modelo.modelo_fotos?.[0]?.url
+                const gallery = modelo.modelo_fotos
+                  ?.slice()
+                  .sort((a: any, b: any) => (b.es_principal ? 1 : 0) - (a.es_principal ? 1 : 0))
+                  .map((f: any) => f.url) || []
+
+                const fotoUrl = gallery[0]
 
                 const servicios = modelo.servicios_modelo
                   ?.filter((s: any) => s.activo) || []
@@ -1115,39 +1118,51 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
                     bg-[#16181c] flex flex-col
                     transition-all duration-300
                   ">
-                    {/* FOTO */}
-                    <div className="
-                      relative h-[240px] 
-                      overflow-hidden flex-shrink-0
-                    ">
-                      {foto ? (
+                    {/* FOTO / MOSAICO */}
+                    <div className="relative h-[240px] overflow-hidden flex-shrink-0 bg-black">
+                      {gallery.length > 1 ? (
+                        <div className="grid grid-cols-3 h-full gap-0.5">
+                          {/* Foto Grande (Izquierda) */}
+                          <div className="col-span-2 h-full overflow-hidden">
+                            <img
+                              src={fotoUrl}
+                              alt={modelo.nombre_artistico}
+                              className="w-full h-full object-cover transition-transform duration-700 hover:scale-110"
+                            />
+                          </div>
+                          {/* Columna Derecha */}
+                          <div className="flex flex-col gap-0.5 h-full">
+                            <div className="h-1/2 overflow-hidden">
+                              <img
+                                src={gallery[1]}
+                                className="w-full h-full object-cover transition-transform duration-700 hover:scale-110"
+                              />
+                            </div>
+                            <div className="h-1/2 overflow-hidden relative">
+                              <img
+                                src={gallery[2] || gallery[0]}
+                                className="w-full h-full object-cover transition-transform duration-700 hover:scale-110"
+                              />
+                              {gallery.length > 3 && (
+                                <div className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-[1px]">
+                                  <span className="text-white font-bold text-xs">+{gallery.length - 3}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ) : fotoUrl ? (
                         <img
-                          src={foto}
+                          src={fotoUrl}
                           alt={modelo.nombre_artistico}
-                          className="
-                            w-full h-full object-cover
-                            hover:scale-105
-                            transition-transform duration-500
-                          "
+                          className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
                         />
                       ) : (
-                        <div className="
-                          w-full h-full bg-[#1a1a1a]
-                          flex items-center 
-                          justify-center
-                          text-6xl text-[#c9a961]
-                          font-bold
-                        ">
-                          {modelo.nombre_artistico?.[0] 
-                          || '◆'}
+                        <div className="w-full h-full bg-[#1a1a1a] flex items-center justify-center text-6xl font-bold text-[#c9a961]">
+                          {modelo.nombre_artistico?.[0] || '◆'}
                         </div>
                       )}
-                      <div className="
-                        absolute inset-0
-                        bg-gradient-to-t
-                        from-black/80 
-                        via-transparent to-transparent
-                      "/>
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"/>
                       <div className="
                         absolute bottom-3 
                         left-3 right-3
