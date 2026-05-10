@@ -335,6 +335,8 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
         : perfilCompleto?.services || [], // ⚠️ FALLBACK: Usar servicios de sedesData si no hay en Supabase
       specialties: perfilCompleto?.specialties || [],
       domicilio: modelo.domicilio !== undefined ? modelo.domicilio : true, // ✅ NUEVO: Tomar del campo domicilio de la BD
+      email: modelo.email,
+      servicios_modelo: modelo.servicios_modelo || [],
     };
   };
   
@@ -608,7 +610,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
   };
 
   return (
-    <div className="min-h-screen bg-background w-full max-w-full overflow-x-hidden box-border" style={{ fontFamily: 'Inter, sans-serif' }}>
+    <div className="min-h-screen bg-background w-full max-w-full overflow-x-hidden box-border" style={{ fontFamily: "'Cormorant Garamond', 'Playfair Display', Georgia, serif" }}>
       {/* Overlay para menú móvil */}
       {menuAbierto && (
         <div 
@@ -619,56 +621,40 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
       )}
 
       {/* Navigation - Navbar responsivo solicitado */}
-      <nav className="
-        fixed top-0 left-0 right-0 z-50
-        bg-[#0f1014]/95 backdrop-blur-md
-        border-b border-[#2a2a2a]
-      ">
-        <div className="
-          flex items-center justify-between
-          px-4 sm:px-6 lg:px-8
-          py-3 sm:py-4
-          max-w-7xl mx-auto
-        ">
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-[#0a0b0d]/96 backdrop-blur-xl border-b border-[#c9a961]/10" style={{ boxShadow: '0 1px 32px rgba(0,0,0,0.7)' }}>
+        <div className="flex items-center justify-between px-4 sm:px-6 lg:px-8 py-3.5 sm:py-4 max-w-7xl mx-auto">
 
           {/* LOGO */}
-          <span className="
-            text-[#c9a961] font-bold
-            text-lg sm:text-xl
-            font-['Playfair_Display']
-            flex-shrink-0
-          ">
-            ◆ Black Diamond
+          <span className="flex-shrink-0 flex items-center gap-2" style={{ fontFamily: "'Cormorant Garamond', serif", letterSpacing: '0.06em' }}>
+            <span style={{ color: '#c9a961', fontSize: 18, lineHeight: 1 }}>◆</span>
+            <span style={{ color: '#fff', fontWeight: 300, fontSize: '1.1rem' }}>BLACK</span>
+            <span style={{ color: '#c9a961', fontWeight: 700, fontSize: '1.1rem' }}>DIAMOND</span>
           </span>
 
           {/* DESKTOP */}
-          <div className="
-            hidden md:flex
-            items-center gap-6 lg:gap-8
-          ">
+          <div className="hidden md:flex items-center gap-7 lg:gap-9">
             {links.map(l => (
               <a key={l.href} href={l.href}
-                className="
-                  text-[#888] hover:text-[#c9a961]
-                  text-sm transition-colors
-                "
+                className="text-[#777] hover:text-[#c9a961] text-sm tracking-wider uppercase transition-all duration-300 relative group"
+                style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.7rem', letterSpacing: '0.14em' }}
               >
                 {l.label}
+                <span className="absolute -bottom-0.5 left-0 w-0 h-px bg-[#c9a961] group-hover:w-full transition-all duration-400" />
               </a>
             ))}
 
-            {/* UN SOLO BOTÓN — cliente */}
             <button
               onClick={() => onAccessSystem('cliente')}
-              className="
-                px-5 py-2.5 rounded-lg
-                bg-[#c9a961] text-[#0f1014]
-                font-bold text-sm
-                hover:bg-[#d4b86a]
-                transition-colors
-              "
+              className="relative px-6 py-2.5 rounded-lg font-bold text-[#0f1014] text-xs tracking-widest uppercase overflow-hidden group transition-all duration-300 hover:scale-105 active:scale-95"
+              style={{
+                background: 'linear-gradient(135deg, #d4b86a 0%, #c9a961 50%, #a07c3a 100%)',
+                boxShadow: '0 4px 20px rgba(201,169,97,0.3)',
+                fontFamily: "'Montserrat', sans-serif",
+                letterSpacing: '0.1em',
+              }}
             >
-              ◆ Iniciar sesión
+              <span className="relative z-10">◆ Iniciar sesión</span>
+              <span className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             </button>
           </div>
 
@@ -717,22 +703,21 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
             ))}
 
             {/* BOTONES EN MENÚ MÓVIL */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+            <div className="flex flex-col gap-3 mt-4 pt-3 border-t border-[#2a2a2a]">
               <button
                 onClick={() => {
                   setMenuAbierto(false)
                   onAccessSystem('cliente')
                 }}
+                className="w-full py-3 rounded-xl font-black text-[11px] uppercase tracking-[0.15em] active:scale-95 transition-all duration-300"
                 style={{
-                  padding: '12px 16px',
-                  background: 'linear-gradient(135deg, #B8860B, #FFD700)',
-                  border: 'none', borderRadius: 8,
-                  color: 'black', fontWeight: 700,
-                  cursor: 'pointer', fontSize: 14,
-                  width: '100%'
+                  background: 'linear-gradient(135deg, #d4b86a 0%, #c9a961 60%, #a07c3a 100%)',
+                  color: '#0f1014',
+                  boxShadow: '0 4px 16px rgba(201,169,97,0.25)',
+                  fontFamily: "'Montserrat', sans-serif",
                 }}
               >
-                👤 Iniciar sesión como Cliente
+                ◆ Iniciar sesión
               </button>
 
               <button
@@ -740,8 +725,8 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
                   setMenuAbierto(false)
                   onAccessSystem('sistema')
                 }}
-                className="mt-6 text-[10px] text-white/30 hover:text-white/50 transition-colors uppercase tracking-widest text-center"
-                style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}
+                className="text-[9px] text-white/20 hover:text-white/40 transition-colors uppercase tracking-[0.3em] text-center py-2"
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: "'Montserrat', sans-serif" }}
               >
                 Acceso al sistema
               </button>
@@ -790,129 +775,99 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
               <Gem className="w-4 h-4 mr-2 inline" />
               {t.services.badge}
             </Badge>
-            <h2 className="text-4xl md:text-6xl font-bold mb-4 bd-animate-fade-up bd-delay-1" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-              {t.services.title} <span className="text-primary">{t.services.titleHighlight}</span>
+            <h2 className="text-4xl md:text-6xl mb-4 bd-animate-fade-up bd-delay-1" style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 300, lineHeight: 1.1 }}>
+              {t.services.title} <span style={{ color: '#c9a961', fontWeight: 700 }}>{t.services.titleHighlight}</span>
             </h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto bd-animate-fade-up bd-delay-2">
+            <p className="text-muted-foreground max-w-2xl mx-auto bd-animate-fade-up bd-delay-2" style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.9rem', letterSpacing: '0.02em' }}>
               {t.services.subtitle}
             </p>
             <div className="bd-shimmer-line max-w-xs mx-auto mt-6" />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 max-w-6xl mx-auto">
             {/* Servicio 1 */}
-            <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/5 hover:shadow-lg hover:shadow-primary/10 transition-all group bd-animate-scale-in bd-delay-0 bd-card-hover">
-              <CardContent className="p-6">
-                <div className="w-14 h-14 rounded-full bg-primary/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                  <Clock className="w-7 h-7 text-primary" />
-                </div>
-                <h3 className="text-2xl font-bold mb-3" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-                  {t.services.personalMeetings.title}
-                </h3>
-                <p className="text-muted-foreground mb-4">
-                  {t.services.personalMeetings.description}
-                </p>
-                <div className="flex items-center gap-2 text-sm text-primary">
-                  <Star className="w-4 h-4 fill-primary" />
-                  <span>{t.services.personalMeetings.badge}</span>
-                </div>
-              </CardContent>
-            </Card>
+            <div className="group bd-animate-scale-in bd-delay-0 rounded-2xl p-6 flex flex-col gap-4 border border-[#c9a961]/12 bg-[#16181c] hover:border-[#c9a961]/40 hover:-translate-y-1 transition-all duration-400" style={{ boxShadow: 'none' }}
+              onMouseEnter={e => (e.currentTarget.style.boxShadow='0 12px 40px rgba(201,169,97,0.12)')} onMouseLeave={e => (e.currentTarget.style.boxShadow='none')}>
+              <div className="w-12 h-12 flex items-center justify-center flex-shrink-0" style={{ transform: 'rotate(45deg)', background: 'rgba(201,169,97,0.08)', border: '1px solid rgba(201,169,97,0.25)', borderRadius: 6 }}>
+                <Clock className="w-5 h-5 text-[#c9a961]" style={{ transform: 'rotate(-45deg)' }} />
+              </div>
+              <h3 className="text-xl font-semibold text-white" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.35rem' }}>{t.services.personalMeetings.title}</h3>
+              <p className="text-[#888] text-sm leading-relaxed flex-1" style={{ fontFamily: "'Montserrat', sans-serif" }}>{t.services.personalMeetings.description}</p>
+              <div className="flex items-center gap-2 text-xs text-[#c9a961]/70" style={{ fontFamily: "'Montserrat', sans-serif", letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                <span className="w-3 h-px bg-[#c9a961]/50" />
+                {t.services.personalMeetings.badge}
+              </div>
+            </div>
 
             {/* Servicio 2 */}
-            <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/5 hover:shadow-lg hover:shadow-primary/10 transition-all group bd-animate-scale-in bd-delay-1 bd-card-hover">
-              <CardContent className="p-6">
-                <div className="w-14 h-14 rounded-full bg-primary/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                  <MapPin className="w-7 h-7 text-primary" />
-                </div>
-                <h3 className="text-2xl font-bold mb-3" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-                  {t.services.homeService.title}
-                </h3>
-                <p className="text-muted-foreground mb-4">
-                  {t.services.homeService.description}
-                </p>
-                <div className="flex items-center gap-2 text-sm text-primary">
-                  <Shield className="w-4 h-4" />
-                  <span>{t.services.homeService.badge}</span>
-                </div>
-              </CardContent>
-            </Card>
+            <div className="group bd-animate-scale-in bd-delay-1 rounded-2xl p-6 flex flex-col gap-4 border border-[#c9a961]/12 bg-[#16181c] hover:border-[#c9a961]/40 hover:-translate-y-1 transition-all duration-400" style={{ boxShadow: 'none' }}
+              onMouseEnter={e => (e.currentTarget.style.boxShadow='0 12px 40px rgba(201,169,97,0.12)')} onMouseLeave={e => (e.currentTarget.style.boxShadow='none')}>
+              <div className="w-12 h-12 flex items-center justify-center flex-shrink-0" style={{ transform: 'rotate(45deg)', background: 'rgba(201,169,97,0.08)', border: '1px solid rgba(201,169,97,0.25)', borderRadius: 6 }}>
+                <MapPin className="w-5 h-5 text-[#c9a961]" style={{ transform: 'rotate(-45deg)' }} />
+              </div>
+              <h3 className="text-xl font-semibold text-white" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.35rem' }}>{t.services.homeService.title}</h3>
+              <p className="text-[#888] text-sm leading-relaxed flex-1" style={{ fontFamily: "'Montserrat', sans-serif" }}>{t.services.homeService.description}</p>
+              <div className="flex items-center gap-2 text-xs text-[#c9a961]/70" style={{ fontFamily: "'Montserrat', sans-serif", letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                <span className="w-3 h-px bg-[#c9a961]/50" />
+                {t.services.homeService.badge}
+              </div>
+            </div>
 
             {/* Servicio 3 */}
-            <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/5 hover:shadow-lg hover:shadow-primary/10 transition-all group bd-animate-scale-in bd-delay-2 bd-card-hover">
-              <CardContent className="p-6">
-                <div className="w-14 h-14 rounded-full bg-primary/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                  <Gem className="w-7 h-7 text-primary" />
-                </div>
-                <h3 className="text-2xl font-bold mb-3" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-                  {t.services.vipSuites.title}
-                </h3>
-                <p className="text-muted-foreground mb-4">
-                  {t.services.vipSuites.description}
-                </p>
-                <div className="flex items-center gap-2 text-sm text-primary">
-                  <Sparkles className="w-4 h-4" />
-                  <span>{t.services.vipSuites.badge}</span>
-                </div>
-              </CardContent>
-            </Card>
+            <div className="group bd-animate-scale-in bd-delay-2 rounded-2xl p-6 flex flex-col gap-4 border border-[#c9a961]/12 bg-[#16181c] hover:border-[#c9a961]/40 hover:-translate-y-1 transition-all duration-400" style={{ boxShadow: 'none' }}
+              onMouseEnter={e => (e.currentTarget.style.boxShadow='0 12px 40px rgba(201,169,97,0.12)')} onMouseLeave={e => (e.currentTarget.style.boxShadow='none')}>
+              <div className="w-12 h-12 flex items-center justify-center flex-shrink-0" style={{ transform: 'rotate(45deg)', background: 'rgba(201,169,97,0.08)', border: '1px solid rgba(201,169,97,0.25)', borderRadius: 6 }}>
+                <Gem className="w-5 h-5 text-[#c9a961]" style={{ transform: 'rotate(-45deg)' }} />
+              </div>
+              <h3 className="text-xl font-semibold text-white" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.35rem' }}>{t.services.vipSuites.title}</h3>
+              <p className="text-[#888] text-sm leading-relaxed flex-1" style={{ fontFamily: "'Montserrat', sans-serif" }}>{t.services.vipSuites.description}</p>
+              <div className="flex items-center gap-2 text-xs text-[#c9a961]/70" style={{ fontFamily: "'Montserrat', sans-serif", letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                <span className="w-3 h-px bg-[#c9a961]/50" />
+                {t.services.vipSuites.badge}
+              </div>
+            </div>
 
             {/* Servicio 4 */}
-            <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/5 hover:shadow-lg hover:shadow-primary/10 transition-all group bd-animate-scale-in bd-delay-3 bd-card-hover">
-              <CardContent className="p-6">
-                <div className="w-14 h-14 rounded-full bg-primary/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                  <Heart className="w-7 h-7 text-primary" />
-                </div>
-                <h3 className="text-2xl font-bold mb-3" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-                  {t.services.gfeExperience.title}
-                </h3>
-                <p className="text-muted-foreground mb-4">
-                  {t.services.gfeExperience.description}
-                </p>
-                <div className="flex items-center gap-2 text-sm text-primary">
-                  <Star className="w-4 h-4 fill-primary" />
-                  <span>{t.services.gfeExperience.badge}</span>
-                </div>
-              </CardContent>
-            </Card>
+            <div className="group bd-animate-scale-in bd-delay-3 rounded-2xl p-6 flex flex-col gap-4 border border-[#c9a961]/12 bg-[#16181c] hover:border-[#c9a961]/40 hover:-translate-y-1 transition-all duration-400" style={{ boxShadow: 'none' }}
+              onMouseEnter={e => (e.currentTarget.style.boxShadow='0 12px 40px rgba(201,169,97,0.12)')} onMouseLeave={e => (e.currentTarget.style.boxShadow='none')}>
+              <div className="w-12 h-12 flex items-center justify-center flex-shrink-0" style={{ transform: 'rotate(45deg)', background: 'rgba(201,169,97,0.08)', border: '1px solid rgba(201,169,97,0.25)', borderRadius: 6 }}>
+                <Heart className="w-5 h-5 text-[#c9a961]" style={{ transform: 'rotate(-45deg)' }} />
+              </div>
+              <h3 className="text-xl font-semibold text-white" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.35rem' }}>{t.services.gfeExperience.title}</h3>
+              <p className="text-[#888] text-sm leading-relaxed flex-1" style={{ fontFamily: "'Montserrat', sans-serif" }}>{t.services.gfeExperience.description}</p>
+              <div className="flex items-center gap-2 text-xs text-[#c9a961]/70" style={{ fontFamily: "'Montserrat', sans-serif", letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                <span className="w-3 h-px bg-[#c9a961]/50" />
+                {t.services.gfeExperience.badge}
+              </div>
+            </div>
 
             {/* Servicio 5 */}
-            <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/5 hover:shadow-lg hover:shadow-primary/10 transition-all group bd-animate-scale-in bd-delay-4 bd-card-hover">
-              <CardContent className="p-6">
-                <div className="w-14 h-14 rounded-full bg-primary/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                  <Award className="w-7 h-7 text-primary" />
-                </div>
-                <h3 className="text-2xl font-bold mb-3" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-                  {t.services.specialEvents.title}
-                </h3>
-                <p className="text-muted-foreground mb-4">
-                  {t.services.specialEvents.description}
-                </p>
-                <div className="flex items-center gap-2 text-sm text-primary">
-                  <Gem className="w-4 h-4" />
-                  <span>{t.services.specialEvents.badge}</span>
-                </div>
-              </CardContent>
-            </Card>
+            <div className="group bd-animate-scale-in bd-delay-4 rounded-2xl p-6 flex flex-col gap-4 border border-[#c9a961]/12 bg-[#16181c] hover:border-[#c9a961]/40 hover:-translate-y-1 transition-all duration-400" style={{ boxShadow: 'none' }}
+              onMouseEnter={e => (e.currentTarget.style.boxShadow='0 12px 40px rgba(201,169,97,0.12)')} onMouseLeave={e => (e.currentTarget.style.boxShadow='none')}>
+              <div className="w-12 h-12 flex items-center justify-center flex-shrink-0" style={{ transform: 'rotate(45deg)', background: 'rgba(201,169,97,0.08)', border: '1px solid rgba(201,169,97,0.25)', borderRadius: 6 }}>
+                <Award className="w-5 h-5 text-[#c9a961]" style={{ transform: 'rotate(-45deg)' }} />
+              </div>
+              <h3 className="text-xl font-semibold text-white" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.35rem' }}>{t.services.specialEvents.title}</h3>
+              <p className="text-[#888] text-sm leading-relaxed flex-1" style={{ fontFamily: "'Montserrat', sans-serif" }}>{t.services.specialEvents.description}</p>
+              <div className="flex items-center gap-2 text-xs text-[#c9a961]/70" style={{ fontFamily: "'Montserrat', sans-serif", letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                <span className="w-3 h-px bg-[#c9a961]/50" />
+                {t.services.specialEvents.badge}
+              </div>
+            </div>
 
             {/* Servicio 6 */}
-            <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/5 hover:shadow-lg hover:shadow-primary/10 transition-all group bd-animate-scale-in bd-delay-5 bd-card-hover">
-              <CardContent className="p-6">
-                <div className="w-14 h-14 rounded-full bg-primary/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                  <Sparkles className="w-7 h-7 text-primary" />
-                </div>
-                <h3 className="text-2xl font-bold mb-3" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-                  {t.services.boutique.title}
-                </h3>
-                <p className="text-muted-foreground mb-4">
-                  {t.services.boutique.description}
-                </p>
-                <div className="flex items-center gap-2 text-sm text-primary">
-                  <Gem className="w-4 h-4" />
-                  <span>{t.services.boutique.badge}</span>
-                </div>
-              </CardContent>
-            </Card>
+            <div className="group bd-animate-scale-in bd-delay-5 rounded-2xl p-6 flex flex-col gap-4 border border-[#c9a961]/12 bg-[#16181c] hover:border-[#c9a961]/40 hover:-translate-y-1 transition-all duration-400" style={{ boxShadow: 'none' }}
+              onMouseEnter={e => (e.currentTarget.style.boxShadow='0 12px 40px rgba(201,169,97,0.12)')} onMouseLeave={e => (e.currentTarget.style.boxShadow='none')}>
+              <div className="w-12 h-12 flex items-center justify-center flex-shrink-0" style={{ transform: 'rotate(45deg)', background: 'rgba(201,169,97,0.08)', border: '1px solid rgba(201,169,97,0.25)', borderRadius: 6 }}>
+                <Sparkles className="w-5 h-5 text-[#c9a961]" style={{ transform: 'rotate(-45deg)' }} />
+              </div>
+              <h3 className="text-xl font-semibold text-white" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.35rem' }}>{t.services.boutique.title}</h3>
+              <p className="text-[#888] text-sm leading-relaxed flex-1" style={{ fontFamily: "'Montserrat', sans-serif" }}>{t.services.boutique.description}</p>
+              <div className="flex items-center gap-2 text-xs text-[#c9a961]/70" style={{ fontFamily: "'Montserrat', sans-serif", letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                <span className="w-3 h-px bg-[#c9a961]/50" />
+                {t.services.boutique.badge}
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -932,10 +887,10 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
               <Star className="w-4 h-4 mr-2 inline" />
               {t.models.badge}
             </Badge>
-            <h2 className="text-4xl md:text-6xl font-bold mb-4 bd-animate-fade-up bd-delay-1" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-              {t.models.title} <span className="text-primary">{t.models.titleHighlight}</span>
+            <h2 className="text-4xl md:text-6xl mb-4 bd-animate-fade-up bd-delay-1" style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 300, lineHeight: 1.1 }}>
+              {t.models.title} <span style={{ color: '#c9a961', fontWeight: 700 }}>{t.models.titleHighlight}</span>
             </h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto bd-animate-fade-up bd-delay-2">
+            <p className="text-muted-foreground max-w-2xl mx-auto bd-animate-fade-up bd-delay-2" style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.9rem' }}>
               {t.models.subtitle}
             </p>
             <div className="bd-shimmer-line max-w-xs mx-auto mt-6" />
@@ -999,63 +954,54 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
                 <Gem className="w-4 h-4 mr-2 inline" />
                 {t.about.badge}
               </Badge>
-              <h2 className="text-4xl md:text-6xl font-bold mb-6 bd-animate-fade-up bd-delay-1" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-                {t.about.title} <span className="text-primary">{t.about.titleHighlight}</span>
+              <h2 className="text-4xl md:text-6xl mb-6 bd-animate-fade-up bd-delay-1" style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 300, lineHeight: 1.1 }}>
+                {t.about.title} <span style={{ color: '#c9a961', fontWeight: 700 }}>{t.about.titleHighlight}</span>
               </h2>
               <div className="bd-shimmer-line max-w-xs mx-auto" />
             </div>
 
-            <div className="grid md:grid-cols-2 gap-8 mb-12">
-              <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/5 bd-animate-scale-in bd-delay-2 bd-card-hover">
-                <CardContent className="p-6">
-                  <Shield className="w-12 h-12 text-primary mb-4 bd-animate-float" />
-                  <h3 className="text-2xl font-bold mb-3" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-                    {t.about.totalSecurity.title}
-                  </h3>
-                  <p className="text-muted-foreground">
-                    {t.about.totalSecurity.description}
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/5 bd-animate-scale-in bd-delay-3 bd-card-hover">
-                <CardContent className="p-6">
-                  <Award className="w-12 h-12 text-primary mb-4 bd-animate-float" style={{ animationDelay: '0.8s' }} />
-                  <h3 className="text-2xl font-bold mb-3" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-                    {t.about.premiumQuality.title}
-                  </h3>
-                  <p className="text-muted-foreground">
-                    {t.about.premiumQuality.description}
-                  </p>
-                </CardContent>
-              </Card>
+            <div className="grid md:grid-cols-2 gap-6 mb-8">
+              <div className="rounded-2xl p-6 border border-[#c9a961]/15 bg-[#16181c] bd-animate-scale-in bd-delay-2">
+                <div className="w-10 h-10 flex items-center justify-center mb-4 flex-shrink-0" style={{ transform: 'rotate(45deg)', background: 'rgba(201,169,97,0.08)', border: '1px solid rgba(201,169,97,0.25)', borderRadius: 6 }}>
+                  <Shield className="w-5 h-5 text-[#c9a961] bd-animate-float" style={{ transform: 'rotate(-45deg)' }} />
+                </div>
+                <h3 className="text-xl font-semibold text-white mb-2" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.3rem' }}>{t.about.totalSecurity.title}</h3>
+                <p className="text-[#888] text-sm leading-relaxed" style={{ fontFamily: "'Montserrat', sans-serif" }}>{t.about.totalSecurity.description}</p>
+              </div>
+              <div className="rounded-2xl p-6 border border-[#c9a961]/15 bg-[#16181c] bd-animate-scale-in bd-delay-3">
+                <div className="w-10 h-10 flex items-center justify-center mb-4 flex-shrink-0" style={{ transform: 'rotate(45deg)', background: 'rgba(201,169,97,0.08)', border: '1px solid rgba(201,169,97,0.25)', borderRadius: 6 }}>
+                  <Award className="w-5 h-5 text-[#c9a961] bd-animate-float" style={{ transform: 'rotate(-45deg)', animationDelay: '0.8s' }} />
+                </div>
+                <h3 className="text-xl font-semibold text-white mb-2" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.3rem' }}>{t.about.premiumQuality.title}</h3>
+                <p className="text-[#888] text-sm leading-relaxed" style={{ fontFamily: "'Montserrat', sans-serif" }}>{t.about.premiumQuality.description}</p>
+              </div>
             </div>
 
-            <div className="text-center bg-gradient-to-br from-primary/10 to-primary/5 rounded-2xl p-8 border border-primary/20 bd-animate-scale-in bd-delay-4 bd-animate-glow">
-              <h3 className="text-3xl font-bold mb-4" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+            <div className="rounded-2xl border border-[#c9a961]/15 bg-[#0d0f12] p-8 bd-animate-scale-in bd-delay-4">
+              <h3 className="text-2xl mb-6 text-center" style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 400, color: '#c9a961' }}>
                 {t.about.ourValues}
               </h3>
-              <div className="grid md:grid-cols-3 gap-6 mt-8">
-                <div className="bd-animate-fade-up bd-delay-0">
-                  <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-3 bd-animate-float">
-                    <Heart className="w-8 h-8 text-primary" />
+              <div className="grid md:grid-cols-3 gap-6">
+                <div className="text-center bd-animate-fade-up bd-delay-0">
+                  <div className="w-12 h-12 flex items-center justify-center mx-auto mb-3" style={{ transform: 'rotate(45deg)', background: 'rgba(201,169,97,0.08)', border: '1px solid rgba(201,169,97,0.2)', borderRadius: 6 }}>
+                    <Heart className="w-5 h-5 text-[#c9a961] bd-animate-float" style={{ transform: 'rotate(-45deg)' }} />
                   </div>
-                  <h4 className="font-bold mb-2">{t.about.respect.title}</h4>
-                  <p className="text-sm text-muted-foreground">{t.about.respect.description}</p>
+                  <h4 className="font-semibold mb-1 text-white" style={{ fontFamily: "'Cormorant Garamond', serif" }}>{t.about.respect.title}</h4>
+                  <p className="text-xs text-[#888]" style={{ fontFamily: "'Montserrat', sans-serif" }}>{t.about.respect.description}</p>
                 </div>
-                <div className="bd-animate-fade-up bd-delay-2">
-                  <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-3 bd-animate-float" style={{ animationDelay: '1s' }}>
-                    <Shield className="w-8 h-8 text-primary" />
+                <div className="text-center bd-animate-fade-up bd-delay-2">
+                  <div className="w-12 h-12 flex items-center justify-center mx-auto mb-3" style={{ transform: 'rotate(45deg)', background: 'rgba(201,169,97,0.08)', border: '1px solid rgba(201,169,97,0.2)', borderRadius: 6 }}>
+                    <Shield className="w-5 h-5 text-[#c9a961] bd-animate-float" style={{ transform: 'rotate(-45deg)', animationDelay: '1s' }} />
                   </div>
-                  <h4 className="font-bold mb-2">{t.about.confidentiality.title}</h4>
-                  <p className="text-sm text-muted-foreground">{t.about.confidentiality.description}</p>
+                  <h4 className="font-semibold mb-1 text-white" style={{ fontFamily: "'Cormorant Garamond', serif" }}>{t.about.confidentiality.title}</h4>
+                  <p className="text-xs text-[#888]" style={{ fontFamily: "'Montserrat', sans-serif" }}>{t.about.confidentiality.description}</p>
                 </div>
-                <div className="bd-animate-fade-up bd-delay-4">
-                  <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-3 bd-animate-float" style={{ animationDelay: '2s' }}>
-                    <Sparkles className="w-8 h-8 text-primary" />
+                <div className="text-center bd-animate-fade-up bd-delay-4">
+                  <div className="w-12 h-12 flex items-center justify-center mx-auto mb-3" style={{ transform: 'rotate(45deg)', background: 'rgba(201,169,97,0.08)', border: '1px solid rgba(201,169,97,0.2)', borderRadius: 6 }}>
+                    <Sparkles className="w-5 h-5 text-[#c9a961] bd-animate-float" style={{ transform: 'rotate(-45deg)', animationDelay: '2s' }} />
                   </div>
-                  <h4 className="font-bold mb-2">{t.about.excellence.title}</h4>
-                  <p className="text-sm text-muted-foreground">{t.about.excellence.description}</p>
+                  <h4 className="font-semibold mb-1 text-white" style={{ fontFamily: "'Cormorant Garamond', serif" }}>{t.about.excellence.title}</h4>
+                  <p className="text-xs text-[#888]" style={{ fontFamily: "'Montserrat', sans-serif" }}>{t.about.excellence.description}</p>
                 </div>
               </div>
             </div>
@@ -1082,167 +1028,137 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
                 <Phone className="w-4 h-4 mr-2 inline" />
                 {t.contact.badge}
               </Badge>
-              <h2 className="text-4xl md:text-6xl font-bold mb-4 bd-animate-fade-up bd-delay-1" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-                {t.contact.title} <span className="text-primary">{t.contact.titleHighlight}</span>
+              <h2 className="text-4xl md:text-6xl mb-4 bd-animate-fade-up bd-delay-1" style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 300, lineHeight: 1.1 }}>
+                {t.contact.title} <span style={{ color: '#c9a961', fontWeight: 700 }}>{t.contact.titleHighlight}</span>
               </h2>
-              <p className="text-muted-foreground max-w-2xl mx-auto bd-animate-fade-up bd-delay-2">
+              <p className="text-muted-foreground max-w-2xl mx-auto bd-animate-fade-up bd-delay-2" style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.9rem' }}>
                 {t.contact.subtitle}
               </p>
               <div className="bd-shimmer-line max-w-xs mx-auto mt-6" />
             </div>
 
-            <div className="grid md:grid-cols-4 gap-6 mb-12">
-              {/* Telegram - Azul */}
-              <Card className="border-blue-500/20 bg-gradient-to-br from-card to-blue-600/10 hover:shadow-lg hover:shadow-blue-500/20 transition-all bd-animate-scale-in bd-delay-0 bd-card-hover">
-                <CardContent className="p-6 text-center">
-                  <div className="w-14 h-14 rounded-full bg-blue-600/20 flex items-center justify-center mx-auto mb-4">
-                    <Send className="w-7 h-7 text-blue-500" />
-                  </div>
-                  <h3 className="font-bold mb-2">Telegram</h3>
-                  <p className="text-sm text-muted-foreground mb-3">Respuesta inmediata 24/7</p>
-                  <a href="https://t.me/BlackDiamondScorts" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
-                    @BlackDiamondScorts
-                  </a>
-                </CardContent>
-              </Card>
+            <div className="grid md:grid-cols-4 gap-4 mb-10">
+              {/* Telegram */}
+              <div className="rounded-2xl p-5 text-center border border-[#c9a961]/15 bg-[#16181c] bd-animate-scale-in bd-delay-0 hover:border-[#c9a961]/40 hover:-translate-y-0.5 transition-all duration-300" style={{ boxShadow: 'none' }}
+                onMouseEnter={e => (e.currentTarget.style.boxShadow='0 8px 32px rgba(201,169,97,0.1)')} onMouseLeave={e => (e.currentTarget.style.boxShadow='none')}>
+                <div className="w-12 h-12 rounded-xl bg-[#229ED9]/10 border border-[#229ED9]/25 flex items-center justify-center mx-auto mb-3">
+                  <Send className="w-5 h-5" style={{ color: '#229ED9' }} />
+                </div>
+                <h3 className="font-semibold mb-1 text-white text-sm" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1rem' }}>Telegram</h3>
+                <p className="text-xs text-[#666] mb-2" style={{ fontFamily: "'Montserrat', sans-serif" }}>Respuesta inmediata 24/7</p>
+                <a href="https://t.me/BlackDiamondScorts" target="_blank" rel="noopener noreferrer" className="text-xs hover:underline" style={{ color: '#229ED9', fontFamily: "'Montserrat', sans-serif" }}>@BlackDiamondScorts</a>
+              </div>
 
-              {/* WhatsApp - Verde */}
-              <Card className="border-green-500/20 bg-gradient-to-br from-card to-green-600/10 hover:shadow-lg hover:shadow-green-500/20 transition-all bd-animate-scale-in bd-delay-1 bd-card-hover">
-                <CardContent className="p-6 text-center">
-                  <div className="w-14 h-14 rounded-full bg-green-600/20 flex items-center justify-center mx-auto mb-4">
-                    <Phone className="w-7 h-7 text-green-500" />
-                  </div>
-                  <h3 className="font-bold mb-2">{t.contact.whatsapp}</h3>
-                  <p className="text-sm text-muted-foreground mb-3">{t.contact.whatsappDesc}</p>
-                  <a href="https://wa.me/573017626768" target="_blank" rel="noopener noreferrer" className="text-green-500 hover:underline">
-                    +57 301 762 6768
-                  </a>
-                </CardContent>
-              </Card>
+              {/* WhatsApp */}
+              <div className="rounded-2xl p-5 text-center border border-[#c9a961]/15 bg-[#16181c] bd-animate-scale-in bd-delay-1 hover:border-[#c9a961]/40 hover:-translate-y-0.5 transition-all duration-300" style={{ boxShadow: 'none' }}
+                onMouseEnter={e => (e.currentTarget.style.boxShadow='0 8px 32px rgba(201,169,97,0.1)')} onMouseLeave={e => (e.currentTarget.style.boxShadow='none')}>
+                <div className="w-12 h-12 rounded-xl bg-[#25D366]/10 border border-[#25D366]/25 flex items-center justify-center mx-auto mb-3">
+                  <Phone className="w-5 h-5" style={{ color: '#25D366' }} />
+                </div>
+                <h3 className="font-semibold mb-1 text-white text-sm" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1rem' }}>{t.contact.whatsapp}</h3>
+                <p className="text-xs text-[#666] mb-2" style={{ fontFamily: "'Montserrat', sans-serif" }}>{t.contact.whatsappDesc}</p>
+                <a href="https://wa.me/573017626768" target="_blank" rel="noopener noreferrer" className="text-xs hover:underline" style={{ color: '#25D366', fontFamily: "'Montserrat', sans-serif" }}>+57 301 762 6768</a>
+              </div>
 
-              {/* X (antes Twitter) - Negro/Blanco */}
-              <Card className="border-white/20 bg-gradient-to-br from-card to-white/10 hover:shadow-lg hover:shadow-white/20 transition-all bd-animate-scale-in bd-delay-2 bd-card-hover">
-                <CardContent className="p-6 text-center">
-                  <div className="w-14 h-14 rounded-full bg-white/10 flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-7 h-7 text-white" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-                    </svg>
-                  </div>
-                  <h3 className="font-bold mb-2">X</h3>
-                  <p className="text-sm text-muted-foreground mb-3">{t.contact.twitterDesc}</p>
-                  <a href="https://x.com/BlackDiamondBog" target="_blank" rel="noopener noreferrer" className="text-white hover:underline">
-                    @BlackDiamondBog
-                  </a>
-                </CardContent>
-              </Card>
+              {/* X / Twitter */}
+              <div className="rounded-2xl p-5 text-center border border-[#c9a961]/15 bg-[#16181c] bd-animate-scale-in bd-delay-2 hover:border-[#c9a961]/40 hover:-translate-y-0.5 transition-all duration-300" style={{ boxShadow: 'none' }}
+                onMouseEnter={e => (e.currentTarget.style.boxShadow='0 8px 32px rgba(201,169,97,0.1)')} onMouseLeave={e => (e.currentTarget.style.boxShadow='none')}>
+                <div className="w-12 h-12 rounded-xl bg-white/5 border border-white/15 flex items-center justify-center mx-auto mb-3">
+                  <svg className="w-5 h-5 text-white/80" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                </div>
+                <h3 className="font-semibold mb-1 text-white text-sm" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1rem' }}>X</h3>
+                <p className="text-xs text-[#666] mb-2" style={{ fontFamily: "'Montserrat', sans-serif" }}>{t.contact.twitterDesc}</p>
+                <a href="https://x.com/BlackDiamondBog" target="_blank" rel="noopener noreferrer" className="text-xs text-white/60 hover:text-white hover:underline" style={{ fontFamily: "'Montserrat', sans-serif" }}>@BlackDiamondBog</a>
+              </div>
 
-              {/* Email - Blanco con rojo */}
-              <Card className="border-red-500/20 bg-gradient-to-br from-card to-red-600/10 hover:shadow-lg hover:shadow-red-500/20 transition-all bd-animate-scale-in bd-delay-3 bd-card-hover">
-                <CardContent className="p-6 text-center">
-                  <div className="w-14 h-14 rounded-full bg-red-600/20 flex items-center justify-center mx-auto mb-4">
-                    <Mail className="w-7 h-7 text-red-400" />
-                  </div>
-                  <h3 className="font-bold mb-2">{t.contact.email}</h3>
-                  <p className="text-sm text-muted-foreground mb-3">{t.contact.emailDesc}</p>
-                  <a 
-                    href="mailto:blackdiamond.scort@gmail.com" 
-                    className="text-red-400 hover:underline break-words overflow-wrap-anywhere inline-block max-w-full"
-                  >
-                    blackdiamond.scort@gmail.com
-                  </a>
-                </CardContent>
-              </Card>
+              {/* Email */}
+              <div className="rounded-2xl p-5 text-center border border-[#c9a961]/15 bg-[#16181c] bd-animate-scale-in bd-delay-3 hover:border-[#c9a961]/40 hover:-translate-y-0.5 transition-all duration-300" style={{ boxShadow: 'none' }}
+                onMouseEnter={e => (e.currentTarget.style.boxShadow='0 8px 32px rgba(201,169,97,0.1)')} onMouseLeave={e => (e.currentTarget.style.boxShadow='none')}>
+                <div className="w-12 h-12 rounded-xl bg-[#c9a961]/10 border border-[#c9a961]/25 flex items-center justify-center mx-auto mb-3">
+                  <Mail className="w-5 h-5 text-[#c9a961]" />
+                </div>
+                <h3 className="font-semibold mb-1 text-white text-sm" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1rem' }}>{t.contact.email}</h3>
+                <p className="text-xs text-[#666] mb-2" style={{ fontFamily: "'Montserrat', sans-serif" }}>{t.contact.emailDesc}</p>
+                <a href="mailto:blackdiamond.scort@gmail.com" className="text-xs text-[#c9a961] hover:underline break-all" style={{ fontFamily: "'Montserrat', sans-serif" }}>blackdiamond.scort@gmail.com</a>
+              </div>
             </div>
 
             {/* CTA Final */}
-            <Card className="border-primary/30 bg-gradient-to-br from-primary/10 to-primary/5 bd-animate-scale-in bd-delay-4 bd-animate-glow">
-              <CardContent className="p-8 md:p-12 text-center">
-                <Gem className="w-16 h-16 text-primary mx-auto mb-6 bd-animate-float" />
-                <h3 className="text-3xl md:text-4xl font-bold mb-4" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-                  {t.contact.ctaTitle}
-                </h3>
-                <p className="text-muted-foreground mb-8 max-w-2xl mx-auto">
-                  {t.contact.ctaDescription}
-                </p>
-                <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                  <Button size="lg" className="bg-primary text-background hover:bg-primary/90 text-lg px-8 gap-2">
-                    <Phone className="w-5 h-5" />
-                    {t.contact.reserveNow}
-                  </Button>
-                  <Button onClick={() => onAccessSystem('sistema')} variant="outline" size="lg" className="border-primary text-primary hover:bg-primary/10 text-lg px-8">
-                    {t.contact.systemAccess}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+            <div className="rounded-2xl border border-[#c9a961]/25 bg-[#0d0f12] p-8 md:p-12 text-center bd-animate-scale-in bd-delay-4" style={{ boxShadow: '0 0 60px rgba(201,169,97,0.05)' }}>
+              <div className="w-14 h-14 flex items-center justify-center mx-auto mb-6" style={{ transform: 'rotate(45deg)', background: 'rgba(201,169,97,0.1)', border: '1px solid rgba(201,169,97,0.3)', borderRadius: 10 }}>
+                <Gem className="w-7 h-7 text-[#c9a961] bd-animate-float" style={{ transform: 'rotate(-45deg)' }} />
+              </div>
+              <h3 className="text-3xl md:text-4xl mb-4 text-white" style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 400 }}>
+                {t.contact.ctaTitle}
+              </h3>
+              <p className="text-[#777] mb-8 max-w-2xl mx-auto text-sm" style={{ fontFamily: "'Montserrat', sans-serif" }}>
+                {t.contact.ctaDescription}
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <button size="lg" className="px-8 py-3.5 rounded-xl font-black text-[11px] uppercase tracking-[0.15em] active:scale-95 transition-all duration-300 hover:scale-105"
+                  style={{ background: 'linear-gradient(135deg, #d4b86a 0%, #c9a961 60%, #a07c3a 100%)', color: '#0f1014', boxShadow: '0 6px 24px rgba(201,169,97,0.3)', fontFamily: "'Montserrat', sans-serif" }}>
+                  <Phone className="w-4 h-4 inline mr-2" />
+                  {t.contact.reserveNow}
+                </button>
+                <button onClick={() => onAccessSystem('sistema')} className="px-8 py-3.5 rounded-xl font-bold text-xs uppercase tracking-widest border border-[#c9a961]/30 text-[#c9a961]/70 hover:border-[#c9a961]/60 hover:text-[#c9a961] transition-all duration-300"
+                  style={{ fontFamily: "'Montserrat', sans-serif", background: 'transparent' }}>
+                  {t.contact.systemAccess}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Footer con partículas sutiles */}
-      <footer className="border-t border-primary/20 bg-gradient-to-b from-background to-primary/5 relative overflow-hidden">
-        <ParticlesBackground
-          density="low"
-          showConnections={false}
-          showNebula={true}
-          mouseRadius={80}
-          className="opacity-30"
-        />
-        <div className="container mx-auto px-4 py-12 relative" style={{ zIndex: 1 }}>
-          <div className="flex flex-col md:grid md:grid-cols-4 gap-8 mb-8 text-center md:text-left">
+      {/* Footer */}
+      <footer className="border-t border-[#c9a961]/15 bg-[#0a0b0d] relative overflow-hidden">
+        <ParticlesBackground density="low" showConnections={false} showNebula={true} mouseRadius={80} className="opacity-20" />
+        <div className="container mx-auto px-4 py-14 relative" style={{ zIndex: 1 }}>
+          <div className="flex flex-col md:grid md:grid-cols-4 gap-10 mb-10 text-center md:text-left">
             {/* Logo & Description */}
             <div className="md:col-span-2">
-              <Logo variant="horizontal" size="md" className="mb-4" />
-              <p className="text-sm text-muted-foreground max-w-md">
+              <span className="flex items-center gap-2 mb-4 justify-center md:justify-start" style={{ fontFamily: "'Cormorant Garamond', serif", letterSpacing: '0.06em' }}>
+                <span style={{ color: '#c9a961', fontSize: 18 }}>◆</span>
+                <span style={{ color: '#fff', fontWeight: 300, fontSize: '1.05rem' }}>BLACK</span>
+                <span style={{ color: '#c9a961', fontWeight: 700, fontSize: '1.05rem' }}>DIAMOND</span>
+              </span>
+              <p className="text-sm text-[#555] max-w-md mx-auto md:mx-0" style={{ fontFamily: "'Montserrat', sans-serif", lineHeight: 1.8 }}>
                 {t.footer.description}
               </p>
             </div>
 
             {/* Quick Links */}
             <div>
-              <h4 className="font-bold mb-4">{t.footer.quickLinks}</h4>
-              <ul className="space-y-2 text-sm">
-                <li>
-                  <button onClick={() => scrollToSection('inicio')} className="text-muted-foreground hover:text-primary transition-colors">
-                    {t.nav.home}
-                  </button>
-                </li>
-                <li>
-                  <button onClick={() => scrollToSection('servicios')} className="text-muted-foreground hover:text-primary transition-colors">
-                    {t.nav.services}
-                  </button>
-                </li>
-                <li>
-                  <button onClick={() => scrollToSection('modelos')} className="text-muted-foreground hover:text-primary transition-colors">
-                    {t.nav.models}
-                  </button>
-                </li>
-                <li>
-                  <button onClick={() => scrollToSection('contacto')} className="text-muted-foreground hover:text-primary transition-colors">
-                    {t.nav.contact}
-                  </button>
-                </li>
+              <h4 className="text-[#c9a961] font-semibold mb-4 text-sm uppercase tracking-widest" style={{ fontFamily: "'Montserrat', sans-serif" }}>{t.footer.quickLinks}</h4>
+              <ul className="space-y-2.5 text-sm">
+                <li><button onClick={() => scrollToSection('inicio')} className="text-[#555] hover:text-[#c9a961] transition-colors" style={{ fontFamily: "'Montserrat', sans-serif" }}>{t.nav.home}</button></li>
+                <li><button onClick={() => scrollToSection('servicios')} className="text-[#555] hover:text-[#c9a961] transition-colors" style={{ fontFamily: "'Montserrat', sans-serif" }}>{t.nav.services}</button></li>
+                <li><button onClick={() => scrollToSection('modelos')} className="text-[#555] hover:text-[#c9a961] transition-colors" style={{ fontFamily: "'Montserrat', sans-serif" }}>{t.nav.models}</button></li>
+                <li><button onClick={() => scrollToSection('contacto')} className="text-[#555] hover:text-[#c9a961] transition-colors" style={{ fontFamily: "'Montserrat', sans-serif" }}>{t.nav.contact}</button></li>
               </ul>
             </div>
 
             {/* Horarios */}
             <div>
-              <h4 className="font-bold mb-4">{t.footer.schedule}</h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>{t.footer.mondayToSunday}</li>
-                <li className="text-primary font-medium">{t.footer.hours24}</li>
-                <li className="mt-4">{t.footer.whatsappAttention}</li>
-                <li className="text-primary font-medium">{t.footer.immediate}</li>
+              <h4 className="text-[#c9a961] font-semibold mb-4 text-sm uppercase tracking-widest" style={{ fontFamily: "'Montserrat', sans-serif" }}>{t.footer.schedule}</h4>
+              <ul className="space-y-2 text-sm" style={{ fontFamily: "'Montserrat', sans-serif" }}>
+                <li className="text-[#555]">{t.footer.mondayToSunday}</li>
+                <li className="text-[#c9a961] font-medium">{t.footer.hours24}</li>
+                <li className="text-[#555] mt-3">{t.footer.whatsappAttention}</li>
+                <li className="text-[#c9a961] font-medium">{t.footer.immediate}</li>
               </ul>
             </div>
           </div>
 
           {/* Bottom Bar */}
-          <div className="border-t border-primary/20 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
-            <p>{t.footer.rights}</p>
+          <div className="border-t border-[#c9a961]/10 pt-6 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-[#444]">
+            <p style={{ fontFamily: "'Montserrat', sans-serif" }}>
+              <span className="text-[#c9a961]/40 mr-2">◆</span>
+              {t.footer.rights}
+            </p>
             <div className="flex gap-6">
-              <button className="hover:text-primary transition-colors">{t.footer.termsOfService}</button>
-              <button className="hover:text-primary transition-colors">{t.footer.privacyPolicy}</button>
+              <button className="hover:text-[#c9a961] transition-colors" style={{ fontFamily: "'Montserrat', sans-serif" }}>{t.footer.termsOfService}</button>
+              <button className="hover:text-[#c9a961] transition-colors" style={{ fontFamily: "'Montserrat', sans-serif" }}>{t.footer.privacyPolicy}</button>
             </div>
           </div>
         </div>
@@ -1265,10 +1181,12 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
       />
 
       {/* Notificaciones de Propinas */}
-      <TipNotificationsContainer 
-        tips={tips}
-        onRemoveTip={handleRemoveTip}
-      />
+      {tips.length > 0 && (
+        <TipNotificationsContainer
+          tips={tips}
+          onRemoveTip={handleRemoveTip}
+        />
+      )}
 
       {/* Modal de Agregar Testimonio */}
       <AgregarTestimonioModal 

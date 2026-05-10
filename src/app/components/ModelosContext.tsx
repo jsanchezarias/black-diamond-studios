@@ -154,7 +154,7 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
         .from('usuarios')
         .select(`
           *,
-          servicios_modelo!servicios_modelo_modelo_id_fkey (
+          servicios_modelo (
             id, nombre, precio_sede, precio_domicilio, activo, duracion
           )
         `)

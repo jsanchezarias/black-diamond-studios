@@ -183,7 +183,7 @@ export function RegistroEntradaModal({ isOpen, onClose, modeloEmail, modeloNombr
         const fileName = `checkins/${safeEmail}_${Date.now()}.jpg`;
 
         const { data, error: uploadError } = await supabase.storage
-          .from('selfies-entrada')
+          .from('fotos-modelos')
           .upload(fileName, arrayBuffer, {
             contentType: 'image/jpeg',
             upsert: false,
@@ -194,7 +194,7 @@ export function RegistroEntradaModal({ isOpen, onClose, modeloEmail, modeloNombr
           if (process.env.NODE_ENV === 'development') console.warn('Storage upload falló, usando base64:', uploadError.message);
         } else if (data) {
           const { data: urlData } = supabase.storage
-            .from('selfies-entrada')
+            .from('fotos-modelos')
             .getPublicUrl(fileName);
           if (urlData?.publicUrl) {
             selfieUrl = urlData.publicUrl;

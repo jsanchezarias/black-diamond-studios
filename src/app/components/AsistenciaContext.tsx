@@ -212,6 +212,8 @@ export function AsistenciaProvider({ children }: { children: ReactNode }) {
       .from('solicitudes_entrada')
       .insert({
         modelo_id: user.id,
+        modelo_email: modeloEmail,
+        modelo_nombre: modeloNombre,
         selfie_url: selfieUrl,
         estado: 'pendiente',
         fecha: new Date().toISOString().split('T')[0],
@@ -291,7 +293,6 @@ export function AsistenciaProvider({ children }: { children: ReactNode }) {
         modelo_nombre: solicitud.modeloNombre,
         fecha: new Date().toISOString().split('T')[0],
         hora_llegada: ahora,
-        estado: 'En Turno',
         solicitud_entrada_id: solicitudId,
         selfie_url: solicitud.selfieUrl,
       })

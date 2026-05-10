@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { NotificacionBell } from './NotificacionBell';
 import { BalanceDashboard } from './BalanceDashboard';
+import { ResumenFinancieroPanel } from './ResumenFinancieroPanel';
 import { LogoIsotipo } from './LogoIsotipo';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
@@ -630,7 +631,10 @@ export function OwnerDashboard({ accessToken, userId, userEmail = '', onLogout }
         )}
 
         {moduloActivo === 'finanzas' && (
-          <BalanceDashboard />
+          <div className="space-y-6">
+            <ResumenFinancieroPanel />
+            <BalanceDashboard />
+          </div>
         )}
 
         {moduloActivo === 'operaciones' && (

@@ -67,209 +67,177 @@ function isLocked(fecha: string, hora: string): boolean {
 // ─── Skeleton card ────────────────────────────────────────────────────────────
 function SkeletonCard({ delay = 0 }: { delay?: number }) {
   return (
-    <div 
-      className="rounded-2xl overflow-hidden flex flex-col h-auto sm:h-[600px] w-full animate-pulse"
-      style={{ 
-        background: C.card, 
-        border: `1px solid ${C.border}`,
-        animationDelay: `${delay}s`
-      }}
-    >
-      <div className="h-[240px] sm:h-[300px] md:h-[400px] bg-white/5" />
-      <div className="p-5 flex-1 flex flex-col">
-        <div className="h-4 w-3/4 bg-white/5 rounded mb-4" />
-        <div className="flex flex-wrap gap-2 mb-8">
-          <div className="h-5 w-16 bg-white/5 rounded-full" />
-          <div className="h-5 w-20 bg-white/5 rounded-full" />
-          <div className="h-5 w-14 bg-white/5 rounded-full" />
-        </div>
-        <div className="mt-auto pt-4 border-t border-white/5">
-          <div className="h-8 w-1/2 bg-white/5 rounded mb-4" />
-          <div className="h-12 w-full bg-white/5 rounded-xl" />
-        </div>
+    <div className="
+      rounded-xl overflow-hidden
+      bg-[#16181c] animate-pulse
+    ">
+      <div className="h-[240px] bg-[#2a2a2a]"/>
+      <div className="p-3 space-y-2">
+        <div className="h-4 bg-[#2a2a2a] rounded w-3/4"/>
+        <div className="h-4 bg-[#2a2a2a] rounded w-1/2"/>
+        <div className="h-10 bg-[#2a2a2a] rounded"/>
       </div>
     </div>
   );
 }
 
-// ─── PremiumModelCard ─────────────────────────────────────────────────────────
-interface PremiumModelCardProps {
+// ─── ModeloCard ─────────────────────────────────────────────────────────
+interface ModeloCardProps {
   modelo: any;
-  index: number;
   onAgendar: () => void;
 }
 
-function PremiumModelCard({ modelo, index, onAgendar }: PremiumModelCardProps) {
-  const [hovered, setHovered] = useState(false);
-  const [imgError, setImgError] = useState(false);
-  const delay = `${index * 0.1}s`;
+const ModeloCard = ({ modelo, onAgendar }: ModeloCardProps) => {
 
-  const photoToShow = modelo.photo || (modelo.gallery && modelo.gallery[0]);
-  
-  const precios = (modelo.services || [])
-    .map((s: any) => {
-      if (!s.price && s.price !== 0) return 0;
-      // Soporta tanto "80.000" (es-CO) como "80,000" (en) como 80000 (number)
-      const cleanPrice = String(s.price).replace(/[^0-9]/g, '');
-      return cleanPrice.length > 0 ? (parseInt(cleanPrice) || 0) : 0;
-    })
-    .filter((p: number) => p > 0);
+  const fotoUrl = modelo.modelo_fotos
+    ?.find((f: any) => f.es_principal)?.url
+    || modelo.modelo_fotos?.[0]?.url;
 
-  // Precio mínimo formateado; si no hay datos muestra null → card muestra "Consultar"
-  const precioBase: string | null = precios.length > 0
-    ? Math.min(...precios).toLocaleString('es-CO')
+  const serviciosActivos = modelo
+    .servicios_modelo
+    ?.filter((s: any) => s.activo) || [];
+
+  const precioBase = serviciosActivos.length > 0
+    ? Math.min(...serviciosActivos.map(
+        (s: any) => s.precio || s.precio_sede || 0
+      ).filter((p: number) => p > 0))
     : null;
 
   return (
-    <div
-      className="rounded-2xl overflow-hidden flex flex-col w-full min-h-[600px] h-full group"
-      style={{
-        background: C.card,
-        border: hovered ? `1px solid ${C.gold}` : `1px solid ${C.border}`,
-        boxShadow: hovered ? '0 10px 30px rgba(0,0,0,0.5), 0 0 20px rgba(201,169,97,0.1)' : 'none',
-        transition: 'all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1)',
-        animation: `bdFadeInUp 0.5s ease ${delay} both`,
-        position: 'relative',
-      }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      {/* 1. Foto Area - Responsiva */}
-      <div className="relative h-[240px] sm:h-[300px] md:h-[400px] w-full overflow-hidden flex-none">
-        {photoToShow && !imgError ? (
+    <div className="
+      rounded-xl overflow-hidden
+      border border-[#2a2a2a]
+      hover:border-[#c9a961]/50
+      bg-[#16181c]
+      flex flex-col
+      transition-all duration-300
+      hover:shadow-lg 
+      hover:shadow-[#c9a961]/10
+    ">
+
+      {/* FOTO */}
+      <div className="
+        relative h-[240px] 
+        sm:h-[260px] overflow-hidden
+        flex-shrink-0
+      ">
+        {fotoUrl ? (
           <img
-            src={photoToShow}
-            alt={modelo.name}
-            onError={() => setImgError(true)}
-            className="w-full h-full object-cover"
-            style={{
-              transform: hovered ? 'scale(1.05)' : 'scale(1)',
-              transition: 'transform 0.6s cubic-bezier(0.165, 0.84, 0.44, 1)',
-            }}
+            src={fotoUrl}
+            alt={modelo.nombre_artistico}
+            className="
+              w-full h-full object-cover
+              transition-transform duration-500
+              hover:scale-105
+            "
           />
         ) : (
           <div className="
             w-full h-full bg-[#1a1a1a]
             flex items-center justify-center
-            text-[#c9a961] text-6xl font-bold
+            text-6xl font-bold
+            text-[#c9a961]
           ">
-            {modelo.name?.[0]}
+            {modelo.nombre_artistico?.[0] || '◆'}
           </div>
         )}
 
-        {/* Gradiente sobre la foto para legibilidad del nombre */}
-        <div className="absolute inset-0 pointer-events-none" style={{
-          background: 'linear-gradient(to top, rgba(15,16,20,0.95) 0%, rgba(15,16,20,0.4) 30%, transparent 100%)',
-        }} />
+        {/* Gradiente */}
+        <div className="
+          absolute inset-0
+          bg-gradient-to-t
+          from-black/80 via-transparent 
+          to-transparent
+        "/>
 
-        {/* Nombre y Estado (Flotando sobre la foto) */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5">
-          <div className="flex items-end justify-between gap-3">
-            <div className="flex-1 min-w-0">
-              <h3 className="truncate" style={{
-                fontFamily: "'Playfair Display', serif",
-                fontSize: '1.25rem', fontWeight: 700,
-                color: 'white', margin: 0, textShadow: '0 2px 10px rgba(0,0,0,0.8)',
-              }}>
-                {modelo.name}
-              </h3>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-[10px] font-medium opacity-80" style={{ color: C.gold }}>
-                  {modelo.location}
-                </span>
-                <span className="w-1 h-1 rounded-full bg-white/20" />
-                <span className="text-[10px] font-medium opacity-80" style={{ color: 'white' }}>
-                  {modelo.age} años
-                </span>
-              </div>
-            </div>
-            
-            {modelo.available ? (
-              <div className="flex items-center gap-1.5 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[8px] sm:text-[9px] font-bold uppercase tracking-wider flex-shrink-0"
-                style={{ background: 'rgba(34,197,94,0.15)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.3)' }}>
-                <span className="w-1.5 h-1.5 rounded-full bg-green-400 shadow-[0_0_8px_#4ade80]"
-                  style={{ animation: 'bdPulse 2s infinite' }} />
-                Libre
-              </div>
-            ) : (
-              <div className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[8px] sm:text-[9px] font-bold uppercase tracking-wider flex-shrink-0"
-                style={{ background: 'rgba(255,255,255,0.05)', color: '#9ca3af', border: '1px solid rgba(255,255,255,0.1)' }}>
-                Ocupada
-              </div>
-            )}
-          </div>
+        {/* Nombre y disponibilidad */}
+        <div className="
+          absolute bottom-3 
+          left-3 right-3
+          flex justify-between 
+          items-end gap-2
+        ">
+          <span className="
+            text-[#c9a961] font-bold
+            text-base
+            font-['Playfair_Display']
+            drop-shadow-lg truncate
+          ">
+            {modelo.nombre_artistico}
+          </span>
+          <span className="
+            text-xs px-2 py-0.5 
+            rounded-full flex-shrink-0
+            bg-green-500/20 text-green-400
+            border border-green-500/30
+          ">
+            ● Disponible
+          </span>
         </div>
       </div>
 
-      {/* 2. Content Area */}
-      <div className="p-4 sm:p-5 flex flex-col flex-1" style={{ background: 'rgba(255,255,255,0.01)' }}>
-        {/* Sección de Tags (Especialidades/Servicios) - Scroll horizontal en móvil */}
-        <div className="mb-4 relative">
-          <div className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-1 pr-8">
-            {(modelo.services || []).length > 0 ? (
-              (modelo.services || []).map((s: any, i: number) => (
-                <span key={i} className="px-2.5 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-colors whitespace-nowrap flex-shrink-0"
-                  style={{ 
-                    background: 'rgba(201,169,97,0.1)', 
-                    color: C.gold, 
-                    border: '1px solid rgba(201,169,97,0.2)',
-                  }}>
-                  {s.name}
-                </span>
-              ))
-            ) : (
-              <span className="px-2 py-1 rounded-md text-[9px] font-semibold uppercase tracking-wider opacity-30" style={{ color: C.text }}>
-                Servicios premium
+      {/* CONTENIDO */}
+      <div className="
+        flex flex-col gap-2 p-3 flex-1
+      ">
+
+        {/* Chips servicios */}
+        {serviciosActivos.length > 0 && (
+          <div className="flex gap-1.5 flex-wrap">
+            {serviciosActivos
+              .slice(0, 3)
+              .map((s: any) => (
+              <span key={s.id} className="
+                text-xs px-2 py-1 rounded-full
+                bg-[#c9a961]/10 text-[#c9a961]
+                border border-[#c9a961]/20
+                whitespace-nowrap
+              ">
+                {s.nombre}
               </span>
-            )}
+            ))}
           </div>
-          {/* Indicador de scroll sutil */}
-          <div className="absolute right-0 top-0 bottom-1 w-8 bg-gradient-to-l from-[#16181c] to-transparent pointer-events-none sm:hidden" />
+        )}
+
+        {/* PRECIO — NUNCA OCULTO */}
+        <div className="
+          flex items-center gap-1
+          text-[#c9a961] font-bold text-sm
+        ">
+          {precioBase && precioBase > 0 ? (
+            <>
+              <span className="
+                text-[#888] text-xs font-normal
+              ">
+                Desde
+              </span>
+              ${precioBase
+                .toLocaleString('es-CO')} COP
+            </>
+          ) : (
+            <span className="
+              text-[#888] text-xs italic
+            ">
+              Consultar precio
+            </span>
+          )}
         </div>
 
-        {/* Footer: Precio + Botón - SIEMPRE VISIBLE */}
-        <div className="mt-auto pt-4 border-t border-white/5 space-y-4">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex flex-col bg-[#c9a961]/5 p-2 px-3 rounded-xl border border-[#c9a961]/20 shadow-sm min-w-0 flex-1">
-              <span className="text-[10px] uppercase tracking-[0.2em] font-black mb-1" style={{ color: C.gold }}>
-                {precioBase ? 'Desde' : 'Tarifa'}
-              </span>
-              {precioBase ? (
-                <div className="flex items-baseline gap-1 flex-wrap">
-                  <span className="text-sm font-bold flex-shrink-0" style={{ color: C.gold }}>$</span>
-                  <span className="text-xl sm:text-2xl font-black tracking-tighter leading-none" style={{ color: 'white' }}>
-                    {precioBase}
-                  </span>
-                  <span className="text-[10px] font-bold ml-0.5 flex-shrink-0" style={{ color: C.gold }}>COP</span>
-                </div>
-              ) : (
-                <span className="text-sm font-bold" style={{ color: 'white' }}>Consultar</span>
-              )}
-            </div>
+        {/* BOTÓN */}
+        <button
+          onClick={onAgendar}
+          className="
+            w-full py-2.5 rounded-lg
+            bg-[#c9a961] text-[#0f1014]
+            font-bold text-sm mt-auto
+            hover:bg-[#d4b86a]
+            active:scale-95
+            transition-all duration-200
+          "
+        >
+          ◆ Ver perfil y agendar
+        </button>
 
-            <div className="flex flex-col items-end gap-1 flex-shrink-0">
-              <div className="flex items-center gap-1">
-                <span className="text-sm font-black text-white">5.0</span>
-                <Star className="w-4 h-4" style={{ fill: C.gold, color: C.gold }} />
-              </div>
-              <span className="text-[10px] uppercase tracking-widest font-bold text-white/40">Rating</span>
-            </div>
-          </div>
-
-          <button
-            onClick={onAgendar}
-            className="w-full py-4 rounded-xl font-black text-[11px] uppercase tracking-[0.15em] transition-all duration-300 flex items-center justify-center gap-2 group/btn shadow-lg"
-            style={{
-              background: `linear-gradient(135deg, ${C.gold} 0%, #a07c3a 100%)`,
-              color: '#0f1014',
-              transform: hovered ? 'translateY(-2px)' : 'none',
-              boxShadow: hovered ? `0 8px 25px rgba(201,169,97,0.4)` : '0 4px 15px rgba(0,0,0,0.3)',
-            }}
-          >
-            ◆ Agendar Experiencia
-            <ArrowRight className="w-4 h-4 transition-transform group-hover/btn:translate-x-1" />
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -492,9 +460,88 @@ export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboa
   const [confirmCancel, setConfirmCancel] = useState<string | null>(null);
   const [perfilCliente, setPerfilCliente] = useState<any | null>(null);
   const [loadingPerfil, setLoadingPerfil] = useState(false);
+  const [modelos, setModelos] = useState<any[]>([]);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const { agendamientos = [] } = useAgendamientos() || {};
-  const { modelos = [], loading: cargandoModelos = false } = (useModelos() || {}) as any;
+
+  const cargarModelos = async () => {
+    setCargando(true)
+    try {
+      console.log('📸 Cargando modelos...')
+
+      const hoy = new Date()
+        .toISOString().split('T')[0]
+
+      const { data, error } = await supabase
+        .from('usuarios')
+        .select(`
+          id,
+          email,
+          nombre_artistico,
+          estado,
+          descripcion,
+          modelo_fotos (
+            id,
+            url,
+            es_principal
+          ),
+          servicios_modelo (
+            id,
+            nombre,
+            precio,
+            precio_sede,
+            activo
+          ),
+          periodos_modelo (
+            id,
+            fecha_inicio,
+            fecha_fin,
+            activo
+          )
+        `)
+        .eq('role', 'modelo')
+        .eq('estado', 'activo')
+
+      console.log('📊 Resultado:', { 
+        data, 
+        error, 
+        total: data?.length 
+      })
+
+      if (error) {
+        console.error('❌ Error:', error)
+        setError(error.message)
+        return
+      }
+
+      // Filtrar las que están en período hoy
+      const disponibles = data?.filter(modelo => {
+        const enPeriodo = modelo.periodos_modelo
+          ?.some((p: any) =>
+            p.activo &&
+            p.fecha_inicio <= hoy &&
+            p.fecha_fin >= hoy
+          )
+        return !enPeriodo
+      }) || []
+
+      console.log('✅ Modelos disponibles:', 
+        disponibles.length)
+      setModelos(disponibles)
+
+    } catch (err: any) {
+      console.error('❌ Error inesperado:', err)
+      setError(err.message)
+    } finally {
+      setCargando(false)
+    }
+  }
+
+  useEffect(() => {
+    cargarModelos()
+  }, [])
 
   // ── Cargar perfil cuando el tab se activa ────────────────────────────────
   useEffect(() => {
@@ -556,15 +603,12 @@ export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboa
     : [];
 
   // ── Abrir modal ───────────────────────────────────────────────────────────
-  const abrirModal = useCallback((modelConverted: any) => {
-    const original = (modelos as any[]).find(m =>
-      String(m.id) === String(modelConverted.id) || m.email === modelConverted._email
-    );
+  const abrirModal = useCallback((modelo: any) => {
     setModalData({
-      modelo: modelConverted,
-      modeloEmail: original?.email || modelConverted._email || '',
+      modelo,
+      modeloEmail: modelo.email || '',
     });
-  }, [modelos]);
+  }, []);
 
   // ── Cancelar cita ─────────────────────────────────────────────────────────
   const cancelarCita = async (citaId: string) => {
@@ -719,27 +763,96 @@ export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboa
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-              {cargandoModelos ? (
-                Array.from({ length: 6 }).map((_, i) => (
-                  <SkeletonCard key={i} />
-                ))
-              ) : modelosActivos.length === 0 ? (
-                <div className="col-span-full text-center py-16">
-                  <div style={{ fontSize: '2.5rem', marginBottom: 12, color: C.gold, opacity: 0.4 }}>◆</div>
-                  <p style={{ color: C.muted }}>No hay acompañantes disponibles en este momento</p>
-                </div>
-              ) : (
-                modelosActivos.map((modelo, idx) => (
-                  <PremiumModelCard
+            {/* ESTADO: CARGANDO */}
+            {cargando && (
+              <div className="
+                grid grid-cols-1 sm:grid-cols-2 
+                lg:grid-cols-3 gap-4 p-4
+              ">
+                {[1,2,3,4,5,6].map(i => (
+                  <div key={i} className="
+                    rounded-xl overflow-hidden
+                    bg-[#16181c] animate-pulse
+                  ">
+                    <div className="h-[240px] bg-[#2a2a2a]"/>
+                    <div className="p-3 space-y-2">
+                      <div className="h-4 bg-[#2a2a2a] 
+                                      rounded w-3/4"/>
+                      <div className="h-4 bg-[#2a2a2a] 
+                                      rounded w-1/2"/>
+                      <div className="h-10 bg-[#2a2a2a] 
+                                      rounded"/>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* ESTADO: ERROR */}
+            {!cargando && error && (
+              <div className="
+                mx-4 p-6 rounded-xl text-center
+                border border-red-500/30
+                bg-red-500/5
+              ">
+                <p className="text-red-400 text-sm">
+                  Error al cargar modelos: {error}
+                </p>
+                <button
+                  onClick={cargarModelos}
+                  className="
+                    mt-3 px-4 py-2 rounded-lg
+                    bg-[#c9a961] text-[#0f1014]
+                    text-sm font-bold
+                  "
+                >
+                  Reintentar
+                </button>
+              </div>
+            )}
+
+            {/* ESTADO: VACÍO */}
+            {!cargando && !error && 
+            modelos.length === 0 && (
+              <div className="
+                flex flex-col items-center 
+                justify-center p-12 text-center
+              ">
+                <span className="text-5xl mb-4 text-[#c9a961] opacity-40">◆</span>
+                <p className="text-[#c9a961] font-bold 
+                              text-lg">
+                  Próximamente
+                </p>
+                <p className="text-[#888] text-sm mt-2">
+                  Nuestras acompañantes estarán 
+                  disponibles muy pronto
+                </p>
+              </div>
+            )}
+
+            {/* ESTADO: CON DATOS — MOSAICO */}
+            {!cargando && !error && 
+            modelos.length > 0 && (
+              <div className="
+                grid
+                grid-cols-1
+                sm:grid-cols-2
+                lg:grid-cols-3
+                gap-4 sm:gap-5
+                px-4 sm:px-6
+                pb-8
+              ">
+                {modelos.map(modelo => (
+                  <ModeloCard
                     key={modelo.id}
                     modelo={modelo}
-                    index={idx}
-                    onAgendar={() => abrirModal(modelo)}
+                    onAgendar={() => 
+                      abrirModal(modelo)
+                    }
                   />
-                ))
-              )}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -795,9 +908,9 @@ export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboa
                   const locked = isLocked(cita.fecha, cita.hora);
                   const esActiva = ['pendiente', 'solicitud_cliente', 'aceptado_programador', 'confirmado', 'aprobado'].includes(cita.estado);
                   const cAny = cita as any;
-                  const modeloParaModal = modelosActivos.find(m =>
-                    m._email === cAny.modeloEmail || m._email === cAny.modelo_email ||
-                    m.name === (cAny.modeloNombre || cAny.modelo_nombre)
+                  const modeloParaModal = modelos.find(m =>
+                    m.email === cAny.modeloEmail || m.email === cAny.modelo_email ||
+                    m.nombre_artistico === (cAny.modeloNombre || cAny.modelo_nombre)
                   );
 
                   return (
