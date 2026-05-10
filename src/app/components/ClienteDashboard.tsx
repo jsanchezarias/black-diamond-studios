@@ -17,6 +17,7 @@ const supabasePublic = createClient(
   { auth: { persistSession: false } }
 );
 import { Calendar, Sparkles, Lock, Mail, Phone, Loader2, Star, ArrowRight } from 'lucide-react';
+import { ModeloCard } from './ModeloCard';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 interface ClienteDashboardProps {
@@ -92,184 +93,7 @@ function SkeletonCard({ delay = 0 }: { delay?: number }) {
   );
 }
 
-// ─── ModeloCard ─────────────────────────────────────────────────────────
-interface ModeloCardProps {
-  modelo: any;
-  onAgendar: () => void;
-}
-
-const ModeloCard = ({ modelo, onAgendar }: ModeloCardProps) => {
-
-  const fotoUrl = (modelo.gallery && modelo.gallery[0]) || modelo.fotoPerfil || modelo.photo || '';
-  const gallery = modelo.gallery || [];
-
-  const serviciosActivos = modelo
-    .servicios_modelo
-    ?.filter((s: any) => s.activo) || [];
-
-  const precioBase = serviciosActivos.length > 0
-    ? Math.min(...serviciosActivos.map(
-        (s: any) => s.precio_sede || s.precio_domicilio || 0
-      ).filter((p: number) => p > 0))
-    : null;
-
-  return (
-    <div className="
-      rounded-xl overflow-hidden
-      border border-[#2a2a2a]
-      hover:border-[#c9a961]/50
-      bg-[#16181c]
-      flex flex-col
-      transition-all duration-300
-      hover:shadow-lg 
-      hover:shadow-[#c9a961]/10
-    ">
-
-      {/* FOTO / MOSAICO */}
-      <div className="relative h-[240px] sm:h-[260px] overflow-hidden flex-shrink-0 bg-black">
-        {gallery.length > 1 ? (
-          <div className="grid grid-cols-3 h-full gap-0.5">
-            {/* Foto Grande (Izquierda) */}
-            <div className="col-span-2 h-full overflow-hidden">
-              <img
-                src={fotoUrl}
-                alt={modelo.name}
-                className="w-full h-full object-cover transition-transform duration-700 hover:scale-110"
-              />
-            </div>
-            {/* Columna Derecha */}
-            <div className="flex flex-col gap-0.5 h-full">
-              <div className="h-1/2 overflow-hidden">
-                <img
-                  src={gallery[1]}
-                  className="w-full h-full object-cover transition-transform duration-700 hover:scale-110"
-                />
-              </div>
-              <div className="h-1/2 overflow-hidden relative">
-                <img
-                  src={gallery[2] || gallery[0]}
-                  className="w-full h-full object-cover transition-transform duration-700 hover:scale-110"
-                />
-                {gallery.length > 3 && (
-                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-[1px]">
-                    <span className="text-white font-bold text-xs">+{gallery.length - 3}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        ) : fotoUrl ? (
-          <img
-            src={fotoUrl}
-            alt={modelo.nombre_artistico}
-            className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
-          />
-        ) : (
-          <div className="w-full h-full bg-[#1a1a1a] flex items-center justify-center text-6xl font-bold text-[#c9a961]">
-            {modelo.nombre_artistico?.[0] || modelo.nombre?.[0] || '◆'}
-          </div>
-        )}
-
-        {/* Gradiente */}
-        <div className="
-          absolute inset-0
-          bg-gradient-to-t
-          from-black/80 via-transparent 
-          to-transparent
-        "/>
-
-        {/* Nombre y disponibilidad */}
-        <div className="
-          absolute bottom-3 
-          left-3 right-3
-          flex justify-between 
-          items-end gap-2
-        ">
-          <span className="
-            text-[#c9a961] font-bold
-            text-base
-            font-['Playfair_Display']
-            drop-shadow-lg truncate
-          ">
-            {modelo.nombre_artistico}
-          </span>
-          <span className="
-            text-xs px-2 py-0.5 
-            rounded-full flex-shrink-0
-            bg-green-500/20 text-green-400
-            border border-green-500/30
-          ">
-            ● Disponible
-          </span>
-        </div>
-      </div>
-
-      {/* CONTENIDO */}
-      <div className="
-        flex flex-col gap-2 p-3 flex-1
-      ">
-
-        {/* Chips servicios */}
-        {serviciosActivos.length > 0 && (
-          <div className="flex gap-1.5 flex-wrap">
-            {serviciosActivos
-              .slice(0, 3)
-              .map((s: any) => (
-              <span key={s.id} className="
-                text-xs px-2 py-1 rounded-full
-                bg-[#c9a961]/10 text-[#c9a961]
-                border border-[#c9a961]/20
-                whitespace-nowrap
-              ">
-                {s.nombre}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {/* PRECIO — NUNCA OCULTO */}
-        <div className="
-          flex items-center gap-1
-          text-[#c9a961] font-bold text-sm
-        ">
-          {precioBase && precioBase > 0 ? (
-            <>
-              <span className="
-                text-[#888] text-xs font-normal
-              ">
-                Desde
-              </span>
-              ${precioBase
-                .toLocaleString('es-CO')} COP
-            </>
-          ) : (
-            <span className="
-              text-[#888] text-xs italic
-            ">
-              Consultar precio
-            </span>
-          )}
-        </div>
-
-        {/* BOTÓN */}
-        <button
-          onClick={onAgendar}
-          className="
-            w-full py-2.5 rounded-lg
-            bg-[#c9a961] text-[#0f1014]
-            font-bold text-sm mt-auto
-            hover:bg-[#d4b86a]
-            active:scale-95
-            transition-all duration-200
-          "
-        >
-          ◆ Ver perfil y agendar
-        </button>
-
-      </div>
-    </div>
-  );
-}
+// Old ModeloCard removed to use shared ModeloCard
 
 interface CitaCardProps {
   cita: any;
@@ -506,8 +330,9 @@ export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboa
             nombre_artistico,
             estado,
             descripcion,
+            foto_url,
             modelo_fotos!modelo_fotos_modelo_id_fkey (
-              id, url, es_principal
+              id, url, es_principal, orden
             ),
             servicios_modelo!servicios_modelo_modelo_id_fkey (
               id, nombre,
@@ -816,182 +641,13 @@ export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboa
                 px-4 sm:px-6
                 pb-8
               ">
-                {modelos.map(modelo => {
-
-                  const gallery = modelo.modelo_fotos
-                    ?.slice()
-                    .sort((a: any, b: any) => (b.es_principal ? 1 : 0) - (a.es_principal ? 1 : 0))
-                    .map((f: any) => f.url) || []
-
-                  const fotoUrl = gallery[0]
-
-                  const servicios = modelo.servicios_modelo
-                    ?.filter((s: any) => s.activo) || []
-
-                  const precios = servicios
-                    .map((s: any) => s.precio_sede || s.precio_domicilio || 0)
-                    .filter((p: number) => p > 0)
-
-                  const precioBase = precios.length > 0
-                    ? Math.min(...precios)
-                    : null
-
-                  return (
-                    <div key={modelo.id} className="
-                      rounded-xl overflow-hidden
-                      border border-[#2a2a2a]
-                      hover:border-[#c9a961]/50
-                      bg-[#16181c] flex flex-col
-                      transition-all duration-300
-                    ">
-                      {/* FOTO / MOSAICO */}
-                      <div className="relative h-[240px] overflow-hidden flex-shrink-0 bg-black">
-                        {gallery.length > 1 ? (
-                          <div className="grid grid-cols-3 h-full gap-0.5">
-                            {/* Foto Grande (Izquierda) */}
-                            <div className="col-span-2 h-full overflow-hidden">
-                              <img
-                                src={fotoUrl}
-                                alt={modelo.nombre_artistico}
-                                className="w-full h-full object-cover transition-transform duration-700 hover:scale-110"
-                              />
-                            </div>
-                            {/* Columna Derecha */}
-                            <div className="flex flex-col gap-0.5 h-full">
-                              <div className="h-1/2 overflow-hidden">
-                                <img
-                                  src={gallery[1]}
-                                  className="w-full h-full object-cover transition-transform duration-700 hover:scale-110"
-                                />
-                              </div>
-                              <div className="h-1/2 overflow-hidden relative">
-                                <img
-                                  src={gallery[2] || gallery[0]}
-                                  className="w-full h-full object-cover transition-transform duration-700 hover:scale-110"
-                                />
-                                {gallery.length > 3 && (
-                                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-[1px]">
-                                    <span className="text-white font-bold text-xs">+{gallery.length - 3}</span>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        ) : fotoUrl ? (
-                          <img
-                            src={fotoUrl}
-                            alt={modelo.nombre_artistico}
-                            className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
-                          />
-                        ) : (
-                          <div className="w-full h-full bg-[#1a1a1a] flex items-center justify-center text-6xl font-bold text-[#c9a961]">
-                            {modelo.nombre_artistico?.[0] || '◆'}
-                          </div>
-                        )}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"/>
-                        <div className="
-                          absolute bottom-3 
-                          left-3 right-3
-                          flex justify-between 
-                          items-end gap-2
-                        ">
-                          <span className="
-                            text-[#c9a961] font-bold
-                            text-base truncate
-                            font-['Playfair_Display']
-                          ">
-                            {modelo.nombre_artistico}
-                          </span>
-                          <span className="
-                            text-xs px-2 py-0.5
-                            rounded-full flex-shrink-0
-                            bg-green-500/20 
-                            text-green-400
-                            border border-green-500/30
-                          ">
-                            ● Disponible
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* CONTENIDO */}
-                      <div className="
-                        flex flex-col gap-2 
-                        p-3 flex-1
-                      ">
-                        {/* Chips */}
-                        {servicios.length > 0 && (
-                          <div className="
-                            flex gap-1.5 flex-wrap
-                          ">
-                            {servicios.slice(0,3)
-                              .map((s: any) => (
-                              <span key={s.id} className="
-                                text-xs px-2 py-1 
-                                rounded-full
-                                bg-[#c9a961]/10 
-                                text-[#c9a961]
-                                border border-[#c9a961]/20
-                                whitespace-nowrap
-                              ">
-                                {s.nombre}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* PRECIO — NUNCA OCULTO */}
-                        <div className="
-                          flex items-center gap-1
-                          text-[#c9a961] font-bold 
-                          text-sm
-                        ">
-                          {precioBase ? (
-                            <>
-                              <span className="
-                                text-[#888] text-xs 
-                                font-normal
-                              ">
-                                Desde
-                              </span>
-                              ${precioBase
-                                .toLocaleString('es-CO')} 
-                              <span className="
-                                text-[#888] text-xs 
-                                font-normal
-                              ">
-                                COP
-                              </span>
-                            </>
-                          ) : (
-                            <span className="
-                              text-[#888] text-xs italic
-                            ">
-                              Consultar precio
-                            </span>
-                          )}
-                        </div>
-
-                        {/* BOTÓN */}
-                        <button
-                          onClick={() => 
-                            abrirModal(modelo)
-                          }
-                          className="
-                            w-full py-2.5 rounded-lg
-                            bg-[#c9a961] text-[#0f1014]
-                            font-bold text-sm mt-auto
-                            hover:bg-[#d4b86a]
-                            active:scale-95
-                            transition-all duration-200
-                          "
-                        >
-                          ◆ Ver perfil y agendar
-                        </button>
-                      </div>
-                    </div>
-                  )
-                })}
+                {modelos.map(modelo => (
+                  <ModeloCard 
+                    key={modelo.id} 
+                    modelo={modelo} 
+                    onAgendar={(m: any) => abrirModal(m)} 
+                  />
+                ))}
               </div>
             )}
           </div>

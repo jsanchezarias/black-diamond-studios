@@ -42,6 +42,27 @@ export class ErrorBoundary extends Component<Props, State> {
     const errorObj = error instanceof Error 
       ? error 
       : new Error(error ? String(error) : 'Unknown runtime error (null/undefined thrown)');
+
+    // ── Auto-recarga ante errores de chunk obsoleto (post-deploy) ──────────────
+    // Ocurre cuando el navegador tiene en caché un hash de JS antiguo
+    // que Vercel ya eliminó al publicar una nueva versión.
+    const isChunkError =
+      errorObj.message.includes('Failed to fetch dynamically imported module') ||
+      errorObj.message.includes('Loading chunk') ||
+      errorObj.message.includes('ChunkLoadError') ||
+      errorObj.message.includes('Importing a module script failed');
+
+    if (isChunkError) {
+      const alreadyReloaded = sessionStorage.getItem('bd_chunk_reload');
+      if (!alreadyReloaded) {
+        sessionStorage.setItem('bd_chunk_reload', '1');
+        // Recarga dura — fuerza al navegador a pedir los nuevos assets
+        window.location.reload();
+        return;
+      }
+      // Si ya intentamos, limpiar para no quedar en bucle
+      sessionStorage.removeItem('bd_chunk_reload');
+    }
     
     this.setState({
       error: errorObj,
@@ -56,6 +77,11 @@ export class ErrorBoundary extends Component<Props, State> {
         return this.props.fallback;
       }
 
+      const isChunkError =
+        this.state.error?.message.includes('Failed to fetch dynamically imported module') ||
+        this.state.error?.message.includes('ChunkLoadError') ||
+        this.state.error?.message.includes('Loading chunk');
+
       return (
         <div 
           className="min-h-screen w-full flex items-center justify-center p-8" 
@@ -67,13 +93,15 @@ export class ErrorBoundary extends Component<Props, State> {
               className="text-3xl font-bold mb-4" 
               style={{ fontFamily: 'Playfair Display, serif', color: '#c9a961' }}
             >
-              Algo salió mal
+              {isChunkError ? 'Nueva versión disponible' : 'Algo salió mal'}
             </h1>
             <p className="text-lg mb-6">
-              La aplicación encontró un error inesperado.
+              {isChunkError
+                ? 'La aplicación fue actualizada. Por favor recarga la página para continuar.'
+                : 'La aplicación encontró un error inesperado.'}
             </p>
             
-            {this.state.error && (
+            {!isChunkError && this.state.error && (
               <div className="bg-red-900/20 border border-red-500 rounded-lg p-4 text-left">
                 <p className="font-mono text-sm text-red-300 mb-2">
                   {this.state.error.toString()}
@@ -92,11 +120,14 @@ export class ErrorBoundary extends Component<Props, State> {
             )}
 
             <button
-              onClick={() => window.location.reload()}
+              onClick={() => {
+                sessionStorage.removeItem('bd_chunk_reload');
+                window.location.reload();
+              }}
               className="px-8 py-3 rounded-lg font-medium transition-colors"
               style={{ backgroundColor: '#c9a961', color: '#0f1014' }}
             >
-              Recargar página
+              {isChunkError ? '↻ Actualizar ahora' : 'Recargar página'}
             </button>
           </div>
         </div>

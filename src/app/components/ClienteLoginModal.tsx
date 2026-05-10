@@ -14,14 +14,15 @@ interface ClienteLoginModalProps {
   isOpen: boolean;
   onClose: () => void;
   onLoginSuccess: (cliente: any) => void;
+  tabInicial?: 'login' | 'registro'; // ✅ NUEVO: abrir en tab específico desde paywall
 }
 
 const telefonoToEmail = (telefono: string) =>
   `${telefono.replace(/\s+/g, '')}@clientes.blackdiamond.app`;
 
-export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLoginModalProps) {
+export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess, tabInicial = 'login' }: ClienteLoginModalProps) {
   const { loginUser } = usePublicUsers();
-  const [tab, setTab] = useState<'login' | 'registro'>('login');
+  const [tab, setTab] = useState<'login' | 'registro'>(tabInicial);
   const [procesando, setProcesando] = useState(false);
   const [error, setError] = useState('');
   const [exitoso, setExitoso] = useState(false);
@@ -35,7 +36,7 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess }: ClienteLo
   const [telefono, setTelefono] = useState('');
 
   const handleClose = () => {
-    setTab('login');
+    setTab(tabInicial); // ✅ resetear al tab pedido por el paywall, no siempre a 'login'
     setEmailTelefono('');
     setPassword('');
     setNombre('');
