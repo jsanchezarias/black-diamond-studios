@@ -498,9 +498,9 @@ export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboa
             modelo_fotos (
               id, url, es_principal
             ),
-            servicios_modelo (
+            servicios_modelo!servicios_modelo_modelo_id_fkey (
               id, nombre,
-              precio, precio_sede,
+              precio_sede, precio_domicilio,
               activo
             )
           `)

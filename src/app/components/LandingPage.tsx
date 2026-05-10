@@ -11,6 +11,7 @@ import { TestimoniosSection } from './TestimoniosSection';
 import { AgregarTestimonioModal } from './AgregarTestimonioModal';
 import { ClienteLoginModal } from './ClienteLoginModal';
 import { BDPremiumStream } from './BDPremiumStream';
+import { StreamConPaywall } from './StreamConPaywall';
 import { TipNotification } from './TipNotification'; // ✅ Agregar TipNotification
 import { SolicitudServicioModal } from './SolicitudServicioModal';
 import { ParticlesBackground } from './ParticlesBackground'; // ✅ Fondo de partículas premium
@@ -295,9 +296,9 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
             modelo_fotos (
               id, url, es_principal
             ),
-            servicios_modelo (
+            servicios_modelo!servicios_modelo_modelo_id_fkey (
               id, nombre,
-              precio, precio_sede,
+              precio_sede, precio_domicilio,
               activo
             )
           `)
@@ -333,6 +334,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
   const [sedeActual, setSedeActual] = useState('sede-1');
   const [loadingStream, setLoadingStream] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [streamFallido, setStreamFallido] = useState(false);
 
   
   // Estados para sistema de propinas
@@ -346,6 +348,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
   // Estado para login de clientes
   const [showClienteLogin, setShowClienteLogin] = useState(false);
   const [clienteActual, setClienteActual] = useState<any>(null);
+  const [tabLoginInicial, setTabLoginInicial] = useState<'login' | 'registro'>('login'); // ✅ PAYWALL: tab inicial del modal de login
 
   // Estado para registro de clientes
   const [mostrarRegistro, setMostrarRegistro] = useState(false);
@@ -402,6 +405,35 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
     checkStream();
     const interval = setInterval(checkStream, 30000);
     return () => clearInterval(interval);
+  }, []);
+
+  // Health-check del stream — máximo 3 intentos, luego muestra fallback elegante
+  useEffect(() => {
+    const STREAM_URL = 'https://stream.blackdiamondscorts.com/live/stream1/index.m3u8';
+    let intentos = 0;
+    let activo = true;
+
+    const verificar = async () => {
+      if (!activo) return;
+      try {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 5000);
+        await fetch(STREAM_URL, { signal: ctrl.signal });
+        clearTimeout(t);
+        // Stream responde — no hacer nada, BDPremiumStream se monta normalmente
+      } catch {
+        if (!activo) return;
+        intentos += 1;
+        if (intentos >= 3) {
+          setStreamFallido(true);
+        } else {
+          setTimeout(verificar, 1500);
+        }
+      }
+    };
+
+    verificar();
+    return () => { activo = false; };
   }, []);
 
   // Hook para modelos - Eliminado para usar query directa
@@ -606,20 +638,20 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
   };
 
   // Obtener modelos desde el contexto y aplicar filtros
-  const modelosDisponibles = modelosContext
+  const modelosDisponibles = modelos
     .filter((m: any) => m.activa && !m.enPeriodo && m.disponible)
     .map(convertirModeloParaCard);
   
-  const modelosNoDisponibles = modelosContext
+  const modelosNoDisponibles = modelos
     .filter((m: any) => m.activa && (m.enPeriodo || !m.disponible))
     .map(convertirModeloParaCard);
   
   // ✅ NUEVO: Modelos inactivas - aparecen al final
-  const modelosInactivas = modelosContext
+  const modelosInactivas = modelos
     .filter((m: any) => !m.activa)
     .map(convertirModeloParaCard);
     
-  const todosLosModelos = modelosContext.map(convertirModeloParaCard); // Para el modal
+  const todosLosModelos = modelos.map(convertirModeloParaCard); // Para el modal
 
 
   const handleContactModel = (model: any, service?: any, location?: 'sede' | 'domicilio', price?: string) => {
@@ -837,7 +869,13 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
       <section id="inicio" className="pt-20 relative overflow-hidden bg-black">
         <div className="w-full h-[calc(100vh-5rem)] flex flex-col lg:flex-row relative">
           <div className="w-full lg:w-[70%] h-[45vh] lg:h-full relative border-b lg:border-b-0 lg:border-r border-[#c9a961]/10">
-            <BDPremiumStream />
+            <StreamConPaywall
+              onRegistrarse={(tipo) => {
+                // ✅ PAYWALL: abrir modal en tab correcto según si pidió registro o login
+                setTabLoginInicial(tipo);
+                setShowClienteLogin(true);
+              }}
+            />
           </div>
           <div className="w-full lg:w-[30%] h-[55vh] lg:h-full">
             <LiveChat
@@ -1488,6 +1526,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
         <ClienteLoginModal
           isOpen={showClienteLogin}
           onClose={() => setShowClienteLogin(false)}
+          tabInicial={tabLoginInicial}
           onLoginSuccess={(cliente) => {
             setClienteActual(cliente);
             setShowClienteLogin(false);
