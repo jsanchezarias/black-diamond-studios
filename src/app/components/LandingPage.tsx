@@ -82,8 +82,14 @@ const ModeloCard = ({ modelo, onAccessSystem }: { modelo: any, onAccessSystem: (
         .eq('activo', true);
 
       const filters: string[] = [];
-      if (modelo.id) filters.push(`modelo_id.eq.${modelo.id}`);
-      if (modelo.email) filters.push(`modelo_email.eq.${modelo.email}`);
+      const isUUID = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str);
+      
+      if (modelo.id && isUUID(String(modelo.id))) {
+        filters.push(`modelo_id.eq.${modelo.id}`);
+      }
+      if (modelo.email) {
+        filters.push(`modelo_email.eq.${modelo.email}`);
+      }
 
       if (filters.length > 0) {
         query = query.or(filters.join(','));
