@@ -177,6 +177,23 @@ function RealtimeIndicator() {
   );
 }
 
+function getSavedUser(): CurrentUser | null {
+  try {
+    const saved = localStorage.getItem('blackDiamondUser');
+    if (!saved) return null;
+    const parsed = JSON.parse(saved);
+    if (parsed?.userId && parsed?.email && parsed?.role) {
+      // accessToken no se persiste en localStorage por seguridad;
+      // inicializarSesion lo obtendrá de Supabase al montar
+      return { accessToken: '', ...parsed } as CurrentUser;
+    }
+    return null;
+  } catch {
+    localStorage.removeItem('blackDiamondUser');
+    return null;
+  }
+}
+
 function clearLocalSession() {
   // Limpiar localStorage
   Object.keys(localStorage).forEach(key => {
@@ -197,7 +214,7 @@ function clearLocalSession() {
 export default function App() {
   const [showLogin, setShowLogin] = useState(false);
   const [tipoLogin, setTipoLogin] = useState<'cliente' | 'sistema'>('cliente');
-  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(() => getSavedUser());
   const [verifyingSession, setVerifyingSession] = useState(true);
 
   // ✅ ROLES VÁLIDOS DEL SISTEMA

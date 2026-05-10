@@ -3,8 +3,18 @@ import { ClienteNavbar } from './ClienteNavbar';
 import { useAgendamientos } from './AgendamientosContext';
 import { useModelos } from './ModelosContext';
 import { ClienteAgendarModal } from './ClienteAgendarModal';
-import { supabase } from '../../utils/supabase/info';
+import { createClient } from '@supabase/supabase-js';
+import { supabase, projectId, publicAnonKey } from '../../utils/supabase/info';
 import { toast } from 'sonner';
+
+// Cliente anónimo para consultas públicas de modelos.
+// RLS solo permite anon ver modelos; el JWT de cliente autenticado
+// usa el rol 'authenticated' que no tiene esa política SELECT.
+const supabasePublic = createClient(
+  `https://${projectId}.supabase.co`,
+  publicAnonKey,
+  { auth: { persistSession: false } }
+);
 import { Calendar, Sparkles, Lock, Mail, Phone, Loader2, Star, ArrowRight } from 'lucide-react';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -488,7 +498,7 @@ export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboa
       try {
         console.log('🔍 Cargando modelos...')
         
-        const { data, error } = await supabase
+        const { data, error } = await supabasePublic
           .from('usuarios')
           .select(`
             id,
