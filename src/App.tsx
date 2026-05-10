@@ -331,40 +331,6 @@ export default function App() {
               nombre: clienteData.nombre || session.user.email,
               role: 'cliente',
             };
-          } else if (!clienteData) {
-            // 🆕 AUTO-PROVISIÓN: Si el usuario existe en Auth pero no en tablas (post-limpieza)
-            // lo registramos como cliente automáticamente para que pueda entrar.
-            if (process.env.NODE_ENV === 'development') console.log('🌱 [App] Auto-provisionando perfil de cliente...');
-            
-            const nombreAuto = session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Cliente';
-            
-            const { data: newCliente, error: createError } = await supabase
-              .from('clientes')
-              .insert({
-                user_id: session.user.id,
-                email: session.user.email,
-                nombre: nombreAuto,
-                telefono: '000-' + session.user.id.substring(0, 8),
-                nombre_usuario: nombreAuto.toLowerCase().replace(/\s/g, '') + Math.floor(Math.random() * 100),
-                created_at: new Date().toISOString()
-              })
-              .select()
-              .maybeSingle();
-
-            if (createError) {
-              console.error('❌ Error creando perfil:', createError);
-              toast.error('Fallo al crear perfil: ' + createError.message);
-            }
-
-            if (newCliente) {
-              verifiedUser = {
-                accessToken: session.access_token,
-                userId: session.user.id,
-                email: session.user.email || '',
-                nombre: newCliente.nombre,
-                role: 'cliente',
-              };
-            }
           }
         }
 

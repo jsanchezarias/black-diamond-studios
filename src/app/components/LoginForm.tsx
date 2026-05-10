@@ -91,6 +91,83 @@ export function LoginForm({ tipo, onLogin, onBackToLanding }: LoginFormProps) {
 
   const esEmail = (valor: string) => valor.includes('@');
 
+  const loginCliente = async (emailParaLogin: string, pass: string) => {
+    const { data: { user, session }, error } = await supabase.auth.signInWithPassword({
+      email: emailParaLogin, password: pass
+    });
+    if (error) { 
+      const msg = translateSupabaseError(error);
+      setError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    // Buscar en usuarios primero
+    const { data: usuario, error: userError } = await supabase
+      .from('usuarios')
+      .select('role')
+      .eq('id', user!.id)
+      .maybeSingle();
+
+    let role = usuario?.role;
+
+    // Si no está en usuarios buscar en clientes
+    if (!role) {
+      const { data: cliente } = await supabase
+        .from('clientes')
+        .select('id')
+        .eq('user_id', user!.id)
+        .maybeSingle();
+      if (cliente) role = 'cliente';
+    }
+
+    // Validar que es cliente
+    if (role !== 'cliente') {
+      const msg = 'Usa Acceso al sistema para ingresar';
+      setError(msg);
+      toast.error(msg);
+      await supabase.auth.signOut();
+      return;
+    }
+
+    onLogin(session!.access_token, user!.id, emailParaLogin, 'cliente');
+  };
+
+  const loginSistema = async (emailParaLogin: string, pass: string) => {
+    const { data: { user, session }, error } = await supabase.auth.signInWithPassword({
+      email: emailParaLogin, password: pass
+    });
+    if (error) { 
+      const msg = translateSupabaseError(error);
+      setError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    const { data: usuario, error: userError } = await supabase
+      .from('usuarios')
+      .select('role')
+      .eq('id', user!.id)
+      .maybeSingle();
+
+    const role = usuario?.role;
+    const rolesPermitidos = [
+      'administrador', 'owner',
+      'programador', 'modelo'
+    ];
+
+    if (!role || !rolesPermitidos.includes(role)) {
+      const msg = 'Acceso no autorizado. Si eres cliente usa Iniciar sesión';
+      setError(msg);
+      toast.error(msg);
+      await supabase.auth.signOut();
+      return;
+    }
+
+    // Usar el rol REAL de Supabase
+    onLogin(session!.access_token, user!.id, emailParaLogin, role);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -117,141 +194,11 @@ export function LoginForm({ tipo, onLogin, onBackToLanding }: LoginFormProps) {
         emailParaLogin = clienteData.email;
       }
 
-      // Login con Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: emailParaLogin,
-        password,
-      });
-
-      if (authError) {
-        const msg = translateSupabaseError(authError);
-        setError(msg);
-        toast.error(msg);
-        setLoading(false);
-        return;
+      if (tipo === 'cliente') {
+        await loginCliente(emailParaLogin, password);
+      } else {
+        await loginSistema(emailParaLogin, password);
       }
-
-      if (!authData.user) {
-        setError('No se pudo obtener la información del usuario.');
-        setLoading(false);
-        return;
-      }
-
-      // Obtener el rol del usuario desde la tabla usuarios
-      const { data: userData, error: userError } = await supabase
-        .from('usuarios')
-        .select('role, nombre, estado')
-        .eq('id', authData.user.id)
-        .maybeSingle();
-
-      let role: string | null = null;
-
-      if (userError || !userData) {
-        // Si no está en usuarios, verificar si es cliente
-        const { data: clienteData } = await supabase
-          .from('clientes')
-          .select('id, email, nombre, bloqueado')
-          .or(`user_id.eq.${authData.user.id},email.eq.${authData.user.email}`)
-          .maybeSingle();
-
-        if (clienteData) {
-          if (clienteData.bloqueado) {
-            setError('Tu cuenta está bloqueada. Contacta al administrador.');
-            setLoading(false);
-            return;
-          }
-          
-          onLogin(
-            authData.session.access_token,
-            authData.user.id,
-            authData.user.email || '',
-            'cliente'
-          );
-          return;
-        }
-
-        const nombreAuto = authData.user.user_metadata?.full_name || authData.user.email?.split('@')[0] || 'Cliente';
-
-        const { data: newCliente, error: createError } = await supabase
-          .from('clientes')
-          .insert({
-            user_id: authData.user.id,
-            email: authData.user.email,
-            nombre: nombreAuto,
-            telefono: '000-' + authData.user.id.substring(0, 8),
-            nombre_usuario: nombreAuto.toLowerCase().replace(/\s/g, '') + Math.floor(Math.random() * 100),
-            created_at: new Date().toISOString()
-          })
-          .select()
-          .maybeSingle();
-
-        if (createError) {
-          console.error('❌ Error creando perfil:', createError);
-          toast.error('Error de perfil: ' + createError.message);
-          setError('Error de base de datos: ' + createError.message);
-          setLoading(false);
-          return;
-        }
-
-        if (newCliente) {
-          onLogin(
-            authData.session.access_token,
-            authData.user.id,
-            authData.user.email || '',
-            'cliente'
-          );
-          return;
-        }
-
-        setError('No se pudo inicializar tu perfil. Contacta al administrador.');
-        setLoading(false);
-        return;
-      }
-
-      // Verificar que la cuenta no esté inactiva o archivada
-      if (userData.estado === 'inactivo' || userData.estado === 'archivado') {
-        setError('Tu cuenta está inactiva. Contacta al administrador.');
-        setLoading(false);
-        return;
-      }
-
-      role = userData.role;
-
-      if (!role) {
-        setError('Usuario sin rol asignado. Contacta al administrador.');
-        setLoading(false);
-        return;
-      }
-
-      // Validar que el rol corresponde al tipo de acceso
-      const rolesCliente = ['cliente'];
-      const rolesSistema = ['administrador', 'owner', 'programador', 'modelo'];
-
-      if (tipo === 'cliente' && !rolesCliente.includes(role)) {
-        const msg = 'Esta entrada es solo para clientes. Usa "Acceso al sistema" si eres personal.';
-        setError(msg);
-        toast.error(msg);
-        await supabase.auth.signOut();
-        setLoading(false);
-        return;
-      }
-
-      if (tipo === 'sistema' && !rolesSistema.includes(role)) {
-        const msg = 'Esta entrada es para el personal. Usa "Reservar cita" si eres cliente.';
-        setError(msg);
-        toast.error(msg);
-        await supabase.auth.signOut();
-        setLoading(false);
-        return;
-      }
-
-      onLogin(
-        authData.session.access_token,
-        authData.user.id,
-        authData.user.email || '',
-        role
-      );
-
     } catch (err: any) {
       if (process.env.NODE_ENV === 'development') console.error('Error en login:', err);
       const msg = translateSupabaseError(err);
