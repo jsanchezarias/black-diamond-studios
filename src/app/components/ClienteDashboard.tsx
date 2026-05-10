@@ -89,9 +89,8 @@ interface ModeloCardProps {
 
 const ModeloCard = ({ modelo, onAgendar }: ModeloCardProps) => {
 
-  const fotoUrl = modelo.modelo_fotos
-    ?.find((f: any) => f.es_principal)?.url
-    || modelo.modelo_fotos?.[0]?.url;
+  const fotoUrl = (modelo.gallery && modelo.gallery[0]) || modelo.fotoPerfil || modelo.photo || '';
+  const gallery = modelo.gallery || [];
 
   const serviciosActivos = modelo
     .servicios_modelo
@@ -115,30 +114,48 @@ const ModeloCard = ({ modelo, onAgendar }: ModeloCardProps) => {
       hover:shadow-[#c9a961]/10
     ">
 
-      {/* FOTO */}
-      <div className="
-        relative h-[240px] 
-        sm:h-[260px] overflow-hidden
-        flex-shrink-0
-      ">
-        {fotoUrl ? (
+      {/* FOTO / MOSAICO */}
+      <div className="relative h-[240px] sm:h-[260px] overflow-hidden flex-shrink-0 bg-black">
+        {gallery.length > 1 ? (
+          <div className="grid grid-cols-3 h-full gap-0.5">
+            {/* Foto Grande (Izquierda) */}
+            <div className="col-span-2 h-full overflow-hidden">
+              <img
+                src={fotoUrl}
+                alt={modelo.name}
+                className="w-full h-full object-cover transition-transform duration-700 hover:scale-110"
+              />
+            </div>
+            {/* Columna Derecha */}
+            <div className="flex flex-col gap-0.5 h-full">
+              <div className="h-1/2 overflow-hidden">
+                <img
+                  src={gallery[1]}
+                  className="w-full h-full object-cover transition-transform duration-700 hover:scale-110"
+                />
+              </div>
+              <div className="h-1/2 overflow-hidden relative">
+                <img
+                  src={gallery[2] || gallery[0]}
+                  className="w-full h-full object-cover transition-transform duration-700 hover:scale-110"
+                />
+                {gallery.length > 3 && (
+                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-[1px]">
+                    <span className="text-white font-bold text-xs">+{gallery.length - 3}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : fotoUrl ? (
           <img
             src={fotoUrl}
             alt={modelo.nombre_artistico}
-            className="
-              w-full h-full object-cover
-              transition-transform duration-500
-              hover:scale-105
-            "
+            className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
           />
         ) : (
-          <div className="
-            w-full h-full bg-[#1a1a1a]
-            flex items-center justify-center
-            text-6xl font-bold
-            text-[#c9a961]
-          ">
-            {modelo.nombre_artistico?.[0] || '◆'}
+          <div className="w-full h-full bg-[#1a1a1a] flex items-center justify-center text-6xl font-bold text-[#c9a961]">
+            {modelo.nombre_artistico?.[0] || modelo.nombre?.[0] || '◆'}
           </div>
         )}
 
@@ -461,85 +478,57 @@ export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboa
   const [perfilCliente, setPerfilCliente] = useState<any | null>(null);
   const [loadingPerfil, setLoadingPerfil] = useState(false);
   const [modelos, setModelos] = useState<any[]>([]);
-  const [cargando, setCargando] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [cargandoModelos, setCargandoModelos] = useState(true);
+  const [errorModelos, setErrorModelos] = useState<string | null>(null);
 
   const { agendamientos = [] } = useAgendamientos() || {};
 
-  const cargarModelos = async () => {
-    setCargando(true)
-    try {
-      console.log('📸 Cargando modelos...')
-
-      const hoy = new Date()
-        .toISOString().split('T')[0]
-
-      const { data, error } = await supabase
-        .from('usuarios')
-        .select(`
-          id,
-          email,
-          nombre_artistico,
-          estado,
-          descripcion,
-          modelo_fotos (
-            id,
-            url,
-            es_principal
-          ),
-          servicios_modelo!servicios_modelo_modelo_id_fkey (
-            id,
-            nombre,
-            precio,
-            precio_sede,
-            activo
-          ),
-          periodos_modelo (
-            id,
-            fecha_inicio,
-            fecha_fin,
-            activo
-          )
-        `)
-        .eq('role', 'modelo')
-        .eq('estado', 'activo')
-
-      console.log('📊 Resultado:', { 
-        data, 
-        error, 
-        total: data?.length 
-      })
-
-      if (error) {
-        console.error('❌ Error:', error)
-        setError(error.message)
-        return
-      }
-
-      // Filtrar las que están en período hoy
-      const disponibles = data?.filter(modelo => {
-        const enPeriodo = modelo.periodos_modelo
-          ?.some((p: any) =>
-            p.activo &&
-            p.fecha_inicio <= hoy &&
-            p.fecha_fin >= hoy
-          )
-        return !enPeriodo
-      }) || []
-
-      console.log('✅ Modelos disponibles:', 
-        disponibles.length)
-      setModelos(disponibles)
-
-    } catch (err: any) {
-      console.error('❌ Error inesperado:', err)
-      setError(err.message)
-    } finally {
-      setCargando(false)
-    }
-  }
-
   useEffect(() => {
+    const cargarModelos = async () => {
+      try {
+        console.log('🔍 Cargando modelos...')
+        
+        const { data, error } = await supabase
+          .from('usuarios')
+          .select(`
+            id,
+            nombre_artistico,
+            estado,
+            descripcion,
+            modelo_fotos (
+              id, url, es_principal
+            ),
+            servicios_modelo (
+              id, nombre,
+              precio, precio_sede,
+              activo
+            )
+          `)
+          .eq('role', 'modelo')
+          .eq('estado', 'activo')
+          .order('nombre_artistico')
+
+        console.log('📊 Modelos:', { 
+          total: data?.length, 
+          error 
+        })
+
+        if (error) {
+          console.error('❌ Error RLS:', error)
+          setErrorModelos(error.message)
+          return
+        }
+
+        setModelos(data || [])
+
+      } catch (err: any) {
+        console.error('❌ Error:', err)
+        setErrorModelos(err.message)
+      } finally {
+        setCargandoModelos(false)
+      }
+    }
+
     cargarModelos()
   }, [])
 
@@ -579,28 +568,7 @@ export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboa
   });
 
   // ── Convertir modelo para tarjeta premium ────────────────────────────────
-  const convertirModelo = (m: any) => ({
-    id: String(m.id),
-    name: m.nombreArtistico || m.nombre || 'Sin nombre',
-    age: m.edad || 0,
-    photo: m.fotoPerfil || '',
-    gallery: [m.fotoPerfil, ...(m.fotosAdicionales || [])].filter(Boolean),
-    rating: m.calificacion || 5.0,
-    height: m.altura || '165 cm',
-    measurements: m.medidas || '90-60-90',
-    languages: m.idiomas || ['Español'],
-    location: m.sede || 'Sede Norte',
-    available: !!(m.activa && m.disponible && !m.enPeriodo),
-    description: m.descripcion || 'Modelo profesional',
-    services: m.serviciosDisponibles || m.services || m.servicios || [],
-    specialties: m.especialidades || m.specialties || [],
-    domicilio: m.domicilio !== undefined ? m.domicilio : true,
-    _email: m.email,
-  });
-
-  const modelosActivos = Array.isArray(modelos)
-    ? modelos.filter((m: any) => m?.activa && !m?.enPeriodo).map(convertirModelo)
-    : [];
+  // Eliminado porque usamos el render directo
 
   // ── Abrir modal ───────────────────────────────────────────────────────────
   const abrirModal = useCallback((modelo: any) => {
@@ -763,18 +731,19 @@ export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboa
               </p>
             </div>
 
-            {/* ESTADO: CARGANDO */}
-            {cargando && (
-              <div className="
-                grid grid-cols-1 sm:grid-cols-2 
-                lg:grid-cols-3 gap-4 p-4
-              ">
+            {/* CARGANDO */}
+            {cargandoModelos && (
+              <div className="grid grid-cols-1 
+                              sm:grid-cols-2 
+                              lg:grid-cols-3 
+                              gap-4 px-4">
                 {[1,2,3,4,5,6].map(i => (
                   <div key={i} className="
-                    rounded-xl overflow-hidden
-                    bg-[#16181c] animate-pulse
+                    rounded-xl bg-[#16181c] 
+                    animate-pulse overflow-hidden
                   ">
-                    <div className="h-[240px] bg-[#2a2a2a]"/>
+                    <div className="h-[240px] 
+                                    bg-[#2a2a2a]"/>
                     <div className="p-3 space-y-2">
                       <div className="h-4 bg-[#2a2a2a] 
                                       rounded w-3/4"/>
@@ -788,50 +757,32 @@ export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboa
               </div>
             )}
 
-            {/* ESTADO: ERROR */}
-            {!cargando && error && (
-              <div className="
-                mx-4 p-6 rounded-xl text-center
-                border border-red-500/30
-                bg-red-500/5
-              ">
+            {/* ERROR */}
+            {!cargandoModelos && errorModelos && (
+              <div className="mx-4 p-6 text-center
+                              rounded-xl
+                              border border-red-500/30
+                              bg-red-500/5">
                 <p className="text-red-400 text-sm">
-                  Error al cargar modelos: {error}
+                  {errorModelos}
                 </p>
-                <button
-                  onClick={cargarModelos}
-                  className="
-                    mt-3 px-4 py-2 rounded-lg
-                    bg-[#c9a961] text-[#0f1014]
-                    text-sm font-bold
-                  "
-                >
-                  Reintentar
-                </button>
               </div>
             )}
 
-            {/* ESTADO: VACÍO */}
-            {!cargando && !error && 
+            {/* VACÍO */}
+            {!cargandoModelos && !errorModelos && 
             modelos.length === 0 && (
-              <div className="
-                flex flex-col items-center 
-                justify-center p-12 text-center
-              ">
-                <span className="text-5xl mb-4 text-[#c9a961] opacity-40">◆</span>
-                <p className="text-[#c9a961] font-bold 
-                              text-lg">
-                  Próximamente
-                </p>
+              <div className="py-16 text-center">
+                <p className="text-[#c9a961] text-xl 
+                              font-bold">◆</p>
                 <p className="text-[#888] text-sm mt-2">
-                  Nuestras acompañantes estarán 
-                  disponibles muy pronto
+                  Próximamente disponible
                 </p>
               </div>
             )}
 
-            {/* ESTADO: CON DATOS — MOSAICO */}
-            {!cargando && !error && 
+            {/* MOSAICO */}
+            {!cargandoModelos && !errorModelos && 
             modelos.length > 0 && (
               <div className="
                 grid
@@ -842,15 +793,167 @@ export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboa
                 px-4 sm:px-6
                 pb-8
               ">
-                {modelos.map(modelo => (
-                  <ModeloCard
-                    key={modelo.id}
-                    modelo={modelo}
-                    onAgendar={() => 
-                      abrirModal(modelo)
-                    }
-                  />
-                ))}
+                {modelos.map(modelo => {
+
+                  const foto = modelo.modelo_fotos
+                    ?.find((f: any) => f.es_principal)?.url
+                    || modelo.modelo_fotos?.[0]?.url
+
+                  const servicios = modelo.servicios_modelo
+                    ?.filter((s: any) => s.activo) || []
+
+                  const precios = servicios
+                    .map((s: any) => s.precio || s.precio_sede || 0)
+                    .filter((p: number) => p > 0)
+
+                  const precioBase = precios.length > 0
+                    ? Math.min(...precios)
+                    : null
+
+                  return (
+                    <div key={modelo.id} className="
+                      rounded-xl overflow-hidden
+                      border border-[#2a2a2a]
+                      hover:border-[#c9a961]/50
+                      bg-[#16181c] flex flex-col
+                      transition-all duration-300
+                    ">
+                      {/* FOTO */}
+                      <div className="
+                        relative h-[240px] 
+                        overflow-hidden flex-shrink-0
+                      ">
+                        {foto ? (
+                          <img
+                            src={foto}
+                            alt={modelo.nombre_artistico}
+                            className="
+                              w-full h-full object-cover
+                              hover:scale-105
+                              transition-transform duration-500
+                            "
+                          />
+                        ) : (
+                          <div className="
+                            w-full h-full bg-[#1a1a1a]
+                            flex items-center 
+                            justify-center
+                            text-6xl text-[#c9a961]
+                            font-bold
+                          ">
+                            {modelo.nombre_artistico?.[0] 
+                            || '◆'}
+                          </div>
+                        )}
+                        <div className="
+                          absolute inset-0
+                          bg-gradient-to-t
+                          from-black/80 
+                          via-transparent to-transparent
+                        "/>
+                        <div className="
+                          absolute bottom-3 
+                          left-3 right-3
+                          flex justify-between 
+                          items-end gap-2
+                        ">
+                          <span className="
+                            text-[#c9a961] font-bold
+                            text-base truncate
+                            font-['Playfair_Display']
+                          ">
+                            {modelo.nombre_artistico}
+                          </span>
+                          <span className="
+                            text-xs px-2 py-0.5
+                            rounded-full flex-shrink-0
+                            bg-green-500/20 
+                            text-green-400
+                            border border-green-500/30
+                          ">
+                            ● Disponible
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* CONTENIDO */}
+                      <div className="
+                        flex flex-col gap-2 
+                        p-3 flex-1
+                      ">
+                        {/* Chips */}
+                        {servicios.length > 0 && (
+                          <div className="
+                            flex gap-1.5 flex-wrap
+                          ">
+                            {servicios.slice(0,3)
+                              .map((s: any) => (
+                              <span key={s.id} className="
+                                text-xs px-2 py-1 
+                                rounded-full
+                                bg-[#c9a961]/10 
+                                text-[#c9a961]
+                                border border-[#c9a961]/20
+                                whitespace-nowrap
+                              ">
+                                {s.nombre}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* PRECIO — NUNCA OCULTO */}
+                        <div className="
+                          flex items-center gap-1
+                          text-[#c9a961] font-bold 
+                          text-sm
+                        ">
+                          {precioBase ? (
+                            <>
+                              <span className="
+                                text-[#888] text-xs 
+                                font-normal
+                              ">
+                                Desde
+                              </span>
+                              ${precioBase
+                                .toLocaleString('es-CO')} 
+                              <span className="
+                                text-[#888] text-xs 
+                                font-normal
+                              ">
+                                COP
+                              </span>
+                            </>
+                          ) : (
+                            <span className="
+                              text-[#888] text-xs italic
+                            ">
+                              Consultar precio
+                            </span>
+                          )}
+                        </div>
+
+                        {/* BOTÓN */}
+                        <button
+                          onClick={() => 
+                            abrirModal(modelo)
+                          }
+                          className="
+                            w-full py-2.5 rounded-lg
+                            bg-[#c9a961] text-[#0f1014]
+                            font-bold text-sm mt-auto
+                            hover:bg-[#d4b86a]
+                            active:scale-95
+                            transition-all duration-200
+                          "
+                        >
+                          ◆ Ver perfil y agendar
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             )}
           </div>

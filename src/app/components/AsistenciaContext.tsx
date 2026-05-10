@@ -212,8 +212,6 @@ export function AsistenciaProvider({ children }: { children: ReactNode }) {
       .from('solicitudes_entrada')
       .insert({
         modelo_id: user.id,
-        modelo_email: modeloEmail,
-        modelo_nombre: modeloNombre,
         selfie_url: selfieUrl,
         estado: 'pendiente',
         fecha: new Date().toISOString().split('T')[0],
@@ -251,13 +249,25 @@ export function AsistenciaProvider({ children }: { children: ReactNode }) {
 
     const ahora = new Date().toISOString();
 
+    // Obtener email del modelo si no está en el objeto solicitud
+    let modeloEmailFinal = solicitud.modeloEmail;
+    if (!modeloEmailFinal) {
+      const { data: usuData } = await supabase
+        .from('usuarios')
+        .select('email, nombre, nombreArtistico')
+        .eq('id', solicitud.modeloId)
+        .maybeSingle();
+      modeloEmailFinal = usuData?.email || '';
+    }
+    const modeloNombreFinal = solicitud.modeloNombre || modeloEmailFinal;
+
     // 1. Crear la Jornada
     const { data: jornadaData, error: jorErr } = await supabase
       .from('jornadas')
       .insert({
         modelo_id: solicitud.modeloId,
-        modelo_email: solicitud.modeloEmail,
-        modelo_nombre: solicitud.modeloNombre,
+        modelo_email: modeloEmailFinal,
+        modelo_nombre: modeloNombreFinal,
         fecha: new Date().toISOString().split('T')[0],
         hora_inicio_jornada: ahora,
         horas_requeridas: configuracion?.horasJornada ?? 8,
@@ -289,8 +299,8 @@ export function AsistenciaProvider({ children }: { children: ReactNode }) {
       .from('asistencias')
       .insert({
         modelo_id: solicitud.modeloId,
-        modelo_email: solicitud.modeloEmail,
-        modelo_nombre: solicitud.modeloNombre,
+        modelo_email: modeloEmailFinal,
+        modelo_nombre: modeloNombreFinal,
         fecha: new Date().toISOString().split('T')[0],
         hora_llegada: ahora,
         solicitud_entrada_id: solicitudId,

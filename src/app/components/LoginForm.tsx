@@ -180,18 +180,15 @@ export function LoginForm({ tipo, onLogin, onBackToLanding }: LoginFormProps) {
         const soloDigitos = emailParaLogin.replace(/[^0-9]/g, '');
         const tel10 = soloDigitos.slice(-10);
 
-        const { data: clienteData } = await supabase
-          .from('clientes')
-          .select('email')
-          .or(`telefono.eq.${tel10},telefono.eq.57${tel10},telefono.eq.+57${tel10}`)
-          .maybeSingle();
+        const { data: emailData } = await supabase
+          .rpc('get_email_by_telefono', { p_telefono: tel10 });
 
-        if (!clienteData?.email) {
+        if (!emailData) {
           setError('No encontramos una cuenta con ese número.');
           setLoading(false);
           return;
         }
-        emailParaLogin = clienteData.email;
+        emailParaLogin = emailData;
       }
 
       if (tipo === 'cliente') {

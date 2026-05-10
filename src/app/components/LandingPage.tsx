@@ -102,10 +102,12 @@ const ModeloCard = ({ modelo, onAccessSystem }: { modelo: any, onAccessSystem: (
   }, [modelo.id, modelo.email]);
 
   const fotoUrl = modelo.photo
-    || modelo.modelo_fotos?.find((f: any) => f.es_principal)?.url
-    || modelo.modelo_fotos?.[0]?.url
     || modelo.fotoPerfil
-    || modelo.foto_perfil;
+    || modelo.foto_perfil
+    || modelo.fotoperfil
+    || modelo.foto_url
+    || modelo.modelo_fotos?.find((f: any) => f.es_principal)?.url
+    || modelo.modelo_fotos?.[0]?.url;
   const name = modelo.name || modelo.nombre_artistico || modelo.nombreArtistico || modelo.nombre;
 
   const precioMin: number | null = precios.length > 0
@@ -126,9 +128,44 @@ const ModeloCard = ({ modelo, onAccessSystem }: { modelo: any, onAccessSystem: (
       onMouseLeave={() => setHovered(false)}
     >
 
-      {/* ── FOTO ── */}
-      <div className="relative h-[280px] sm:h-[300px] lg:h-[340px] overflow-hidden flex-shrink-0">
-        {fotoUrl ? (
+      {/* ── FOTO / MOSAICO ── */}
+      <div className="relative h-[280px] sm:h-[300px] lg:h-[340px] overflow-hidden flex-shrink-0 bg-black">
+        {modelo.gallery && modelo.gallery.length > 1 ? (
+          <div className="grid grid-cols-3 h-full gap-0.5">
+            {/* Foto Grande (Izquierda) */}
+            <div className="col-span-2 h-full overflow-hidden">
+              <img
+                src={modelo.gallery[0]}
+                alt={name}
+                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+              />
+            </div>
+            {/* Columna Derecha (Fotos pequeñas) */}
+            <div className="flex flex-col gap-0.5 h-full">
+              <div className="h-1/2 overflow-hidden relative">
+                <img
+                  src={modelo.gallery[1]}
+                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                />
+              </div>
+              <div className="h-1/2 overflow-hidden relative">
+                {modelo.gallery[2] ? (
+                  <img
+                    src={modelo.gallery[2]}
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-[#1e1e22]" />
+                )}
+                {modelo.gallery.length > 3 && (
+                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-[2px]">
+                    <span className="text-white font-black text-sm">+{modelo.gallery.length - 3}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : fotoUrl ? (
           <img
             src={fotoUrl}
             alt={name}
@@ -238,7 +275,59 @@ const ModeloCard = ({ modelo, onAccessSystem }: { modelo: any, onAccessSystem: (
 
 export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLoginSuccess }: LandingPageProps) {
   const [menuAbierto, setMenuAbierto] = useState(false);
-  const { modelos: modelosContext, loading: modelosLoading } = useModelos();
+  
+  const [modelos, setModelos] = useState<any[]>([]);
+  const [cargandoModelos, setCargandoModelos] = useState(true);
+  const [errorModelos, setErrorModelos] = useState<string | null>(null);
+
+  useEffect(() => {
+    const cargarModelos = async () => {
+      try {
+        console.log('🔍 Cargando modelos...')
+        
+        const { data, error } = await supabase
+          .from('usuarios')
+          .select(`
+            id,
+            nombre_artistico,
+            estado,
+            descripcion,
+            modelo_fotos (
+              id, url, es_principal
+            ),
+            servicios_modelo (
+              id, nombre,
+              precio, precio_sede,
+              activo
+            )
+          `)
+          .eq('role', 'modelo')
+          .eq('estado', 'activo')
+          .order('nombre_artistico')
+
+        console.log('📊 Modelos:', { 
+          total: data?.length, 
+          error 
+        })
+
+        if (error) {
+          console.error('❌ Error RLS:', error)
+          setErrorModelos(error.message)
+          return
+        }
+
+        setModelos(data || [])
+
+      } catch (err: any) {
+        console.error('❌ Error:', err)
+        setErrorModelos(err.message)
+      } finally {
+        setCargandoModelos(false)
+      }
+    }
+
+    cargarModelos()
+  }, [])
 
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
   const [sedeActual, setSedeActual] = useState('sede-1');
@@ -327,8 +416,8 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
       id: modelo.id.toString(),
       name: modelo.nombre_artistico || modelo.nombreArtistico || modelo.nombre,
       age: modelo.edad,
-      photo: modelo.fotoPerfil || (modelo.modelo_fotos?.find((f: any) => f.es_principal)?.url || modelo.modelo_fotos?.[0]?.url),
-      gallery: [modelo.fotoPerfil, ...(modelo.fotosAdicionales || [])].filter(Boolean),
+      photo: modelo.fotoPerfil || modelo.photo || (modelo.gallery && modelo.gallery[0]) || '',
+      gallery: modelo.gallery && modelo.gallery.length > 0 ? modelo.gallery : [modelo.fotoPerfil].filter(Boolean),
       rating: 5.0,
       height: modelo.altura || '165 cm',
       measurements: modelo.medidas || '90-60-90',
@@ -902,38 +991,232 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
             <div className="bd-shimmer-line max-w-xs mx-auto mt-6" />
           </div>
 
-          {/* Modelos Disponibles - Grid Vertical */}
-          <div className="
-            grid
-            grid-cols-1
-            sm:grid-cols-2
-            lg:grid-cols-3
-            xl:grid-cols-4
-            gap-4 sm:gap-5 lg:gap-6
-            px-4 sm:px-6 lg:px-8
-            max-w-7xl mx-auto
-            pb-24 md:pb-8
-          ">
-            {modelosLoading ? (
-              // SKELETON LOADING
-              [...Array(4)].map((_, i) => (
-                <div key={i} className="h-[400px] bg-[#1a1c21] animate-pulse rounded-xl border border-white/5" />
-              ))
-            ) : modelosDisponibles.length > 0 ? (
-              modelosDisponibles.map(modelo => (
-                <ModeloCard
-                  key={modelo.id}
-                  modelo={modelo}
-                  onAccessSystem={onAccessSystem}
-                />
-              ))
-            ) : (
-              <div className="col-span-full py-20 text-center text-muted-foreground">
-                <p className="text-xl">No hay modelos disponibles en este momento.</p>
-                <p className="text-sm mt-2">Vuelve a consultarnos pronto.</p>
-              </div>
-            )}
-          </div>
+          {/* CARGANDO */}
+          {cargandoModelos && (
+            <div className="grid grid-cols-1 
+                            sm:grid-cols-2 
+                            lg:grid-cols-3 
+                            gap-4 px-4">
+              {[1,2,3,4,5,6].map(i => (
+                <div key={i} className="
+                  rounded-xl bg-[#16181c] 
+                  animate-pulse overflow-hidden
+                ">
+                  <div className="h-[240px] 
+                                  bg-[#2a2a2a]"/>
+                  <div className="p-3 space-y-2">
+                    <div className="h-4 bg-[#2a2a2a] 
+                                    rounded w-3/4"/>
+                    <div className="h-4 bg-[#2a2a2a] 
+                                    rounded w-1/2"/>
+                    <div className="h-10 bg-[#2a2a2a] 
+                                    rounded"/>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ERROR */}
+          {!cargandoModelos && errorModelos && (
+            <div className="mx-4 p-6 text-center
+                            rounded-xl
+                            border border-red-500/30
+                            bg-red-500/5">
+              <p className="text-red-400 text-sm">
+                {errorModelos}
+              </p>
+            </div>
+          )}
+
+          {/* VACÍO */}
+          {!cargandoModelos && !errorModelos && 
+          modelos.length === 0 && (
+            <div className="py-16 text-center">
+              <p className="text-[#c9a961] text-xl 
+                            font-bold">◆</p>
+              <p className="text-[#888] text-sm mt-2">
+                Próximamente disponible
+              </p>
+            </div>
+          )}
+
+          {/* MOSAICO */}
+          {!cargandoModelos && !errorModelos && 
+          modelos.length > 0 && (
+            <div className="
+              grid
+              grid-cols-1
+              sm:grid-cols-2
+              lg:grid-cols-3
+              gap-4 sm:gap-5
+              px-4 sm:px-6
+              pb-8
+            ">
+              {modelos.map(modelo => {
+
+                const foto = modelo.modelo_fotos
+                  ?.find((f: any) => f.es_principal)?.url
+                  || modelo.modelo_fotos?.[0]?.url
+
+                const servicios = modelo.servicios_modelo
+                  ?.filter((s: any) => s.activo) || []
+
+                const precios = servicios
+                  .map((s: any) => s.precio || s.precio_sede || 0)
+                  .filter((p: number) => p > 0)
+
+                const precioBase = precios.length > 0
+                  ? Math.min(...precios)
+                  : null
+
+                return (
+                  <div key={modelo.id} className="
+                    rounded-xl overflow-hidden
+                    border border-[#2a2a2a]
+                    hover:border-[#c9a961]/50
+                    bg-[#16181c] flex flex-col
+                    transition-all duration-300
+                  ">
+                    {/* FOTO */}
+                    <div className="
+                      relative h-[240px] 
+                      overflow-hidden flex-shrink-0
+                    ">
+                      {foto ? (
+                        <img
+                          src={foto}
+                          alt={modelo.nombre_artistico}
+                          className="
+                            w-full h-full object-cover
+                            hover:scale-105
+                            transition-transform duration-500
+                          "
+                        />
+                      ) : (
+                        <div className="
+                          w-full h-full bg-[#1a1a1a]
+                          flex items-center 
+                          justify-center
+                          text-6xl text-[#c9a961]
+                          font-bold
+                        ">
+                          {modelo.nombre_artistico?.[0] 
+                          || '◆'}
+                        </div>
+                      )}
+                      <div className="
+                        absolute inset-0
+                        bg-gradient-to-t
+                        from-black/80 
+                        via-transparent to-transparent
+                      "/>
+                      <div className="
+                        absolute bottom-3 
+                        left-3 right-3
+                        flex justify-between 
+                        items-end gap-2
+                      ">
+                        <span className="
+                          text-[#c9a961] font-bold
+                          text-base truncate
+                          font-['Playfair_Display']
+                        ">
+                          {modelo.nombre_artistico}
+                        </span>
+                        <span className="
+                          text-xs px-2 py-0.5
+                          rounded-full flex-shrink-0
+                          bg-green-500/20 
+                          text-green-400
+                          border border-green-500/30
+                        ">
+                          ● Disponible
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* CONTENIDO */}
+                    <div className="
+                      flex flex-col gap-2 
+                      p-3 flex-1
+                    ">
+                      {/* Chips */}
+                      {servicios.length > 0 && (
+                        <div className="
+                          flex gap-1.5 flex-wrap
+                        ">
+                          {servicios.slice(0,3)
+                            .map((s: any) => (
+                            <span key={s.id} className="
+                              text-xs px-2 py-1 
+                              rounded-full
+                              bg-[#c9a961]/10 
+                              text-[#c9a961]
+                              border border-[#c9a961]/20
+                              whitespace-nowrap
+                            ">
+                              {s.nombre}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* PRECIO — NUNCA OCULTO */}
+                      <div className="
+                        flex items-center gap-1
+                        text-[#c9a961] font-bold 
+                        text-sm
+                      ">
+                        {precioBase ? (
+                          <>
+                            <span className="
+                              text-[#888] text-xs 
+                              font-normal
+                            ">
+                              Desde
+                            </span>
+                            ${precioBase
+                              .toLocaleString('es-CO')} 
+                            <span className="
+                              text-[#888] text-xs 
+                              font-normal
+                            ">
+                              COP
+                            </span>
+                          </>
+                        ) : (
+                          <span className="
+                            text-[#888] text-xs italic
+                          ">
+                            Consultar precio
+                          </span>
+                        )}
+                      </div>
+
+                      {/* BOTÓN */}
+                      <button
+                        onClick={() => 
+                          onAccessSystem('cliente')
+                        }
+                        className="
+                          w-full py-2.5 rounded-lg
+                          bg-[#c9a961] text-[#0f1014]
+                          font-bold text-sm mt-auto
+                          hover:bg-[#d4b86a]
+                          active:scale-95
+                          transition-all duration-200
+                        "
+                      >
+                        ◆ Ver perfil y agendar
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
         </div>
       </section>
 

@@ -15,6 +15,7 @@ export interface Modelo {
   password: string;
   fotoPerfil: string;
   fotosAdicionales?: string[];
+  gallery?: string[]; // ✅ NUEVO: Alias para fotosAdicionales usado en LandingPage
   documentoFrente?: string;
   documentoReverso?: string;
   documento_tipo?: string;
@@ -156,7 +157,8 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
           *,
           servicios_modelo!servicios_modelo_modelo_id_fkey (
             id, nombre, precio_sede, precio_domicilio, activo, duracion
-          )
+          ),
+          modelo_fotos (*)
         `)
         .eq('role', 'modelo')
         .limit(200);
@@ -296,8 +298,10 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
             direccion: usuario.direccion || '',
             email: usuario.email,
             password: '', // No guardamos contraseñas en el contexto
-            fotoPerfil: usuario.fotoPerfil || usuario.foto_perfil || usuario.fotoperfil || fotosPrincipalesMap.get(usuario.id) || '',
-            fotosAdicionales: fotosAdicionalesMap.get(usuario.id) || usuario.fotosAdicionales || usuario.fotosadicionales || usuario.fotos_adicionales || [],
+            fotoPerfil: usuario.fotoPerfil || usuario.foto_perfil || usuario.fotoperfil || usuario.foto_url || usuario.modelo_fotos?.find((f: any) => f.es_principal)?.url || usuario.modelo_fotos?.[0]?.url || fotosPrincipalesMap.get(usuario.id) || '',
+            fotosAdicionales: fotosAdicionalesMap.get(usuario.id) || usuario.modelo_fotos?.filter((f: any) => !f.es_principal).map((f: any) => f.url) || usuario.fotosAdicionales || usuario.fotosadicionales || [],
+            gallery: [], // Se calculará dinámicamente o se llenará abajo
+            modelo_fotos: usuario.modelo_fotos || [],
             edad: usuario.edad || 21,
             altura: usuario.altura || '',
             medidas: usuario.medidas || '',
@@ -322,8 +326,24 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
             documento_numero: usuario.documento_numero || undefined,
             documento_verificado: usuario.documento_verificado || false,
             documento_fecha_subida: usuario.documento_fecha_subida || undefined,
-            servicios_modelo: usuario.servicios_modelo || usuario['servicios_modelo!servicios_modelo_modelo_id_fkey'] || [], // ✅ Pasar servicios modelo
+            servicios_modelo: usuario.servicios_modelo || usuario['servicios_modelo!servicios_modelo_modelo_id_fkey'] || [], 
           };
+
+          // ✅ UNIFICAR GALERÍA: Combinar todas las fuentes posibles de fotos en un array único y limpio
+          const rawPhotos = [
+            modelo.fotoPerfil,
+            ...(modelo.fotosAdicionales || []),
+            ...(usuario.modelo_fotos?.map((f: any) => f.url) || []),
+            ...(fotosAdicionalesMap.get(usuario.id) || []),
+            fotosPrincipalesMap.get(usuario.id)
+          ];
+          
+          modelo.gallery = Array.from(new Set(rawPhotos.filter(Boolean)));
+          
+          // Asegurar que la foto de perfil sea la primera si existe
+          if (modelo.fotoPerfil && modelo.gallery.includes(modelo.fotoPerfil)) {
+            modelo.gallery = [modelo.fotoPerfil, ...modelo.gallery.filter(u => u !== modelo.fotoPerfil)];
+          }
           
           return modelo;
         });

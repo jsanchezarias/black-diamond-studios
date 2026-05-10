@@ -246,13 +246,13 @@ export function CrearModeloModal({ open, onClose }: CrearModeloModalProps) {
       // ✅ NUEVO FLUJO: Crear usuario directamente con Supabase (sin servidor)
       
       // Paso 0: Verificar que el email no esté registrado
-      const { data: existingUser, error: checkError } = await supabase
+      const { data: existingUser } = await supabase
         .from('usuarios')
         .select('email, role')
         .eq('email', email)
-        .single();
+        .maybeSingle();
 
-      if (existingUser && !checkError) {
+      if (existingUser) {
         toast.error(`El email ${email} ya está registrado como ${existingUser.role}`);
         setLoading(false);
         return;
@@ -264,20 +264,9 @@ export function CrearModeloModal({ open, onClose }: CrearModeloModalProps) {
       let documentoFrenteUrl: string | null = null;
       let documentoReversoUrl: string | null = null;
 
-      // Crear bucket si no existe
-      const bucketName = 'make-9dadc017-modelos-fotos';
-      const { data: buckets } = await supabase.storage.listBuckets();
-      const bucketExists = buckets?.some(bucket => bucket.name === bucketName);
-      
-      if (!bucketExists) {
-        const { error: bucketError } = await supabase.storage.createBucket(bucketName, {
-          public: false,
-          fileSizeLimit: 5242880 // 5MB
-        });
-        if (bucketError) {
-          if (process.env.NODE_ENV === 'development') console.error('❌ Error creando bucket:', bucketError);
-        }
-      }
+      // El bucket se gestiona del lado del servidor (la Edge Function lo crea si no existe)
+      // No intentamos crear buckets desde el frontend porque el rol anon/authenticated no tiene permisos
+      const bucketName = 'modelos-fotos'; // Bucket público gestionado por la Edge Function
 
       // Subir foto de perfil
       if (archivoFoto) {
@@ -380,46 +369,58 @@ export function CrearModeloModal({ open, onClose }: CrearModeloModalProps) {
         }
       }
 
-      // Paso 2: Crear usuario vía Edge Function (evita desloguear al admin)
-      const { data: fnData, error: fnError } = await supabase.functions.invoke('server', {
-        method: 'POST',
-        headers: { 'x-invoke-path': '/make-server-9dadc017/administrador/crear-modelo' },
-        body: {
-          email: email,
-          password: password,
-          nombre: nombre,
-          nombreArtistico: nombreArtistico || nombre,
-          telefono: telefono || null,
-          cedula: cedula || null,
-          edad: parseInt(edad),
-          direccion: direccion || null,
-          fotoPerfil: fotoPerfilUrl,
-          fotosAdicionales: fotosAdicionalesUrls,
-          descripcion: descripcion || null,
-          altura: altura || null,
-          medidas: medidas || null,
-          sede: sede || null,
-          activa: activa,
-          disponible: disponible,
-          domicilio: domicilio,
-          politicaTarifa: politicaTarifa,
-          documentoFrente: documentoFrenteUrl,
-          documentoReverso: documentoReversoUrl,
-          role: 'modelo',
-          _path: '/make-server-9dadc017/administrador/crear-modelo'
+      // Paso 2: Crear usuario vía Edge Function (fetch directo sin headers custom que bloquea CORS)
+      // Usamos fetch directo a la URL completa para evitar que el gateway de Supabase
+      // bloquee el header x-invoke-path en el preflight CORS.
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      const authToken = currentSession?.access_token || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt6ZGpyYXZ3Y2p1bW1lZ3h4cmtkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3NzY4ODIsImV4cCI6MjA4MzM1Mjg4Mn0.xC2QDsAzhYRRg8yakyRTChzHL_bleIT-u9mtKlNeBpc';
+
+      const fnResponse = await fetch(
+        'https://kzdjravwcjummegxxrkd.supabase.co/functions/v1/server',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`,
+            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt6ZGpyYXZ3Y2p1bW1lZ3h4cmtkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3NzY4ODIsImV4cCI6MjA4MzM1Mjg4Mn0.xC2QDsAzhYRRg8yakyRTChzHL_bleIT-u9mtKlNeBpc',
+            'x-invoke-path': '/make-server-9dadc017/administrador/crear-modelo',
+          },
+          body: JSON.stringify({
+            email: email,
+            password: password,
+            nombre: nombre,
+            nombreArtistico: nombreArtistico || nombre,
+            telefono: telefono || null,
+            cedula: cedula || null,
+            edad: parseInt(edad),
+            direccion: direccion || null,
+            fotoPerfil: fotoPerfilUrl,
+            fotosAdicionales: fotosAdicionalesUrls,
+            descripcion: descripcion || null,
+            altura: altura || null,
+            medidas: medidas || null,
+            sede: sede || null,
+            activa: activa,
+            disponible: disponible,
+            domicilio: domicilio,
+            politicaTarifa: politicaTarifa,
+            documentoFrente: documentoFrenteUrl,
+            documentoReverso: documentoReversoUrl,
+            role: 'modelo',
+          })
         }
-      });
+      );
 
-      const responseError = fnError || (fnData?.error ? new Error(fnData.error) : null);
+      const fnData = await fnResponse.json();
 
-      if (responseError) {
-        console.error('❌ Error detallado de la Edge Function:', fnData);
-        throw responseError;
+      if (!fnResponse.ok || fnData?.error) {
+        const detalle = fnData?.error || `Error HTTP ${fnResponse.status}`;
+        console.error('❌ Error de la Edge Function:', fnResponse.status, fnData);
+        throw new Error(detalle);
       }
 
       // Paso 3: Opcional - Reforzar actualización si es necesario (ya lo hace la Edge Function)
-      // Pero lo mantenemos para asegurar que todos los campos locales se sincronizan
-      const userId = fnData.userId;
+      const userId = fnData?.userId || fnData?.user?.id;
       if (userId) {
         await supabase
           .from('usuarios')

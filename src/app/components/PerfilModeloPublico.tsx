@@ -70,12 +70,12 @@ export function PerfilModeloPublico({ modeloId, onClose, currentUser, onLoginReq
     try {
       const { data: modelo } = await supabase
         .from('usuarios')
-        .select('id, nombre_artistico, nombreArtistico, nombre, descripcion, altura, medidas, idiomas, sede, edad, foto_perfil, fotoPerfil, rating, calificacion')
+        .select('id, nombre_artistico, nombreArtistico, nombre, descripcion, altura, medidas, idiomas, sede, edad, foto_perfil, fotoPerfil, fotoperfil, foto_url, rating, calificacion')
         .eq('id', modeloId)
         .single();
 
       if (modelo) {
-        const fotoPerfilUrl = modelo.foto_perfil || modelo.fotoPerfil;
+        const fotoPerfilUrl = modelo.foto_perfil || modelo.fotoPerfil || modelo.fotoperfil || modelo.foto_url;
         const nombre = modelo.nombre_artistico || modelo.nombreArtistico || modelo.nombre;
         const rating = modelo.rating || modelo.calificacion || 5.0;
         const estatura = modelo.altura;
@@ -90,8 +90,9 @@ export function PerfilModeloPublico({ modeloId, onClose, currentUser, onLoginReq
         .order('orden', { ascending: true });
 
       const urlsFotos: string[] = [];
-      if (modelo?.foto_perfil || modelo?.fotoPerfil) {
-        urlsFotos.push(modelo.foto_perfil || modelo.fotoPerfil);
+      const mainUrl = modelo?.foto_perfil || modelo?.fotoPerfil || modelo?.fotoperfil || modelo?.foto_url;
+      if (mainUrl) {
+        urlsFotos.push(mainUrl);
       }
       if (fotosData && fotosData.length > 0) {
         fotosData.forEach((f: any) => {
