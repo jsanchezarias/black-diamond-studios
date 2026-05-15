@@ -59,12 +59,13 @@ export function BDWalletProvider({ balance, onRecargar, children }: BDWalletProv
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const STREAM_URL      = 'https://stream.blackdiamondscorts.com/live/stream1/index.m3u8';
-const RETRY_DELAY_MS  = 5_000;
+const RETRY_DELAY_MS  = 30_000;
+const MAX_RETRIES     = 3;
 const GOLD            = '#d4af37';
 const GOLD_DIM        = 'rgba(212,175,55,0.18)';
 const GOLD_BORDER     = 'rgba(212,175,55,0.35)';
 
-type StreamState = 'idle' | 'connecting' | 'live' | 'error' | 'reconnecting';
+type StreamState = 'idle' | 'connecting' | 'live' | 'error' | 'reconnecting' | 'offline';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // COMPONENTE PRINCIPAL
@@ -87,9 +88,10 @@ export function BDPremiumStream({
   const { balance, onRecargar } = useWallet();
   const hasFunds = balance > 0;
 
-  const videoRef   = useRef<HTMLVideoElement | null>(null);
-  const hlsRef     = useRef<Hls | null>(null);
-  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const videoRef    = useRef<HTMLVideoElement | null>(null);
+  const hlsRef      = useRef<Hls | null>(null);
+  const retryTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retryCount  = useRef(0);
 
   // ─── Destruir HLS de forma segura ─────────────────────────────────────────
   // Llamar SIEMPRE antes de crear una nueva instancia o al desmontar.
@@ -134,17 +136,22 @@ export function BDPremiumStream({
         },
       });
 
-      // Manifiesto cargado → reproducir
+      // Manifiesto cargado → reproducir y resetear contador de reintentos
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        retryCount.current = 0;
         setStreamState('live');
         videoRef.current?.play().catch(() => {});
       });
 
-      // Error fatal → destruir y reconectar automáticamente en 5 s
+      // Error fatal → reintentar hasta MAX_RETRIES veces, luego offline
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (!data.fatal) return;
-        console.warn('[BDStream] Error fatal, reconectando en 5 s…', data.type, data.details);
         destroyHls();
+        if (retryCount.current >= MAX_RETRIES) {
+          setStreamState('offline');
+          return;
+        }
+        retryCount.current += 1;
         setStreamState('reconnecting');
         retryTimer.current = setTimeout(() => mountHls(), RETRY_DELAY_MS);
       });
@@ -201,7 +208,7 @@ export function BDPremiumStream({
 
   const isLive       = streamState === 'live';
   const isConnecting = streamState === 'connecting' || streamState === 'reconnecting';
-  const isError      = streamState === 'error';
+  const isError      = streamState === 'error' || streamState === 'offline';
 
   // ═══════════════════════════════════════════════════════════════════════════
   // RENDER
@@ -306,18 +313,24 @@ export function BDPremiumStream({
       {isError && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4" style={{ background: '#000' }}>
           <span style={{ fontSize: '2.5rem' }}>📡</span>
-          <p style={{ color: GOLD, fontFamily: "'Playfair Display', serif", fontSize: '1rem', fontWeight: 700 }}>Sin señal</p>
-          <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.78rem', textAlign: 'center', maxWidth: 240 }}>
-            El stream no está disponible en este momento
+          <p style={{ color: GOLD, fontFamily: "'Playfair Display', serif", fontSize: '1rem', fontWeight: 700 }}>
+            {streamState === 'offline' ? 'Stream no disponible' : 'Sin señal'}
           </p>
-          <button
-            onClick={mountHls}
-            style={{ marginTop: 8, padding: '9px 24px', borderRadius: 8, background: GOLD_DIM, border: `1px solid ${GOLD_BORDER}`, color: GOLD, fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', letterSpacing: '0.05em', transition: 'background 0.2s' }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(212,175,55,0.28)')}
-            onMouseLeave={e => (e.currentTarget.style.background = GOLD_DIM)}
-          >
-            Reintentar
-          </button>
+          <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.78rem', textAlign: 'center', maxWidth: 240 }}>
+            {streamState === 'offline'
+              ? 'La transmisión no está activa en este momento. Vuelve más tarde.'
+              : 'El stream no está disponible en este momento'}
+          </p>
+          {streamState !== 'offline' && (
+            <button
+              onClick={mountHls}
+              style={{ marginTop: 8, padding: '9px 24px', borderRadius: 8, background: GOLD_DIM, border: `1px solid ${GOLD_BORDER}`, color: GOLD, fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', letterSpacing: '0.05em', transition: 'background 0.2s' }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(212,175,55,0.28)')}
+              onMouseLeave={e => (e.currentTarget.style.background = GOLD_DIM)}
+            >
+              Reintentar
+            </button>
+          )}
         </div>
       )}
 

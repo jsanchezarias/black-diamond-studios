@@ -228,7 +228,6 @@ export function AgendamientosProvider({ children }: { children: ReactNode }) {
         .from('agendamientos')
         .select('*')
         .gte('fecha', fechaLimite.toISOString().split('T')[0])
-        .or('eliminado.is.null,eliminado.eq.false')
         .order('fecha', { ascending: true })
         .order('hora', { ascending: true })
         .limit(500);
