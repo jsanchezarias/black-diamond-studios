@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ClienteNavbar } from './ClienteNavbar';
 import { useAgendamientos } from './AgendamientosContext';
-import { BDPremiumStream, BDWalletProvider } from './BDPremiumStream';
+import { StreamConTimer } from './StreamConTimer';
+import { LiveChat } from './LiveChat';
 import { createClient } from '@supabase/supabase-js';
 import { supabase, projectId, publicAnonKey } from '../../utils/supabase/info';
 import { toast } from 'sonner';
@@ -1017,15 +1018,18 @@ export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboa
         {activeTab === 'explorar' && (
           <div style={{ animation: 'bdFadeInUp 0.3s ease' }}>
             
-            {/* ── Reproductor Premium Stream ── */}
+            {/* ── Stream + Chat en vivo ── */}
             <div className="mb-8 px-4 sm:px-6">
-              <div className="w-full h-[260px] sm:h-[450px] lg:h-[550px] shadow-2xl rounded-lg overflow-hidden border border-[#2a2a2a]">
-                <BDWalletProvider 
-                  balance={perfilCliente?.diamantes || 0} 
-                  onRecargar={() => toast('💎 Funcionalidad de recarga en construcción', { style: { background: '#16181c', color: '#c9a961', border: '1px solid #c9a961' } })}
-                >
-                  <BDPremiumStream />
-                </BDWalletProvider>
+              <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-4">
+                {/* Stream con timer de 3 min y bloqueo de 1 hora */}
+                <div className="w-full h-[260px] sm:h-[420px] lg:h-[480px] shadow-2xl rounded-xl overflow-hidden border border-[#2a2a2a]">
+                  <StreamConTimer mostrarModelos={false} />
+                </div>
+
+                {/* Chat en vivo */}
+                <div className="rounded-xl border border-[#2a2a2a] overflow-hidden h-[320px] lg:h-[480px]">
+                  <LiveChat />
+                </div>
               </div>
             </div>
             <div className="mb-8">
