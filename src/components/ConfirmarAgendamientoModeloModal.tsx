@@ -1,23 +1,17 @@
 import { useState, useEffect } from 'react';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
-import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { toast } from 'sonner';
-import { 
-  Calendar as CalendarIcon, 
-  User, 
-  ShoppingBag, 
-  Plus, 
-  Minus, 
+import {
+  ShoppingBag,
+  Plus,
   X,
   Upload,
   Image as ImageIcon,
   PlayCircle,
-  Trash2,
   Loader2,
   DoorOpen,
-  Timer,
   ChevronDown,
   ChevronRight
 } from 'lucide-react';

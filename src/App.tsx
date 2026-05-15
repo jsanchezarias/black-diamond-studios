@@ -30,6 +30,10 @@ const OwnerDashboard = lazy(() => import('./app/components/OwnerDashboard').then
 const AdminDashboard = lazy(() => import('./app/components/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
 const ModeloDashboard = lazy(() => import('./app/components/ModeloDashboard').then(m => ({ default: m.ModeloDashboard })));
 const ClienteDashboard = lazy(() => import('./app/components/ClienteDashboard').then(m => ({ default: m.ClienteDashboard })));
+const ContadorDashboard = lazy(() => import('./app/components/ContadorDashboard').then(m => ({ default: m.ContadorDashboard })));
+const RecepcionistaDashboard = lazy(() => import('./app/components/RecepcionistaDashboard').then(m => ({ default: m.RecepcionistaDashboard })));
+const SupervisorDashboard = lazy(() => import('./app/components/SupervisorDashboard').then(m => ({ default: m.SupervisorDashboard })));
+const ModeradorDashboard = lazy(() => import('./app/components/ModeradorDashboard').then(m => ({ default: m.ModeradorDashboard })));
 
 // ✅ Componente que envuelve todos los providers en un solo lugar
 function AllProvidersWrapper({ children }: { children: React.ReactNode }) {
@@ -219,7 +223,7 @@ export default function App() {
   const [verifyingSession, setVerifyingSession] = useState(true);
 
   // ✅ ROLES VÁLIDOS DEL SISTEMA
-  const rolesValidos = ['programador', 'owner', 'administrador', 'modelo', 'cliente'];
+  const rolesValidos = ['programador', 'owner', 'administrador', 'modelo', 'cliente', 'contador', 'recepcionista', 'supervisor', 'moderador'];
 
   // Verificar localStorage al cargar
   useEffect(() => {
@@ -482,7 +486,7 @@ export default function App() {
     };
   }, [currentUser]);
 
-  const ROLES_VALIDOS = ['programador', 'owner', 'administrador', 'modelo', 'cliente'];
+  const ROLES_VALIDOS = ['programador', 'owner', 'administrador', 'modelo', 'cliente', 'contador', 'recepcionista', 'supervisor', 'moderador'];
 
   const handleLogin = (accessToken: string, userId: string, email: string, role: string) => {
     const roleLimpio = role?.trim().toLowerCase() ?? '';
@@ -618,9 +622,53 @@ export default function App() {
 
                 {currentUser.role === 'modelo' && (
                   <Suspense fallback={<GlobalLoadingScreen />}>
-                    <ModeloDashboard 
-                      accessToken={currentUser.accessToken} 
-                      userId={currentUser.userId} 
+                    <ModeloDashboard
+                      accessToken={currentUser.accessToken}
+                      userId={currentUser.userId}
+                      userEmail={currentUser.email || ''}
+                      onLogout={handleLogout}
+                    />
+                  </Suspense>
+                )}
+
+                {currentUser.role === 'contador' && (
+                  <Suspense fallback={<GlobalLoadingScreen />}>
+                    <ContadorDashboard
+                      accessToken={currentUser.accessToken}
+                      userId={currentUser.userId}
+                      userEmail={currentUser.email || ''}
+                      onLogout={handleLogout}
+                    />
+                  </Suspense>
+                )}
+
+                {currentUser.role === 'recepcionista' && (
+                  <Suspense fallback={<GlobalLoadingScreen />}>
+                    <RecepcionistaDashboard
+                      accessToken={currentUser.accessToken}
+                      userId={currentUser.userId}
+                      userEmail={currentUser.email || ''}
+                      onLogout={handleLogout}
+                    />
+                  </Suspense>
+                )}
+
+                {currentUser.role === 'supervisor' && (
+                  <Suspense fallback={<GlobalLoadingScreen />}>
+                    <SupervisorDashboard
+                      accessToken={currentUser.accessToken}
+                      userId={currentUser.userId}
+                      userEmail={currentUser.email || ''}
+                      onLogout={handleLogout}
+                    />
+                  </Suspense>
+                )}
+
+                {currentUser.role === 'moderador' && (
+                  <Suspense fallback={<GlobalLoadingScreen />}>
+                    <ModeradorDashboard
+                      accessToken={currentUser.accessToken}
+                      userId={currentUser.userId}
                       userEmail={currentUser.email || ''}
                       onLogout={handleLogout}
                     />

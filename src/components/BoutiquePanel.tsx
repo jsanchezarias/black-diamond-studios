@@ -7,7 +7,6 @@ import {
   Download, Eye, Calendar, User, Receipt, X, Check, RefreshCw
 } from 'lucide-react';
 import { supabase } from '../utils/supabase/info';
-import { useAgendamientos } from '../app/components/AgendamientosContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';

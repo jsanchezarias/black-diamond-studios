@@ -193,7 +193,7 @@ export function BoutiqueStreamPlayer({
           video.play().catch(e => console.error("Autoplay prevented:", e));
         });
 
-        hls.on(Hls.Events.ERROR, (event, data) => {
+        hls.on(Hls.Events.ERROR, (_event, data) => {
           console.error("HLS Error:", data);
           if (data.fatal) {
             switch (data.type) {

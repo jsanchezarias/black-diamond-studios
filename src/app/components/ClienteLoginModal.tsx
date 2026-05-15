@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { User, Phone, Lock, Loader2, CheckCircle, AlertCircle, Mail, ArrowLeft } from 'lucide-react';
+import { Loader2, CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../components/ui/dialog';
 import { Button } from '../../components/ui/button';

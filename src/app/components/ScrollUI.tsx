@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { ArrowUp } from 'lucide-react';
 
 /**
  * ScrollUI — Barra de progreso dorada + botón back-to-top premium
@@ -7,7 +6,7 @@ import { ArrowUp } from 'lucide-react';
  */
 export function ScrollUI() {
   const [progress, setProgress] = useState(0);
-  const [showBtn, setShowBtn] = useState(false);
+  const [_showBtn, setShowBtn] = useState(false);
 
   useEffect(() => {
     const onScroll = () => {
@@ -22,9 +21,6 @@ export function ScrollUI() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
 
   return (
     <>

@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ClienteNavbar } from './ClienteNavbar';
 import { useAgendamientos } from './AgendamientosContext';
-import { useModelos } from './ModelosContext';
 import { BDPremiumStream, BDWalletProvider } from './BDPremiumStream';
 import { createClient } from '@supabase/supabase-js';
 import { supabase, projectId, publicAnonKey } from '../../utils/supabase/info';
@@ -15,8 +14,9 @@ const supabasePublic = createClient(
   publicAnonKey,
   { auth: { persistSession: false } }
 );
-import { Calendar, Sparkles, Lock, Mail, Phone, Loader2, Star, ArrowRight } from 'lucide-react';
+import { Calendar, Mail, Phone, Loader2, ShoppingBag, Plus, Minus, ShoppingCart, X as XIcon } from 'lucide-react';
 import { ModeloCard } from './ModeloCard';
+import { useInventory, type Producto } from './InventoryContext';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 interface ClienteDashboardProps {
@@ -26,7 +26,7 @@ interface ClienteDashboardProps {
   onLogout: () => void;
 }
 
-type Tab = 'explorar' | 'mis-citas' | 'perfil';
+type Tab = 'explorar' | 'mis-citas' | 'boutique' | 'perfil';
 
 // ─── Paleta de colores ────────────────────────────────────────────────────────
 const C = {
@@ -75,22 +75,6 @@ function isLocked(fecha: string, hora: string): boolean {
   } catch { return false; }
 }
 
-// ─── Skeleton card ────────────────────────────────────────────────────────────
-function SkeletonCard({ delay = 0 }: { delay?: number }) {
-  return (
-    <div className="
-      rounded-xl overflow-hidden
-      bg-[#16181c] animate-pulse
-    ">
-      <div className="h-[240px] bg-[#2a2a2a]"/>
-      <div className="p-3 space-y-2">
-        <div className="h-4 bg-[#2a2a2a] rounded w-3/4"/>
-        <div className="h-4 bg-[#2a2a2a] rounded w-1/2"/>
-        <div className="h-10 bg-[#2a2a2a] rounded"/>
-      </div>
-    </div>
-  );
-}
 
 // ─── Servicios con precios fijos ─────────────────────────────────────────────
 const SERVICIOS_FIJOS = [
@@ -589,6 +573,222 @@ function PerfilTab({ userEmail, nombreMostrado, perfilCliente, misCitas, citasAc
   );
 }
 
+// ─── Boutique Tab ─────────────────────────────────────────────────────────────
+interface CarritoItem extends Producto {
+  cantidad: number;
+}
+
+function BoutiqueTab() {
+  const { inventario, loading } = useInventory();
+  const [carrito, setCarrito] = useState<CarritoItem[]>([]);
+  const [carritoAbierto, setCarritoAbierto] = useState(false);
+  const [categoriaActiva, setCategoriaActiva] = useState<string>('Todos');
+
+  const productosDisponibles = inventario.filter(p => p.stock > 0);
+  const categorias = ['Todos', ...Array.from(new Set(productosDisponibles.map(p => p.categoria || 'General')))];
+  const productosFiltrados = categoriaActiva === 'Todos'
+    ? productosDisponibles
+    : productosDisponibles.filter(p => (p.categoria || 'General') === categoriaActiva);
+
+  const totalCarrito = carrito.reduce((s, i) => s + (i.precioRegular || 0) * i.cantidad, 0);
+  const totalItems = carrito.reduce((s, i) => s + i.cantidad, 0);
+
+  const agregar = (p: Producto) => {
+    setCarrito(prev => {
+      const existe = prev.find(i => i.id === p.id);
+      if (existe) return prev.map(i => i.id === p.id ? { ...i, cantidad: i.cantidad + 1 } : i);
+      return [...prev, { ...p, cantidad: 1 }];
+    });
+  };
+
+  const quitar = (id: string) => {
+    setCarrito(prev => {
+      const item = prev.find(i => i.id === id);
+      if (!item || item.cantidad <= 1) return prev.filter(i => i.id !== id);
+      return prev.map(i => i.id === id ? { ...i, cantidad: i.cantidad - 1 } : i);
+    });
+  };
+
+  const cantidadEnCarrito = (id: string) => carrito.find(i => i.id === id)?.cantidad || 0;
+
+  return (
+    <div style={{ animation: 'bdFadeInUp 0.3s ease', position: 'relative' }}>
+      {/* Header */}
+      <div className="mb-6 flex items-center justify-between flex-wrap gap-4">
+        <div>
+          <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.75rem', fontWeight: 700, color: C.text, marginBottom: 4 }}>
+            Boutique
+          </h2>
+          <p style={{ color: C.muted, fontSize: '0.875rem' }}>Productos exclusivos disponibles en nuestras instalaciones</p>
+        </div>
+        {totalItems > 0 && (
+          <button onClick={() => setCarritoAbierto(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px', background: `linear-gradient(135deg, ${C.gold}, #a07c3a)`, border: 'none', borderRadius: 10, color: '#0f1014', fontWeight: 700, cursor: 'pointer', fontSize: 14 }}>
+            <ShoppingCart style={{ width: 18, height: 18 }} />
+            Carrito ({totalItems}) — ${totalCarrito.toLocaleString('es-CO')}
+          </button>
+        )}
+      </div>
+
+      {/* Filtro por categoría */}
+      <div className="flex gap-2 overflow-x-auto pb-2 mb-6 scrollbar-hide">
+        {categorias.map(cat => (
+          <button key={cat} onClick={() => setCategoriaActiva(cat)}
+            style={{ padding: '7px 16px', borderRadius: 20, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', fontSize: 13, fontWeight: 600, background: categoriaActiva === cat ? C.gold : 'rgba(255,255,255,0.06)', color: categoriaActiva === cat ? '#0f1014' : C.muted, transition: 'all 0.15s' }}>
+            {cat}
+          </button>
+        ))}
+      </div>
+
+      {/* Grid de productos */}
+      {loading ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+          {[1,2,3,4,5,6,7,8].map(i => (
+            <div key={i} style={{ background: C.card, borderRadius: 12, overflow: 'hidden', border: `1px solid ${C.border}` }} className="animate-pulse">
+              <div style={{ height: 180, background: '#2a2a2a' }} />
+              <div style={{ padding: 12 }}>
+                <div style={{ height: 12, background: '#2a2a2a', borderRadius: 4, marginBottom: 8, width: '70%' }} />
+                <div style={{ height: 16, background: '#2a2a2a', borderRadius: 4, width: '40%' }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : productosFiltrados.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+          <ShoppingBag style={{ width: 48, height: 48, color: C.muted, margin: '0 auto 16px' }} />
+          <p style={{ color: C.muted, fontSize: '0.875rem' }}>No hay productos disponibles en esta categoría</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 pb-8">
+          {productosFiltrados.map(producto => {
+            const enCarrito = cantidadEnCarrito(producto.id);
+            return (
+              <div key={producto.id} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden', transition: 'transform 0.2s', cursor: 'default' }}
+                onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-2px)')}
+                onMouseLeave={e => (e.currentTarget.style.transform = 'translateY(0)')}>
+                <div style={{ position: 'relative', height: 180, overflow: 'hidden', background: '#1a1c20' }}>
+                  {producto.imagen ? (
+                    <img src={producto.imagen} alt={producto.nombre} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                      <ShoppingBag style={{ width: 40, height: 40, color: C.muted }} />
+                    </div>
+                  )}
+                  {producto.categoria && (
+                    <span style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(0,0,0,0.7)', color: C.gold, fontSize: 9, fontWeight: 700, padding: '3px 8px', borderRadius: 20, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                      {producto.categoria}
+                    </span>
+                  )}
+                </div>
+                <div style={{ padding: '12px 14px' }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{producto.nombre}</div>
+                  {producto.descripcion && (
+                    <div style={{ fontSize: 11, color: C.muted, marginBottom: 8, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as any }}>{producto.descripcion}</div>
+                  )}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+                    <div>
+                      {(producto.precioInicial && producto.precioFinal && producto.precioInicial > producto.precioFinal) ? (
+                        <div>
+                          <span style={{ fontSize: 10, color: C.muted, textDecoration: 'line-through', marginRight: 4 }}>${(producto.precioInicial || 0).toLocaleString('es-CO')}</span>
+                          <span style={{ fontSize: 15, fontWeight: 700, color: '#4ade80' }}>${(producto.precioFinal || 0).toLocaleString('es-CO')}</span>
+                        </div>
+                      ) : (
+                        <span style={{ fontSize: 15, fontWeight: 700, color: C.gold }}>${(producto.precioRegular || 0).toLocaleString('es-CO')}</span>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {enCarrito > 0 ? (
+                        <>
+                          <button onClick={() => quitar(producto.id)} style={{ width: 26, height: 26, borderRadius: '50%', border: `1px solid ${C.borderGold}`, background: 'transparent', color: C.gold, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Minus style={{ width: 12, height: 12 }} />
+                          </button>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: C.gold, minWidth: 20, textAlign: 'center' }}>{enCarrito}</span>
+                          <button onClick={() => agregar(producto)} style={{ width: 26, height: 26, borderRadius: '50%', border: 'none', background: C.gold, color: '#0f1014', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Plus style={{ width: 12, height: 12 }} />
+                          </button>
+                        </>
+                      ) : (
+                        <button onClick={() => agregar(producto)} style={{ padding: '5px 12px', borderRadius: 8, border: 'none', background: C.gold, color: '#0f1014', fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <Plus style={{ width: 12, height: 12 }} /> Agregar
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Drawer del carrito */}
+      {carritoAbierto && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }} onClick={() => setCarritoAbierto(false)}>
+          <div style={{ width: Math.min(420, window.innerWidth), height: '100%', background: '#111', borderLeft: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+            <div style={{ padding: '20px 24px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <h3 style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.1rem', fontWeight: 700, color: C.text, margin: 0 }}>
+                Mi Carrito
+              </h3>
+              <button onClick={() => setCarritoAbierto(false)} style={{ background: 'transparent', border: 'none', color: C.muted, cursor: 'pointer', padding: 4 }}>
+                <XIcon style={{ width: 20, height: 20 }} />
+              </button>
+            </div>
+            <div style={{ flex: 1, padding: '16px 24px', overflowY: 'auto' }}>
+              {carrito.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px 0', color: C.muted }}>
+                  <ShoppingCart style={{ width: 40, height: 40, margin: '0 auto 12px', opacity: 0.5 }} />
+                  <p style={{ fontSize: 14 }}>Tu carrito está vacío</p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {carrito.map(item => (
+                    <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: 10, border: `1px solid ${C.border}` }}>
+                      {item.imagen && <img src={item.imagen} alt={item.nombre} style={{ width: 48, height: 48, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />}
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{item.nombre}</div>
+                        <div style={{ fontSize: 12, color: C.gold, fontWeight: 700 }}>${(item.precioRegular || 0).toLocaleString('es-CO')} c/u</div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <button onClick={() => quitar(item.id)} style={{ width: 26, height: 26, borderRadius: '50%', border: `1px solid ${C.borderGold}`, background: 'transparent', color: C.gold, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Minus style={{ width: 12, height: 12 }} />
+                        </button>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: C.text, minWidth: 24, textAlign: 'center' }}>{item.cantidad}</span>
+                        <button onClick={() => agregar(item)} style={{ width: 26, height: 26, borderRadius: '50%', border: 'none', background: C.gold, color: '#0f1014', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Plus style={{ width: 12, height: 12 }} />
+                        </button>
+                      </div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: C.gold, minWidth: 80, textAlign: 'right' }}>
+                        ${((item.precioRegular || 0) * item.cantidad).toLocaleString('es-CO')}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            {carrito.length > 0 && (
+              <div style={{ padding: '20px 24px', borderTop: `1px solid ${C.border}` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+                  <span style={{ color: C.muted, fontSize: 14 }}>Total</span>
+                  <span style={{ fontSize: 20, fontWeight: 700, color: C.gold }}>${totalCarrito.toLocaleString('es-CO')}</span>
+                </div>
+                <div style={{ background: 'rgba(201,169,97,0.1)', border: `1px solid ${C.borderGold}`, borderRadius: 10, padding: '12px 16px', marginBottom: 16 }}>
+                  <p style={{ fontSize: 12, color: C.muted, margin: 0, lineHeight: 1.5 }}>
+                    Los productos de boutique se pagan al momento del servicio. Informa a tu acompañante los productos que deseas.
+                  </p>
+                </div>
+                <button onClick={() => { toast.success('✅ Lista de productos guardada. Tu acompañante la tendrá disponible.'); setCarritoAbierto(false); }}
+                  style={{ width: '100%', padding: 13, border: 'none', borderRadius: 10, background: `linear-gradient(135deg, ${C.gold}, #a07c3a)`, color: '#0f1014', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+                  Confirmar Lista
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── ClienteDashboard (componente principal) ──────────────────────────────────
 export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboardProps) {
   const [activeTab, setActiveTab] = useState<Tab>('explorar');
@@ -775,6 +975,7 @@ export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboa
           {([
             { id: 'explorar',   label: 'Explorar',  icon: '✦',  badge: 0 },
             { id: 'mis-citas',  label: 'Mis Citas', icon: '📅', badge: citasActivas.length },
+            { id: 'boutique',   label: 'Boutique',  icon: '🛍️', badge: 0 },
             { id: 'perfil',     label: 'Mi Perfil', icon: '👤', badge: 0 },
           ] as const).map(tab => (
             <button
@@ -914,6 +1115,9 @@ export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboa
             )}
           </div>
         )}
+
+        {/* TAB: BOUTIQUE */}
+        {activeTab === 'boutique' && <BoutiqueTab />}
 
         {/* TAB: MIS CITAS */}
         {activeTab === 'mis-citas' && (

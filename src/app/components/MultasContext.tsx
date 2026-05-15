@@ -39,7 +39,7 @@ import { useEffect, useCallback } from 'react';
 
 export function MultasProvider({ children }: { children: ReactNode }) {
   const [multas, setMultas] = useState<Multa[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [_loading, setLoading] = useState(true);
 
   const cargarMultas = useCallback(async () => {
     try {
@@ -85,7 +85,7 @@ export function MultasProvider({ children }: { children: ReactNode }) {
   }, [cargarMultas]);
 
   const agregarMulta = async (multa: Omit<Multa, 'id' | 'fecha' | 'estado'>) => {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('multas')
       .insert({
         modelo_id: multa.modeloId,

@@ -36,7 +36,7 @@ export const ESTADO_CONFIG: Record<Agendamiento['estado'], { label: string; colo
 // ── Props ─────────────────────────────────────────────────────────────────────
 
 interface AgendamientosPanelProps {
-  rol: 'owner' | 'admin' | 'supervisor' | 'recepcionista' | 'modelo';
+  rol: 'owner' | 'admin' | 'administrador' | 'supervisor' | 'recepcionista' | 'modelo' | 'programador';
   userEmail?: string;
   /** Sólo para rol='modelo': filtra por este email */
   modeloEmail?: string;
@@ -47,7 +47,7 @@ interface AgendamientosPanelProps {
 function AgendamientoRow({
   ag,
   rol,
-  userEmail = '',
+  userEmail: _userEmail = '',
   onAprobar,
   onRechazar,
   onCompletar,
@@ -74,12 +74,12 @@ function AgendamientoRow({
   onToggleSelect?: (id: string) => void;
 }) {
   const cfg = ESTADO_CONFIG[ag.estado] ?? ESTADO_CONFIG.pendiente;
-  const puedeAprobar    = (rol === 'supervisor' || rol === 'admin' || rol === 'owner') && ag.estado === 'pendiente';
+  const puedeAprobar    = (rol === 'supervisor' || rol === 'admin' || rol === 'administrador' || rol === 'owner' || rol === 'programador') && ag.estado === 'pendiente';
   const puedeCompletar  = (rol !== 'modelo') && (ag.estado === 'confirmado' || ag.estado === 'aprobado');
   const puedeNoShow     = (rol !== 'modelo') && (ag.estado === 'confirmado' || ag.estado === 'aprobado');
   const puedeCancelar   = (rol !== 'modelo') && (ag.estado === 'pendiente' || ag.estado === 'confirmado' || ag.estado === 'aprobado');
 
-  const esAdmin = rol === 'admin' || rol === 'owner';
+  const esAdmin = rol === 'admin' || rol === 'administrador' || rol === 'owner';
   const esArchivado = !!(ag as any).archivado;
 
   return (
@@ -182,7 +182,7 @@ function AgendamientoRow({
           </Button>
         )}
         {/* Eliminar */}
-        {onEliminar && rol === 'admin' && (
+        {onEliminar && (rol === 'admin' || rol === 'administrador') && (
           <Button size="sm" onClick={() => onEliminar(ag)}
             className="h-7 px-2 text-xs bg-red-900/20 text-red-400 border border-red-900/30 hover:bg-red-900/30">
             <Trash2 className="w-3 h-3" />
@@ -213,7 +213,7 @@ interface NuevoAgendamientoModalProps {
   onCreado: () => void;
 }
 
-function NuevoAgendamientoModal({ onClose, userEmail, onCreado }: NuevoAgendamientoModalProps) {
+function NuevoAgendamientoModal({ onClose, userEmail: _userEmail, onCreado }: NuevoAgendamientoModalProps) {
   const { modelos } = useModelos();
   const modelosActivos = modelos.filter(m => m.activa);
   const { agregarAgendamiento, actualizarAgendamiento } = useAgendamientos();
@@ -814,7 +814,7 @@ export function AgendamientosPanel({ rol, userEmail = '', modeloEmail }: Agendam
   const [modalEliminacion, setModalEliminacion] = useState<{ag: Agendamiento, tieneRelacionados: boolean} | null>(null);
   const [seleccionados, setSeleccionados] = useState<string[]>([]);
 
-  const esAdmin = rol === 'admin' || rol === 'owner';
+  const esAdmin = rol === 'admin' || rol === 'administrador' || rol === 'owner';
 
   // Cargar archivados cuando se activa el toggle
   useEffect(() => {
@@ -1171,7 +1171,7 @@ export function AgendamientosPanel({ rol, userEmail = '', modeloEmail }: Agendam
             className="h-7 px-2 text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20">
             <Archive className="w-3 h-3 mr-1" />Archivar todos
           </Button>
-          {rol === 'admin' && (
+          {(rol === 'admin' || rol === 'administrador') && (
             <Button size="sm" onClick={eliminarSeleccionados}
               className="h-7 px-2 text-xs bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20">
               <Trash2 className="w-3 h-3 mr-1" />Eliminar todos

@@ -103,7 +103,7 @@ export function LoginForm({ tipo, onLogin, onBackToLanding }: LoginFormProps) {
     }
 
     // Buscar en usuarios primero
-    const { data: usuario, error: userError } = await supabase
+    const { data: usuario, error: _userError } = await supabase
       .from('usuarios')
       .select('role')
       .eq('id', user!.id)
@@ -144,7 +144,7 @@ export function LoginForm({ tipo, onLogin, onBackToLanding }: LoginFormProps) {
       return;
     }
 
-    const { data: usuario, error: userError } = await supabase
+    const { data: usuario, error: _userError } = await supabase
       .from('usuarios')
       .select('role')
       .eq('id', user!.id)

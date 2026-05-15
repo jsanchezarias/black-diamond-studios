@@ -1,13 +1,10 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import { Button } from '../../components/ui/button';
-import { Card, CardContent } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
 // Removed ModelCard import
 import { ModeloCard } from './ModeloCard';
 import { AppointmentModal } from './AppointmentModal';
 import { VideoShowcase } from './VideoShowcase';
-import { Logo } from './Logo';
 import { TestimoniosSection } from './TestimoniosSection';
 import { AgregarTestimonioModal } from './AgregarTestimonioModal';
 import { ClienteLoginModal } from './ClienteLoginModal';
@@ -19,14 +16,12 @@ import { ParticlesBackground } from './ParticlesBackground'; // ✅ Fondo de par
 import { GoldenCursor } from './GoldenCursor'; // ✅ Cursor personalizado dorado
 import { ScrollUI } from './ScrollUI'; // ✅ Barra de progreso y back-to-top
 import { HeroStats } from './HeroStats'; // ✅ Estadísticas de impacto visual
-import { Gem, Clock, MapPin, Shield, Award, Star, X, User as UserIcon, Phone, Mail, Sparkles, Heart, Send, LogOut } from 'lucide-react';
+import { Gem, Clock, MapPin, Shield, Award, Star, X, Phone, Mail, Sparkles, Heart, Send } from 'lucide-react';
 import { useLanguage } from './LanguageContext';
-import { LanguageSelector } from './LanguageSelector';
-import { sedes } from './sedesData';
+
 import { LiveChat } from './LiveChat';
 import { TipModal } from './TipModal';
 import { usePublicUsers } from './PublicUsersContext';
-import { useModelos } from './ModelosContext';
 import { supabase } from '../../utils/supabase/info';
 
 
@@ -120,10 +115,10 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
   }, [])
 
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
-  const [sedeActual, setSedeActual] = useState('sede-1');
-  const [loadingStream, setLoadingStream] = useState(false);
-  const [isScrolled, setIsScrolled] = useState(false);
-  const [streamFallido, setStreamFallido] = useState(false);
+
+
+  const [_isScrolled, setIsScrolled] = useState(false);
+  const [_streamFallido, setStreamFallido] = useState(false);
 
   
   // Estados para sistema de propinas
@@ -148,9 +143,9 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
   const [solicitudData, setSolicitudData] = useState<{model: any, service?: any, location?: 'sede' | 'domicilio', price?: string} | null>(null);
   const [perfilVisibleId, setPerfilVisibleId] = useState<string | null>(null);
 
-  const [streamActivo, setStreamActivo] = useState(false);
+  const [_streamActivo, setStreamActivo] = useState(false);
 
-  const { currentUser: chatUser, logout, logoutRef, sendMessage } = usePublicUsers(); // ✅ Renombrado para evitar conflicto
+  const { currentUser: chatUser, logout: _logout, logoutRef: _logoutRef, sendMessage: _sendMessage } = usePublicUsers(); // ✅ Renombrado para evitar conflicto
 
   // ============================================
   // 🆕 SINCRONIZAR clienteActual con chatUser del chat
@@ -258,7 +253,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
   };
   
   // Hook para traducciones
-  const { t, language } = useLanguage();
+  const { t, language: _language } = useLanguage();
   
   // ✅ NUEVO: Forzar scroll al top al cargar la página
   useEffect(() => {
@@ -342,16 +337,6 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
     setMenuAbierto(false);
   };
 
-  // Handler para cambio de sede
-  const handleSedeChange = (sedeId: string) => {
-    setSedeActual(sedeId);
-    const sede = sedes.find(s => s.id === sedeId);
-    if (sede) {
-      // streamUrl handled internally
-    }
-    // ❌ REMOVIDO: No hacer scroll automático al cambiar de sede
-    // scrollToSection('inicio');
-  };
 
   const normalizarTelefono = (tel: string): string => {
     const soloDigitos = tel.replace(/[^0-9]/g, '');
@@ -427,31 +412,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
     }
   };
 
-  // Obtener modelos desde el contexto y aplicar filtros
-  const modelosDisponibles = modelos
-    .filter((m: any) => m.activa && !m.enPeriodo && m.disponible)
-    .map(convertirModeloParaCard);
-  
-  const modelosNoDisponibles = modelos
-    .filter((m: any) => m.activa && (m.enPeriodo || !m.disponible))
-    .map(convertirModeloParaCard);
-  
-  // ✅ NUEVO: Modelos inactivas - aparecen al final
-  const modelosInactivas = modelos
-    .filter((m: any) => !m.activa)
-    .map(convertirModeloParaCard);
-    
-  const todosLosModelos = modelos.map(convertirModeloParaCard); // Para el modal
-
-
-  const handleContactModel = (model: any, service?: any, location?: 'sede' | 'domicilio', price?: string) => {
-    if (!currentUserProp) {
-      toast.error('Por favor, inicia sesión para solicitar un servicio.');
-      setShowClienteLogin(true);
-      return;
-    }
-    setSolicitudData({ model, service, location, price });
-  };
+  const todosLosModelos = modelos.map(convertirModeloParaCard);
 
 
 
@@ -470,10 +431,6 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
 
     try {
 
-      // 🆕 INTEGRACIÓN CON PAYU/PSE
-      // Crear referencia de pago única
-      const referenciaPago = `TIP-${currentUserProp.id}-${Date.now()}`;
-      
       // Preparar datos de la transacción
       /*
       const transaccionData = {

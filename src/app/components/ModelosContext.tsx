@@ -271,7 +271,7 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
         }
 
         // Convertir datos de Supabase al formato del contexto
-        const modelosData: Modelo[] = usuarios.map((usuario, index) => {
+        const modelosData: Modelo[] = usuarios.map((usuario, _index) => {
           // ✅ OPTIMIZADO: Reducir logs en producción
           // Solo loguear información crítica, no cada campo de cada usuario
           

@@ -419,7 +419,7 @@ function ModalIniciarServicio({ onClose, modeloEmail, modeloNombre, emailPropio 
   const [clienteNombre, setClienteNombre] = useState('');
   const [clienteTelefono, setClienteTelefono] = useState('');
   const [enviando, setEnviando] = useState(false);
-  const [tick, setTick] = useState(0);
+  const [_tick, setTick] = useState(0);
 
   // Cargar habitaciones
   useEffect(() => {
@@ -663,7 +663,7 @@ function ModalIniciarServicio({ onClose, modeloEmail, modeloNombre, emailPropio 
 // ─── Panel de habitaciones (solo lectura para modelo) ─────────────────────────
 function PanelHabitacionesModelo({ emailPropio }: { emailPropio: string }) {
   const [habitaciones, setHabitaciones] = useState<HabRow[]>([]);
-  const [tick, setTick] = useState(0);
+  const [_tick, setTick] = useState(0);
 
   useEffect(() => {
     const cargar = async () => {
@@ -686,7 +686,7 @@ function PanelHabitacionesModelo({ emailPropio }: { emailPropio: string }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 8 }}>
         {habitaciones.map(hab => {
           const esMia = hab.modelo_email === emailPropio;
-          const { texto: tRestante, critico, mins } = hab.estado === 'ocupada' ? calcTiempoRestante(hab.hora_fin_estimada) : { texto: '', critico: false, mins: 999 };
+          const { texto: tRestante, critico } = hab.estado === 'ocupada' ? calcTiempoRestante(hab.hora_fin_estimada) : { texto: '', critico: false };
           const bg = hab.estado === 'disponible' ? 'rgba(34,197,94,0.08)' : hab.estado === 'ocupada' ? 'rgba(239,68,68,0.08)' : 'rgba(234,179,8,0.08)';
           const border = hab.estado === 'disponible' ? 'rgba(34,197,94,0.3)' : hab.estado === 'ocupada' ? 'rgba(239,68,68,0.3)' : 'rgba(234,179,8,0.3)';
           const dotColor = hab.estado === 'disponible' ? '#22c55e' : hab.estado === 'ocupada' ? '#ef4444' : '#eab308';

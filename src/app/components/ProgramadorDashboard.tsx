@@ -111,7 +111,7 @@ export function ProgramadorDashboard({ accessToken: _accessToken, userId, userEm
   const [aprobadas, setAprobadas] = useState<any[]>([]);
   const [modalAceptar, setModalAceptar] = useState<any>(null);
   const [habitacionesDisponibles, setHabitacionesDisponibles] = useState<any[]>([]);
-  const [habitacionSeleccionada, setHabitacionSeleccionada] = useState<any>(null);
+  const [_habitacionSeleccionada, setHabitacionSeleccionada] = useState<any>(null);
   const [loadingAceptar, setLoadingAceptar] = useState(false);
 
   const cargarAgendamientos = async () => {

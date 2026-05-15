@@ -402,6 +402,49 @@ export function AgendamientosProvider({ children }: { children: ReactNode }) {
       canceladoPor: marcadoPor,
       fechaCancelacion: new Date().toISOString(),
     });
+
+    // Multa automática por no-show
+    try {
+      const ag = agendamientos.find(a => a.id === id);
+      if (ag) {
+        const MONTO_BASE = 50000;
+        const PORCENTAJE = 0.30;
+        const montoMulta = Math.max(MONTO_BASE, (ag.montoPago || 0) * PORCENTAJE);
+
+        // Obtener UUID del modelo por email
+        const { data: userData } = await supabase
+          .from('usuarios')
+          .select('id')
+          .eq('email', ag.modeloEmail)
+          .maybeSingle();
+
+        await supabase.from('multas').insert({
+          modelo_id: userData?.id ?? null,
+          modelo_nombre: ag.modeloNombre,
+          modelo_email: ag.modeloEmail,
+          tipo: 'no_show',
+          motivo: `No-show — ${motivo || 'Cliente no se presentó'}`,
+          monto: montoMulta,
+          estado: 'activa',
+          agendamiento_id: id,
+          created_at: new Date().toISOString(),
+        });
+
+        // Notificar al modelo
+        if (userData?.id) {
+          await supabase.from('notificaciones').insert({
+            usuario_id: userData.id,
+            para_usuario_id: userData.id,
+            tipo: 'multa_aplicada',
+            titulo: '⚠️ Multa por no-show',
+            mensaje: `Se aplicó una multa de $${montoMulta.toLocaleString('es-CO')} por no presentarse al servicio del ${ag.fecha} a las ${ag.hora}`,
+            leida: false,
+          });
+        }
+      }
+    } catch (multaErr) {
+      console.error('❌ Error creando multa automática:', multaErr);
+    }
   };
 
   const recargarAgendamientos = async () => {

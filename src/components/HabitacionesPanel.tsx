@@ -42,9 +42,6 @@ function tiempoRestanteSegundos(horaFin: string | null): number {
   return Math.floor((new Date(horaFin).getTime() - Date.now()) / 1000);
 }
 
-function tiempoRestanteMinutos(horaFin: string | null): number {
-  return Math.floor(tiempoRestanteSegundos(horaFin) / 60);
-}
 
 export function HabitacionesPanel() {
   const [habitaciones, setHabitaciones] = useState<Habitacion[]>([]);
