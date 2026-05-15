@@ -61,11 +61,28 @@ export function BDWalletProvider({ balance, onRecargar, children }: BDWalletProv
 const STREAM_URL      = 'https://stream.blackdiamondscorts.com/live/stream1/index.m3u8';
 const RETRY_DELAY_MS  = 30_000;
 const MAX_RETRIES     = 3;
+const CHECK_TIMEOUT   = 5_000;
 const GOLD            = '#d4af37';
 const GOLD_DIM        = 'rgba(212,175,55,0.18)';
 const GOLD_BORDER     = 'rgba(212,175,55,0.35)';
 
-type StreamState = 'idle' | 'connecting' | 'live' | 'error' | 'reconnecting' | 'offline';
+type StreamState = 'idle' | 'checking' | 'connecting' | 'live' | 'error' | 'reconnecting' | 'offline';
+
+/** Verifica si el servidor de stream responde antes de cargar HLS.
+ *  Usa no-cors para evitar el bloqueo CORS en el preflight del fetch.
+ *  Retorna true si el servidor está alcanzable, false si no. */
+async function checkStreamAvailable(): Promise<boolean> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), CHECK_TIMEOUT);
+  try {
+    await fetch(STREAM_URL, { method: 'HEAD', mode: 'no-cors', signal: ctrl.signal });
+    return true;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // COMPONENTE PRINCIPAL
@@ -112,34 +129,45 @@ export function BDPremiumStream({
     }
   }, []);
 
-  // ─── Montar instancia HLS ─────────────────────────────────────────────────
-  const mountHls = useCallback(() => {
+  // ─── Montar instancia HLS (con preflight check) ──────────────────────────
+  const mountHls = useCallback(async () => {
     if (!videoRef.current) return;
 
-    // Destruir instancia previa antes de crear la nueva (evita duplicados)
     destroyHls();
     clearRetry();
+    setStreamState('checking');
+
+    const available = await checkStreamAvailable();
+    if (!available) {
+      if (retryCount.current >= MAX_RETRIES) {
+        setStreamState('offline');
+        return;
+      }
+      retryCount.current += 1;
+      setStreamState('reconnecting');
+      retryTimer.current = setTimeout(() => mountHls(), RETRY_DELAY_MS);
+      return;
+    }
+
     setStreamState('connecting');
 
     if (Hls.isSupported()) {
       const hls = new Hls({
-        maxBufferLength:          8,
-        maxMaxBufferLength:       16,
-        liveSyncDurationCount:    2,
+        maxBufferLength:             8,
+        maxMaxBufferLength:          16,
+        liveSyncDurationCount:       2,
         liveMaxLatencyDurationCount: 4,
-        manifestLoadingTimeOut:   8_000,
-        manifestLoadingMaxRetry:  2,
-        manifestLoadingRetryDelay: 1_000,
+        manifestLoadingTimeOut:      8_000,
+        manifestLoadingMaxRetry:     2,
+        manifestLoadingRetryDelay:   1_000,
       });
 
-      // Manifiesto cargado → reproducir y resetear contador de reintentos
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         retryCount.current = 0;
         setStreamState('live');
         videoRef.current?.play().catch(() => {});
       });
 
-      // Error fatal → reintentar hasta MAX_RETRIES veces, luego offline
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (!data.fatal) return;
         destroyHls();
@@ -154,10 +182,9 @@ export function BDPremiumStream({
 
       hls.loadSource(STREAM_URL);
       hls.attachMedia(videoRef.current);
-      hlsRef.current = hls; // Guardar referencia para cleanup
+      hlsRef.current = hls;
 
     } else if (videoRef.current.canPlayType('application/vnd.apple.mpegurl')) {
-      // Safari: HLS nativo sin librería
       videoRef.current.src = STREAM_URL;
       videoRef.current.load();
       videoRef.current.play().catch(() => {});
@@ -203,7 +230,7 @@ export function BDPremiumStream({
   }, [muted]);
 
   const isLive       = streamState === 'live';
-  const isConnecting = streamState === 'connecting' || streamState === 'reconnecting';
+  const isConnecting = streamState === 'checking' || streamState === 'connecting' || streamState === 'reconnecting';
   const isError      = streamState === 'error' || streamState === 'offline';
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -300,7 +327,7 @@ export function BDPremiumStream({
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4" style={{ background: 'rgba(0,0,0,0.88)' }}>
           <div style={{ width: 44, height: 44, border: `3px solid ${GOLD_DIM}`, borderTop: `3px solid ${GOLD}`, borderRadius: '50%', animation: 'bd-spin 0.8s linear infinite' }} />
           <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.8rem', letterSpacing: '0.06em' }}>
-            {streamState === 'reconnecting' ? 'Reconectando…' : 'Cargando stream…'}
+            {streamState === 'reconnecting' ? `Reintentando (${retryCount.current}/${MAX_RETRIES})…` : streamState === 'checking' ? 'Verificando señal…' : 'Cargando stream…'}
           </p>
         </div>
       )}
@@ -317,16 +344,14 @@ export function BDPremiumStream({
               ? 'La transmisión no está activa en este momento. Vuelve más tarde.'
               : 'El stream no está disponible en este momento'}
           </p>
-          {streamState !== 'offline' && (
-            <button
-              onClick={mountHls}
-              style={{ marginTop: 8, padding: '9px 24px', borderRadius: 8, background: GOLD_DIM, border: `1px solid ${GOLD_BORDER}`, color: GOLD, fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', letterSpacing: '0.05em', transition: 'background 0.2s' }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(212,175,55,0.28)')}
-              onMouseLeave={e => (e.currentTarget.style.background = GOLD_DIM)}
-            >
-              Reintentar
-            </button>
-          )}
+          <button
+            onClick={() => { retryCount.current = 0; mountHls(); }}
+            style={{ marginTop: 8, padding: '9px 24px', borderRadius: 8, background: GOLD_DIM, border: `1px solid ${GOLD_BORDER}`, color: GOLD, fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', letterSpacing: '0.05em', transition: 'background 0.2s' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(212,175,55,0.28)')}
+            onMouseLeave={e => (e.currentTarget.style.background = GOLD_DIM)}
+          >
+            Reintentar conexión
+          </button>
         </div>
       )}
 
