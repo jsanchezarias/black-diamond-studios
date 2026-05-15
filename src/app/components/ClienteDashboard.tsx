@@ -3,6 +3,7 @@ import { ClienteNavbar } from './ClienteNavbar';
 import { useAgendamientos } from './AgendamientosContext';
 import { StreamConTimer } from './StreamConTimer';
 import { LiveChat } from './LiveChat';
+import { usePublicUsers } from './PublicUsersContext';
 import { createClient } from '@supabase/supabase-js';
 import { supabase, projectId, publicAnonKey } from '../../utils/supabase/info';
 import { toast } from 'sonner';
@@ -801,6 +802,7 @@ export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboa
   const [errorModelos, setErrorModelos] = useState<string | null>(null);
 
   const { agendamientos = [] } = useAgendamientos() || {};
+  const { loginUser } = usePublicUsers() || {};
 
   useEffect(() => {
     const cargarModelos = async () => {
@@ -858,12 +860,17 @@ export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboa
     setLoadingPerfil(true);
     supabase
       .from('clientes')
-      .select('nombre, email, telefono, created_at, nombre_usuario, diamantes')
+      .select('id, nombre, email, telefono, created_at, nombre_usuario, diamantes')
       .or(`user_id.eq.${userId},email.eq.${userEmail}`)
       .maybeSingle()
       .then(({ data }) => {
         setPerfilCliente(data);
         setLoadingPerfil(false);
+        // Conectar el cliente autenticado al contexto del chat público
+        // para que LiveChat pueda enviar mensajes a chat_mensajes_publicos
+        if (data && loginUser) {
+          loginUser({ ...data, email: data.email || userEmail });
+        }
       });
   }, [userId, userEmail]);
 
