@@ -547,6 +547,7 @@ export default function App() {
     } catch (error) {
       console.error('❌ Error crítico en logout:', error);
       localStorage.clear();
+      sessionStorage.clear();
       window.location.replace('/');
     }
   };

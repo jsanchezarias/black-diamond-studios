@@ -155,9 +155,8 @@ export function AdminDashboard({ accessToken, userId, userEmail = '', onLogout }
   const { inventario = [] } = inventoryCtx;
   const { gastosOperativos = [] } = gastosCtx || { gastosOperativos: [] };
 
-  // Barrera de seguridad: solo la administradora autorizada puede ver este panel
-  const EMAIL_ADMIN_VALIDO = 'noreidysotto@gmail.com';
-  if (userEmail !== EMAIL_ADMIN_VALIDO) {
+  // Barrera de seguridad: solo usuarios con email válido (el acceso por rol ya está controlado en App.tsx)
+  if (!userEmail) {
     return (
       <div style={{
         backgroundColor: '#0f1014',

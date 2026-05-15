@@ -11,13 +11,13 @@ const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 // Cliente con permisos completos (service role)
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-const BUCKET_NAME = "modelos-fotos";
+const BUCKET_NAME = "fotos-modelos";
 
 /**
  * Asegura que el bucket existe, si no lo crea
  */
 export async function ensureBucketExists() {
-  console.log("📦 Verificando bucket modelos-fotos...");
+  console.log("📦 Verificando bucket fotos-modelos...");
 
   const { data: buckets, error: listError } = await supabase.storage.listBuckets();
 
@@ -29,7 +29,7 @@ export async function ensureBucketExists() {
   const bucketExists = buckets?.some((bucket) => bucket.name === BUCKET_NAME);
 
   if (!bucketExists) {
-    console.log("📦 Creando bucket modelos-fotos...");
+    console.log("📦 Creando bucket fotos-modelos...");
 
     const { data, error: createError } = await supabase.storage.createBucket(
       BUCKET_NAME,

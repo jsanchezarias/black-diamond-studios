@@ -92,7 +92,7 @@ export function DetalleAgendamientoModal({
     const costoTotal = (s.costoServicio || 0) + (s.costoAdicionales || 0) + (s.costoConsumo || 0);
     return sum + costoTotal;
   }, 0);
-  const totalVisitas = historialServicios.filter(s => s.estado === 'finalizado').length;
+  const totalVisitas = historialServicios.filter(s => s.estado === 'completado').length;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>

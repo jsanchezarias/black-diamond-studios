@@ -49,7 +49,6 @@ const ESTADO_CONFIG: Record<string, { label: string; bg: string; color: string; 
   confirmado:           { label: 'Confirmada', bg: 'rgba(34,197,94,0.12)',   color: '#22c55e', icon: '✅' },
   aprobado:             { label: 'Aprobada',   bg: 'rgba(59,130,246,0.12)',  color: '#60a5fa', icon: '✅' },
   completado:           { label: 'Completada', bg: 'rgba(107,114,128,0.12)', color: '#9ca3af', icon: '☑️' },
-  finalizado:           { label: 'Completada', bg: 'rgba(107,114,128,0.12)', color: '#9ca3af', icon: '☑️' },
   cancelado:            { label: 'Cancelada',  bg: 'rgba(239,68,68,0.12)',   color: '#ef4444', icon: '❌' },
   rechazado:            { label: 'Rechazada',  bg: 'rgba(239,68,68,0.12)',   color: '#ef4444', icon: '🚫' },
   no_show:              { label: 'No Show',    bg: 'rgba(239,68,68,0.12)',   color: '#ef4444', icon: '❌' },
@@ -499,7 +498,7 @@ function PerfilTab({ userEmail, nombreMostrado, perfilCliente, misCitas, citasAc
   const miembroDesde = perfilCliente?.created_at
     ? new Date(perfilCliente.created_at).toLocaleDateString('es-CO', { year: 'numeric', month: 'long' })
     : null;
-  const citasCompletadas = misCitas.filter(a => ['completado', 'finalizado'].includes(a.estado)).length;
+  const citasCompletadas = misCitas.filter(a => a.estado === 'completado').length;
 
   return (
     <div className="max-w-lg mx-auto space-y-6" style={{ animation: 'bdFadeInUp 0.35s ease' }}>

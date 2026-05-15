@@ -266,7 +266,7 @@ export function CrearModeloModal({ open, onClose }: CrearModeloModalProps) {
 
       // El bucket se gestiona del lado del servidor (la Edge Function lo crea si no existe)
       // No intentamos crear buckets desde el frontend porque el rol anon/authenticated no tiene permisos
-      const bucketName = 'modelos-fotos'; // Bucket público gestionado por la Edge Function
+      const bucketName = 'fotos-modelos'; // Bucket público gestionado por la Edge Function
 
       // Subir foto de perfil
       if (archivoFoto) {

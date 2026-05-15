@@ -15,7 +15,7 @@ export interface Agendamiento {
   hora: string;
   duracionMinutos: number;
   tipoServicio: string;
-  estado: 'pendiente' | 'confirmado' | 'aprobado' | 'en_curso' | 'activo' | 'completado' | 'cancelado' | 'no_show' | 'finalizado' | 'aceptado_programador' | 'solicitud_cliente' | 'creado_por_modelo';
+  estado: 'pendiente' | 'confirmado' | 'aprobado' | 'en_curso' | 'activo' | 'completado' | 'cancelado' | 'no_show' | 'aceptado_programador' | 'solicitud_cliente' | 'creado_por_modelo';
   notas?: string;
   creadoPor?: string;
   creadoPorRol?: string;

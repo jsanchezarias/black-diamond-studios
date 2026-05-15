@@ -319,20 +319,20 @@ export function ServicioDetalleCard({ servicio, mostrarCliente = false }: Servic
       )}
 
       {/* Estado del servicio */}
-      <Card className={`border-${servicio.estado === 'finalizado' ? 'green' : 'blue'}-500/20 bg-${servicio.estado === 'finalizado' ? 'green' : 'blue'}-500/5`}>
+      <Card className={`border-${servicio.estado === 'completado' ? 'green' : 'blue'}-500/20 bg-${servicio.estado === 'completado' ? 'green' : 'blue'}-500/5`}>
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <CheckCircle className={`w-5 h-5 text-${servicio.estado === 'finalizado' ? 'green' : 'blue'}-500`} />
+              <CheckCircle className={`w-5 h-5 text-${servicio.estado === 'completado' ? 'green' : 'blue'}-500`} />
               <div>
                 <p className="font-semibold text-sm">Estado del Servicio</p>
                 <p className="text-xs text-muted-foreground">
-                  {servicio.estado === 'finalizado' ? 'Servicio completado' : 'Servicio en curso'}
+                  {servicio.estado === 'completado' ? 'Servicio completado' : 'Servicio en curso'}
                 </p>
               </div>
             </div>
-            <Badge className={servicio.estado === 'finalizado' ? 'bg-green-500' : 'bg-blue-500'}>
-              {servicio.estado === 'finalizado' ? 'Finalizado' : 'En Curso'}
+            <Badge className={servicio.estado === 'completado' ? 'bg-green-500' : 'bg-blue-500'}>
+              {servicio.estado === 'completado' ? 'Finalizado' : 'En Curso'}
             </Badge>
           </div>
         </CardContent>

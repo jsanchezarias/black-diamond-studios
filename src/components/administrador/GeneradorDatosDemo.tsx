@@ -186,7 +186,7 @@ export function GeneradorDatosDemo() {
           precio: costoServicio,
           ubicacion: tipoServicio.toLowerCase(),
           fecha: fechaInicio.toISOString(),
-          estado: 'finalizado',
+          estado: 'completado',
           created_at: fechaInicio.toISOString()
         });
       }
@@ -429,7 +429,7 @@ export function GeneradorDatosDemo() {
           .from('agendamientos')
           .select('precio')
           .eq('modelo_id', modelo.id) // ✅ Usar modelo_id (UUID)
-          .eq('estado', 'finalizado');
+          .eq('estado', 'completado');
         
         if (serviciosModelo) {
           const totalServicios = serviciosModelo.length;

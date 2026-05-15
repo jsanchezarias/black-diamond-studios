@@ -49,7 +49,7 @@ export interface Servicio {
   comprobantePago?: string;
   montoPagado?: number;
   propina?: number;
-  estado: 'pendiente' | 'confirmado' | 'aprobado' | 'en_curso' | 'activo' | 'completado' | 'cancelado' | 'no_show' | 'finalizado' | 'aceptado_programador' | 'solicitud_cliente' | 'creado_por_modelo';
+  estado: 'pendiente' | 'confirmado' | 'aprobado' | 'en_curso' | 'activo' | 'completado' | 'cancelado' | 'no_show' | 'aceptado_programador' | 'solicitud_cliente' | 'creado_por_modelo';
   notasPreServicio?: string;
   notasPostServicio?: string;
   notasCierre?: string;
@@ -422,7 +422,7 @@ export function ServiciosProvider({ children }: { children: ReactNode }) {
 
   const finalizarServicio = async (id: string, notas?: string) => {
     await actualizarServicio(id, {
-      estado: 'finalizado',
+      estado: 'completado',
       horaFin: new Date(),
       notasCierre: notas,
     });
@@ -450,7 +450,7 @@ export function ServiciosProvider({ children }: { children: ReactNode }) {
   };
 
   const serviciosActivos = servicios.filter(s => s.estado === 'activo');
-  const serviciosFinalizados = servicios.filter(s => s.estado === 'completado' || s.estado === 'finalizado');
+  const serviciosFinalizados = servicios.filter(s => s.estado === 'completado');
 
   return (
     <ServiciosContext.Provider value={{

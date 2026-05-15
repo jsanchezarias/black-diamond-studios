@@ -876,11 +876,11 @@ app.get("/make-server-9dadc017/diagnostico/estado-completo", async (c) => {
     // 3. Storage buckets
     const { data: buckets } = await supabase.storage.listBuckets();
     
-    // 4. Archivos en bucket modelos-fotos
+    // 4. Archivos en bucket fotos-modelos
     let archivosStorage = 0;
     try {
       const { data: files } = await supabase.storage
-        .from('modelos-fotos')
+        .from('fotos-modelos')
         .list();
       archivosStorage = files?.length || 0;
     } catch (e) {
