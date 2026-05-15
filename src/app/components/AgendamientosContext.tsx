@@ -253,7 +253,7 @@ export function AgendamientosProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase
         .from('agendamientos')
         .insert(row)
-        .select()
+        .select('*')
         .single();
 
       if (error) {
@@ -381,7 +381,7 @@ export function AgendamientosProvider({ children }: { children: ReactNode }) {
         monto: ag.montoPago,
         estado: 'completado',
         created_at: new Date().toISOString(),
-      }).select().maybeSingle();
+      }).select('*').maybeSingle();
     }
   };
 

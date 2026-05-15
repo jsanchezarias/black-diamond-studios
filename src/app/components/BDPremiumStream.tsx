@@ -130,10 +130,6 @@ export function BDPremiumStream({
         manifestLoadingTimeOut:   8_000,
         manifestLoadingMaxRetry:  2,
         manifestLoadingRetryDelay: 1_000,
-        // Header necesario para omitir la advertencia del túnel ngrok
-        xhrSetup: (xhr) => {
-          xhr.setRequestHeader('ngrok-skip-browser-warning', 'true');
-        },
       });
 
       // Manifiesto cargado → reproducir y resetear contador de reintentos

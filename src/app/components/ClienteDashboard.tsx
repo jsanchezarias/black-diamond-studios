@@ -139,7 +139,7 @@ function ModalReserva({
         creado_por: currentUser.email,
         archivado: false,
         fecha_creacion: new Date().toISOString(),
-      }).select().single();
+      }).select('*').single();
 
       if (error) { toast.error('Error al reservar: ' + error.message); setLoading(false); return; }
 
