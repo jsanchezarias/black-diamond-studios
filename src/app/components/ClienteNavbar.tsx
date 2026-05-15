@@ -56,7 +56,7 @@ export function ClienteNavbar({ currentUser, onLogout }: ClienteNavbarProps) {
         .select('id, fecha, hora, modelo_nombre, tipo_servicio, estado')
         .eq('cliente_id', currentUser.id)
         .gte('fecha', hoy)
-        .not('estado', 'in', '("completado","cancelado","no_show","archivado")')
+        .not('estado', 'in', '(completado,cancelado,no_show,archivado)')
         .order('fecha', { ascending: true })
         .order('hora', { ascending: true });
         

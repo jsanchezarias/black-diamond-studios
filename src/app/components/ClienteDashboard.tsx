@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 const supabasePublic = createClient(
   `https://${projectId}.supabase.co`,
   publicAnonKey,
-  { auth: { persistSession: false } }
+  { auth: { persistSession: false, storageKey: 'bd-public-anon' } }
 );
 import { Calendar, Mail, Phone, Loader2, ShoppingBag, Plus, Minus, ShoppingCart, X as XIcon } from 'lucide-react';
 import { ModeloCard } from './ModeloCard';
