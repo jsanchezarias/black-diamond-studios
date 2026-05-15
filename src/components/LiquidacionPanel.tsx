@@ -112,7 +112,7 @@ export function LiquidacionPanel({ userEmail }: LiquidacionPanelProps) {
     const multasModelo = multas.filter(
       (m) =>
         m.modeloEmail === modeloEmail &&
-        m.estado === 'pendiente' &&
+        m.estado === 'activa' &&
         (!ultimoPago || new Date(m.fecha) > ultimoPago)
     );
     const valorMultas = multasModelo.reduce((total, m) => total + m.monto, 0);

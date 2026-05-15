@@ -137,7 +137,7 @@ export function DetalleModeloPanel({ modelo, onClose, onEdit }: DetalleModeloPan
     acc + s.costoServicio + s.costoAdicionales + s.costoConsumo, 0
   );
   const totalMultasPendientes = multasModelo
-    .filter(m => m.estado === 'pendiente')
+    .filter(m => m.estado === 'activa')
     .reduce((acc, m) => acc + m.monto, 0);
   const totalAdelantosPendientes = adelantosModelo
     .filter(a => a.estado === 'pendiente')
@@ -542,20 +542,17 @@ export function DetalleModeloPanel({ modelo, onClose, onEdit }: DetalleModeloPan
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between">
                           <div className="space-y-1">
-                            <p className="font-medium">{multa.concepto}</p>
+                            <p className="font-medium">{multa.motivo}</p>
                             <p className="text-sm text-muted-foreground">{multa.fecha}</p>
-                            {multa.descripcion && (
-                              <p className="text-sm text-muted-foreground italic">{multa.descripcion}</p>
-                            )}
                           </div>
                           <div className="text-right space-y-2">
                             <p className="text-2xl font-bold text-destructive">
                               -${multa.monto.toLocaleString('es-CO')}
                             </p>
-                            <Badge 
-                              variant={multa.estado === 'pendiente' ? 'destructive' : multa.estado === 'pagada' ? 'default' : 'outline'}
+                            <Badge
+                              variant={multa.estado === 'activa' ? 'destructive' : multa.estado === 'pagada' ? 'default' : 'outline'}
                             >
-                              {multa.estado === 'pendiente' ? 'Pendiente' : multa.estado === 'pagada' ? 'Pagada' : 'Cancelada'}
+                              {multa.estado === 'activa' ? 'Pendiente' : multa.estado === 'pagada' ? 'Pagada' : 'Cancelada'}
                             </Badge>
                           </div>
                         </div>

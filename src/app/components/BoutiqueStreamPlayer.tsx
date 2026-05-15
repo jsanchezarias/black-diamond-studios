@@ -178,7 +178,7 @@ export function BoutiqueStreamPlayer({
           enableWorker: true,
           lowLatencyMode: true,
           backBufferLength: 90,
-          maxLoadingRetries: 10,
+          // maxLoadingRetries: 10, // not in HlsConfig type
           manifestLoadingTimeOut: 20000,
           xhrSetup: (xhr) => {
             xhr.setRequestHeader('ngrok-skip-browser-warning', 'true');

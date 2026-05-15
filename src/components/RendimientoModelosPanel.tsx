@@ -11,7 +11,7 @@ type SortOption = 'ingresos' | 'servicios' | 'rating' | 'nombre';
 type PeriodoOption = 'semana' | 'mes' | 'trimestre' | 'año';
 
 interface RendimientoModelo {
-  id: number;
+  id: string;
   nombre: string;
   nombreArtistico?: string;
   fotoPerfil: string;
@@ -33,7 +33,7 @@ export function RendimientoModelosPanel() {
   
   const [sortBy, setSortBy] = useState<SortOption>('ingresos');
   const [periodo, setPeriodo] = useState<PeriodoOption>('mes');
-  const [modeloSeleccionado, setModeloSeleccionado] = useState<number | null>(null);
+  const [modeloSeleccionado, setModeloSeleccionado] = useState<string | null>(null);
 
   const COLORS = ['#d4af37', '#b8960f', '#8b7220', '#f0d875', '#9d8534'];
 

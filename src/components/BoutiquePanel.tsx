@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+const formatCOP = (v: number) => `$${v.toLocaleString('es-CO')}`;
 import { 
   Plus, Pencil, Trash2, Package, 
   Image as ImageIcon, ShoppingBag, Search, Filter,

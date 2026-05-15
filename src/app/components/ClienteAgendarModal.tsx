@@ -148,49 +148,41 @@ export function ClienteAgendarModal({
         return;
       }
 
-      // ── Notificaciones en paralelo ─────────────────────────────────────────
-      const notifPromises: Promise<any>[] = [];
-
+      // ── Notificaciones ─────────────────────────────────────────────────────
       // Buscar programadores para notificarlos
       const { data: programadores } = await supabase
         .from('usuarios')
         .select('id')
         .eq('role', 'programador');
 
-      // 1️⃣ Notificación para el CLIENTE (badge en su ClienteNavbar)
-      notifPromises.push(
-        supabase.from('notificaciones').insert({
-          usuario_id: clienteId,
-          para_usuario_id: clienteId,
-          tipo: 'agendamiento_pendiente',
-          titulo: '📅 Solicitud enviada',
-          mensaje: `Tu solicitud con ${modeloNombreReal} para el ${fecha} a las ${hora} está pendiente de confirmación.`,
-          leida: false,
-          referencia_id: agendamientoData.id,
-          datos: { agendamientoId: agendamientoData.id, modeloNombre: modeloNombreReal, fecha, hora, servicio: servicioSeleccionado!.name },
-        })
-      );
+      // 1️⃣ Notificación para el CLIENTE
+      await supabase.from('notificaciones').insert({
+        usuario_id: clienteId,
+        para_usuario_id: clienteId,
+        tipo: 'agendamiento_pendiente',
+        titulo: '📅 Solicitud enviada',
+        mensaje: `Tu solicitud con ${modeloNombreReal} para el ${fecha} a las ${hora} está pendiente de confirmación.`,
+        leida: false,
+        referencia_id: agendamientoData.id,
+        datos: { agendamientoId: agendamientoData.id, modeloNombre: modeloNombreReal, fecha, hora, servicio: servicioSeleccionado!.name },
+      });
 
       // 2️⃣ Notificación para cada PROGRAMADOR
       if (programadores?.length) {
-        notifPromises.push(
-          supabase.from('notificaciones').insert(
-            programadores.map((p: any) => ({
-              usuario_id: p.id,
-              para_usuario_id: p.id,
-              para_rol: 'programador',
-              tipo: 'agendamiento_nuevo',
-              titulo: '📅 Nueva solicitud de cita',
-              mensaje: `${clienteNombre} solicita cita con ${modeloNombreReal} el ${fecha} a las ${hora} — ${servicioSeleccionado!.name} (${ubicacion === 'sede' ? 'En Sede' : 'A Domicilio'})`,
-              leida: false,
-              referencia_id: agendamientoData.id,
-              datos: { agendamientoId: agendamientoData.id, clienteNombre, modeloNombre: modeloNombreReal, fecha, hora, servicio: servicioSeleccionado!.name, ubicacion },
-            }))
-          )
+        await supabase.from('notificaciones').insert(
+          programadores.map((p: any) => ({
+            usuario_id: p.id,
+            para_usuario_id: p.id,
+            para_rol: 'programador',
+            tipo: 'agendamiento_nuevo',
+            titulo: '📅 Nueva solicitud de cita',
+            mensaje: `${clienteNombre} solicita cita con ${modeloNombreReal} el ${fecha} a las ${hora} — ${servicioSeleccionado!.name} (${ubicacion === 'sede' ? 'En Sede' : 'A Domicilio'})`,
+            leida: false,
+            referencia_id: agendamientoData.id,
+            datos: { agendamientoId: agendamientoData.id, clienteNombre, modeloNombre: modeloNombreReal, fecha, hora, servicio: servicioSeleccionado!.name, ubicacion },
+          }))
         );
       }
-
-      await Promise.all(notifPromises);
 
       setSuccess(true);
       setTimeout(() => { onSuccess(); }, 2000);

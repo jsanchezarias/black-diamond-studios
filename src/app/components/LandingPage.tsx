@@ -347,7 +347,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
     setSedeActual(sedeId);
     const sede = sedes.find(s => s.id === sedeId);
     if (sede) {
-      setStreamUrl(sede.streamUrl);
+      // streamUrl handled internally
     }
     // ❌ REMOVIDO: No hacer scroll automático al cambiar de sede
     // scrollToSection('inicio');
@@ -1058,7 +1058,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
                 {t.contact.ctaDescription}
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <button size="lg" className="px-8 py-3.5 rounded-xl font-black text-[11px] uppercase tracking-[0.15em] active:scale-95 transition-all duration-300 hover:scale-105"
+                <button className="px-8 py-3.5 rounded-xl font-black text-[11px] uppercase tracking-[0.15em] active:scale-95 transition-all duration-300 hover:scale-105"
                   style={{ background: 'linear-gradient(135deg, #d4b86a 0%, #c9a961 60%, #a07c3a 100%)', color: '#0f1014', boxShadow: '0 6px 24px rgba(201,169,97,0.3)', fontFamily: "'Montserrat', sans-serif" }}>
                   <Phone className="w-4 h-4 inline mr-2" />
                   {t.contact.reserveNow}
@@ -1140,7 +1140,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
         onClose={() => setShowTipModal(false)}
         onSendTip={handleSendTip}
         modelName="Black Diamond"
-        userPhone={chatUser?.telefono || currentUserProp?.telefono}
+        userPhone={(chatUser as any)?.telefono || (currentUserProp as any)?.telefono}
       />
 
       {/* Notificaciones de Propinas */}

@@ -367,12 +367,369 @@ function TemporizadorServicio({ servicio }: { servicio: Servicio }) {
   );
 }
 
+// ─── Servicios fijos walk-in ──────────────────────────────────────────────────
+const SERVICIOS_WALKIN = [
+  { nombre: 'Rato',          duracion: '15 min',  minutos: 15,  precio: 130000 },
+  { nombre: '30 Min',        duracion: '30 min',  minutos: 30,  precio: 160000 },
+  { nombre: '1 Hora',        duracion: '1 hora',  minutos: 60,  precio: 190000 },
+  { nombre: '2 Horas',       duracion: '2 horas', minutos: 120, precio: 360000 },
+  { nombre: '3 Horas',       duracion: '3 horas', minutos: 180, precio: 520000 },
+  { nombre: '6 Horas',       duracion: '6 horas', minutos: 360, precio: 1000000 },
+  { nombre: 'Noche',         duracion: '8 horas', minutos: 480, precio: 1200000 },
+  { nombre: 'Dom. 1h',       duracion: '1 hora',  minutos: 60,  precio: 220000 },
+  { nombre: 'Dom. 2h',       duracion: '2 horas', minutos: 120, precio: 400000 },
+];
+
+interface HabRow {
+  id: string;
+  numero: number;
+  nombre: string | null;
+  estado: 'disponible' | 'ocupada' | 'limpieza';
+  modelo_email: string | null;
+  modelo_nombre: string | null;
+  hora_inicio: string | null;
+  duracion_minutos: number | null;
+  hora_fin_estimada: string | null;
+}
+
+function calcTiempoRestante(horaFin: string | null): { texto: string; critico: boolean; mins: number } {
+  if (!horaFin) return { texto: '--:--', critico: false, mins: 999 };
+  const diff = new Date(horaFin).getTime() - Date.now();
+  if (diff <= 0) return { texto: '00:00', critico: true, mins: 0 };
+  const mins = Math.floor(diff / 60000);
+  const secs = Math.floor((diff % 60000) / 1000);
+  return {
+    texto: `${String(Math.floor(mins)).padStart(2,'0')}:${String(secs).padStart(2,'0')}`,
+    critico: mins <= 15,
+    mins,
+  };
+}
+
+// ─── Modal walk-in simplificado ───────────────────────────────────────────────
+function ModalIniciarServicio({ onClose, modeloEmail, modeloNombre, emailPropio }: {
+  onClose: () => void;
+  modeloEmail: string;
+  modeloNombre: string;
+  emailPropio: string;
+}) {
+  const [paso, setPaso] = useState<'servicio' | 'habitacion' | 'cliente' | 'resumen'>('servicio');
+  const [servicioSel, setServicioSel] = useState<typeof SERVICIOS_WALKIN[0] | null>(null);
+  const [habitaciones, setHabitaciones] = useState<HabRow[]>([]);
+  const [habSel, setHabSel] = useState<HabRow | null>(null);
+  const [clienteNombre, setClienteNombre] = useState('');
+  const [clienteTelefono, setClienteTelefono] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const [tick, setTick] = useState(0);
+
+  // Cargar habitaciones
+  useEffect(() => {
+    const cargar = async () => {
+      const { data } = await supabase.from('habitaciones').select('*').order('numero');
+      if (data) setHabitaciones(data as HabRow[]);
+    };
+    cargar();
+    const sub = supabase.channel('walkin-hab-' + emailPropio)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'habitaciones' }, () => cargar())
+      .subscribe();
+    const timer = setInterval(() => setTick(t => t + 1), 60000);
+    return () => { supabase.removeChannel(sub); clearInterval(timer); };
+  }, [emailPropio]);
+
+  const confirmar = async () => {
+    if (!servicioSel) return;
+    setEnviando(true);
+    try {
+      const ahora = new Date();
+      const horaFin = new Date(ahora.getTime() + servicioSel.minutos * 60000).toISOString();
+
+      // Actualizar habitación si fue seleccionada
+      if (habSel) {
+        await supabase.from('habitaciones').update({
+          estado: 'ocupada',
+          modelo_email: modeloEmail,
+          modelo_nombre: modeloNombre,
+          hora_inicio: ahora.toISOString(),
+          duracion_minutos: servicioSel.minutos,
+          hora_fin_estimada: horaFin,
+        }).eq('id', habSel.id);
+      }
+
+      // Insertar agendamiento
+      await supabase.from('agendamientos').insert({
+        modelo_id: null,
+        tipo_servicio: 'sede',
+        nombre_servicio: servicioSel.nombre,
+        duracion_minutos: servicioSel.minutos,
+        precio: servicioSel.precio,
+        monto_pago: servicioSel.precio,
+        estado: 'en_curso',
+        fecha: ahora.toISOString().split('T')[0],
+        hora: ahora.toTimeString().slice(0, 5),
+        hora_fin_estimada: horaFin,
+        habitacion: habSel ? String(habSel.numero) : null,
+        cliente_nombre: clienteNombre || 'Anónimo',
+        cliente_telefono: clienteTelefono || null,
+        modelo_email: modeloEmail,
+        notas: `Walk-in iniciado por ${modeloNombre}`,
+      });
+
+      // Notificar admin/owner/recepcionista
+      const { data: admins } = await supabase
+        .from('usuarios')
+        .select('id')
+        .in('role', ['owner', 'admin', 'administrador', 'recepcionista']);
+      if (admins?.length) {
+        await supabase.from('notificaciones').insert(admins.map((a: any) => ({
+          usuario_id: a.id,
+          titulo: '🟢 Servicio iniciado (Walk-In)',
+          mensaje: `${modeloNombre} inició "${servicioSel.nombre}" (${servicioSel.duracion})${habSel ? ` — Hab. ${habSel.numero}` : ''}${clienteNombre ? ` — Cliente: ${clienteNombre}` : ''}`,
+          tipo: 'servicio_iniciado',
+          leida: false,
+        })));
+      }
+
+      toast.success('Servicio iniciado');
+      onClose();
+    } catch (err: any) {
+      toast.error('Error al iniciar servicio', { description: err.message });
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  const coloresEstado: Record<string, { bg: string; border: string; label: string }> = {
+    disponible: { bg: 'rgba(34,197,94,0.1)',  border: 'rgba(34,197,94,0.5)',  label: 'Libre' },
+    ocupada:    { bg: 'rgba(239,68,68,0.1)',   border: 'rgba(239,68,68,0.5)',  label: 'Ocupada' },
+    limpieza:   { bg: 'rgba(234,179,8,0.1)',   border: 'rgba(234,179,8,0.5)',  label: 'Limpieza' },
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div style={{ background: '#111', border: '1px solid rgba(255,215,0,0.25)', borderRadius: 16, width: '100%', maxWidth: 520, maxHeight: '90vh', overflowY: 'auto', padding: 24, position: 'relative' }}>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+          <div>
+            <h2 style={{ color: '#FFD700', fontSize: 20, fontWeight: 700, margin: 0 }}>Iniciar Servicio Walk-In</h2>
+            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, margin: '2px 0 0' }}>{modeloNombre}</p>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: 22, cursor: 'pointer', lineHeight: 1 }}>×</button>
+        </div>
+
+        {/* Stepper */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 20 }}>
+          {(['servicio','habitacion','cliente','resumen'] as const).map((p, i) => (
+            <div key={p} style={{ flex: 1, height: 3, borderRadius: 2, background: ['servicio','habitacion','cliente','resumen'].indexOf(paso) >= i ? '#FFD700' : 'rgba(255,255,255,0.1)' }} />
+          ))}
+        </div>
+
+        {/* Paso 1: Servicio */}
+        {paso === 'servicio' && (
+          <div>
+            <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, marginBottom: 12 }}>Selecciona el servicio</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+              {SERVICIOS_WALKIN.map(s => (
+                <button
+                  key={s.nombre}
+                  onClick={() => setServicioSel(s)}
+                  style={{
+                    background: servicioSel?.nombre === s.nombre ? 'rgba(255,215,0,0.15)' : 'rgba(255,255,255,0.03)',
+                    border: `1px solid ${servicioSel?.nombre === s.nombre ? '#FFD700' : 'rgba(255,255,255,0.1)'}`,
+                    borderRadius: 8, padding: '10px 6px', cursor: 'pointer', textAlign: 'center',
+                  }}
+                >
+                  <div style={{ color: '#FFD700', fontSize: 14, fontWeight: 700 }}>${Math.round(s.precio / 1000)}k</div>
+                  <div style={{ color: 'white', fontSize: 12, fontWeight: 600, marginTop: 2 }}>{s.nombre}</div>
+                  <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10 }}>{s.duracion}</div>
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => servicioSel && setPaso('habitacion')}
+              disabled={!servicioSel}
+              style={{ marginTop: 16, width: '100%', padding: '12px', background: servicioSel ? 'linear-gradient(135deg,#B8860B,#FFD700)' : 'rgba(255,255,255,0.05)', border: 'none', borderRadius: 8, color: servicioSel ? 'black' : 'rgba(255,255,255,0.3)', fontWeight: 700, fontSize: 14, cursor: servicioSel ? 'pointer' : 'not-allowed' }}
+            >
+              Continuar →
+            </button>
+          </div>
+        )}
+
+        {/* Paso 2: Habitación */}
+        {paso === 'habitacion' && (
+          <div>
+            <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, marginBottom: 12 }}>Selecciona la habitación <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11 }}>(opcional)</span></p>
+            {habitaciones.length === 0 ? (
+              <p style={{ color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '24px 0', fontSize: 13 }}>Sin habitaciones registradas</p>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+                {habitaciones.map(hab => {
+                  const c = coloresEstado[hab.estado] || coloresEstado.disponible;
+                  const { texto: tRestante, critico } = hab.estado === 'ocupada' ? calcTiempoRestante(hab.hora_fin_estimada) : { texto: '', critico: false };
+                  const esMia = hab.modelo_email === emailPropio;
+                  const seleccionada = habSel?.id === hab.id;
+                  return (
+                    <button
+                      key={hab.id}
+                      onClick={() => hab.estado === 'disponible' && setHabSel(seleccionada ? null : hab)}
+                      style={{
+                        background: seleccionada ? 'rgba(255,215,0,0.1)' : c.bg,
+                        border: `1px solid ${seleccionada ? '#FFD700' : c.border}`,
+                        borderRadius: 8, padding: '10px 12px', cursor: hab.estado === 'disponible' ? 'pointer' : 'default',
+                        textAlign: 'left', opacity: hab.estado === 'ocupada' && !esMia ? 0.7 : 1,
+                        animation: critico ? 'pulse-critico 1.5s infinite' : 'none',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ color: 'white', fontWeight: 700, fontSize: 15 }}>Hab. {hab.numero}</span>
+                        {esMia && <span style={{ background: '#FFD700', color: 'black', fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99 }}>TUYA</span>}
+                      </div>
+                      {hab.nombre && <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10, marginTop: 2 }}>{hab.nombre}</div>}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                        <div style={{ width: 6, height: 6, borderRadius: '50%', background: hab.estado === 'disponible' ? '#22c55e' : hab.estado === 'ocupada' ? '#ef4444' : '#eab308' }} />
+                        <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>{c.label}</span>
+                        {tRestante && <span style={{ marginLeft: 'auto', color: critico ? '#ef4444' : 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: 600 }}>{tRestante}</span>}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+              <button onClick={() => setPaso('servicio')} style={{ flex: 1, padding: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: 'white', cursor: 'pointer', fontSize: 14 }}>← Atrás</button>
+              <button onClick={() => setPaso('cliente')} style={{ flex: 2, padding: '10px', background: 'linear-gradient(135deg,#B8860B,#FFD700)', border: 'none', borderRadius: 8, color: 'black', fontWeight: 700, cursor: 'pointer', fontSize: 14 }}>Continuar →</button>
+            </div>
+          </div>
+        )}
+
+        {/* Paso 3: Cliente */}
+        {paso === 'cliente' && (
+          <div>
+            <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, marginBottom: 12 }}>Datos del cliente <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11 }}>(opcional)</span></p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <input
+                placeholder="Nombre del cliente"
+                value={clienteNombre}
+                onChange={e => setClienteNombre(e.target.value)}
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '10px 12px', color: 'white', fontSize: 14, outline: 'none' }}
+              />
+              <input
+                placeholder="Teléfono"
+                value={clienteTelefono}
+                onChange={e => setClienteTelefono(e.target.value)}
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '10px 12px', color: 'white', fontSize: 14, outline: 'none' }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+              <button onClick={() => setPaso('habitacion')} style={{ flex: 1, padding: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: 'white', cursor: 'pointer', fontSize: 14 }}>← Atrás</button>
+              <button onClick={() => setPaso('resumen')} style={{ flex: 2, padding: '10px', background: 'linear-gradient(135deg,#B8860B,#FFD700)', border: 'none', borderRadius: 8, color: 'black', fontWeight: 700, cursor: 'pointer', fontSize: 14 }}>Ver resumen →</button>
+            </div>
+          </div>
+        )}
+
+        {/* Paso 4: Resumen */}
+        {paso === 'resumen' && servicioSel && (
+          <div>
+            <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, marginBottom: 12 }}>Confirma el servicio</p>
+            <div style={{ background: 'rgba(255,215,0,0.05)', border: '1px solid rgba(255,215,0,0.2)', borderRadius: 10, padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {[
+                ['Servicio', `${servicioSel.nombre} — ${servicioSel.duracion}`],
+                ['Precio', `$${servicioSel.precio.toLocaleString('es-CO')}`],
+                ['Habitación', habSel ? `Hab. ${habSel.numero}${habSel.nombre ? ` (${habSel.nombre})` : ''}` : 'Sin asignar'],
+                ['Cliente', clienteNombre || 'Anónimo'],
+                ...(clienteTelefono ? [['Teléfono', clienteTelefono]] : []),
+              ].map(([k, v]) => (
+                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
+                  <span style={{ color: 'rgba(255,255,255,0.45)' }}>{k}</span>
+                  <span style={{ color: 'white', fontWeight: 600 }}>{v}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+              <button onClick={() => setPaso('cliente')} style={{ flex: 1, padding: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: 'white', cursor: 'pointer', fontSize: 14 }}>← Atrás</button>
+              <button
+                onClick={confirmar}
+                disabled={enviando}
+                style={{ flex: 2, padding: '12px', background: 'linear-gradient(135deg,#B8860B,#FFD700)', border: 'none', borderRadius: 8, color: 'black', fontWeight: 700, cursor: 'pointer', fontSize: 15 }}
+              >
+                {enviando ? 'Iniciando...' : '🟢 Confirmar e Iniciar'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Panel de habitaciones (solo lectura para modelo) ─────────────────────────
+function PanelHabitacionesModelo({ emailPropio }: { emailPropio: string }) {
+  const [habitaciones, setHabitaciones] = useState<HabRow[]>([]);
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    const cargar = async () => {
+      const { data } = await supabase.from('habitaciones').select('*').order('numero');
+      if (data) setHabitaciones(data as HabRow[]);
+    };
+    cargar();
+    const sub = supabase.channel('panel-hab-modelo-' + emailPropio)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'habitaciones' }, () => cargar())
+      .subscribe();
+    const timer = setInterval(() => setTick(t => t + 1), 60000);
+    return () => { supabase.removeChannel(sub); clearInterval(timer); };
+  }, [emailPropio]);
+
+  if (habitaciones.length === 0) return null;
+
+  return (
+    <div>
+      <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, letterSpacing: '0.1em', marginBottom: 10, textTransform: 'uppercase' }}>Estado de habitaciones</p>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 8 }}>
+        {habitaciones.map(hab => {
+          const esMia = hab.modelo_email === emailPropio;
+          const { texto: tRestante, critico, mins } = hab.estado === 'ocupada' ? calcTiempoRestante(hab.hora_fin_estimada) : { texto: '', critico: false, mins: 999 };
+          const bg = hab.estado === 'disponible' ? 'rgba(34,197,94,0.08)' : hab.estado === 'ocupada' ? 'rgba(239,68,68,0.08)' : 'rgba(234,179,8,0.08)';
+          const border = hab.estado === 'disponible' ? 'rgba(34,197,94,0.3)' : hab.estado === 'ocupada' ? 'rgba(239,68,68,0.3)' : 'rgba(234,179,8,0.3)';
+          const dotColor = hab.estado === 'disponible' ? '#22c55e' : hab.estado === 'ocupada' ? '#ef4444' : '#eab308';
+          return (
+            <div
+              key={hab.id}
+              style={{
+                background: esMia ? 'rgba(255,215,0,0.08)' : bg,
+                border: `1px solid ${esMia ? 'rgba(255,215,0,0.4)' : border}`,
+                borderRadius: 8, padding: '10px 12px',
+                animation: critico ? 'pulse-critico 1.5s ease-in-out infinite' : 'none',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span style={{ color: 'white', fontWeight: 700, fontSize: 14 }}>Hab. {hab.numero}</span>
+                {esMia && <span style={{ background: '#FFD700', color: 'black', fontSize: 8, fontWeight: 800, padding: '1px 5px', borderRadius: 99 }}>TUYA</span>}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <div style={{ width: 6, height: 6, borderRadius: '50%', background: dotColor, boxShadow: `0 0 4px ${dotColor}` }} />
+                <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11 }}>
+                  {hab.estado === 'disponible' ? 'Libre' : hab.estado === 'limpieza' ? 'Limpieza' : (hab.modelo_nombre || 'Ocupada')}
+                </span>
+              </div>
+              {tRestante && (
+                <div style={{ marginTop: 4, color: critico ? '#ef4444' : 'rgba(255,255,255,0.35)', fontSize: 11, fontWeight: 600 }}>
+                  ⏱ {tRestante}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── Component principal ──────────────────────────────────────────────────────
 export function ModeloDashboard({ accessToken: _accessToken, userId, userEmail, onLogout }: ModeloDashboardProps) {
   const [selectedTab, setSelectedTab] = useState('inicio');
   const [menuOpen, setMenuOpen] = useState(false);
   const [mostrarRegistroEntrada, setMostrarRegistroEntrada] = useState(false);
   const [mostrarIniciarServicio, setMostrarIniciarServicio] = useState(false);
+  const [mostrarWalkIn, setMostrarWalkIn] = useState(false);
   const [mostrarCarritoBoutique, setMostrarCarritoBoutique] = useState(false);
   const [mostrarCheckoutBoutique, setMostrarCheckoutBoutique] = useState(false);
   const [citaSeleccionada, setCitaSeleccionada] = useState<any>(null);
@@ -1266,6 +1623,17 @@ export function ModeloDashboard({ accessToken: _accessToken, userId, userEmail, 
                     <Play className="w-4 h-4" /> Iniciar Servicio
                   </Button>
                 )}
+                <button
+                  onClick={() => setMostrarWalkIn(true)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '8px 16px', borderRadius: 8, cursor: 'pointer',
+                    background: 'linear-gradient(135deg, #166534, #22c55e)',
+                    border: 'none', color: 'white', fontWeight: 700, fontSize: 13,
+                  }}
+                >
+                  🟢 Walk-In
+                </button>
               </div>
             </div>
 
@@ -1389,6 +1757,9 @@ export function ModeloDashboard({ accessToken: _accessToken, userId, userEmail, 
                 />
               </Suspense>
             )}
+
+            {/* Panel habitaciones */}
+            <PanelHabitacionesModelo emailPropio={emailModelo} />
 
             {/* Gráfica ingresos 6 meses */}
             <Card>
@@ -2505,6 +2876,16 @@ export function ModeloDashboard({ accessToken: _accessToken, userId, userEmail, 
             </div>
           </div>
         </button>
+      )}
+
+      {/* Walk-In Modal */}
+      {mostrarWalkIn && modeloActual && (
+        <ModalIniciarServicio
+          onClose={() => setMostrarWalkIn(false)}
+          modeloEmail={emailModelo}
+          modeloNombre={nombreDisplay}
+          emailPropio={emailModelo}
+        />
       )}
 
       {/* ── Modales ───────────────────────────────────────────────────────── */}

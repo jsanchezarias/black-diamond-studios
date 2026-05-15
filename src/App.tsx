@@ -144,6 +144,7 @@ function GlobalLoadingScreen() {
 }
 
 interface CurrentUser {
+  id?: string;
   accessToken: string;
   userId: string;
   email: string;
@@ -661,7 +662,7 @@ export default function App() {
               <LandingPage
                 onAccessSystem={(tipo: 'cliente' | 'sistema') => { setTipoLogin(tipo); setShowLogin(true); }}
                 onLoginSuccess={handleLogin}
-                currentUser={currentUser}
+                currentUser={currentUser ? { ...currentUser, id: currentUser.id ?? currentUser.userId } : null}
               />
             </Suspense>
           )}

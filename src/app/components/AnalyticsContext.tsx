@@ -380,7 +380,7 @@ export function AnalyticsProvider({ children }: AnalyticsProviderProps) {
       return estaEnRango(fechaMulta, inicioMes, hoy);
     });
     const totalMultasMes = (multasMes || []).reduce((sum, m) => sum + (m.monto || 0), 0);
-    const multasPendientes = (multas || []).filter(m => m.estado === 'pendiente').reduce((sum, m) => sum + (m.monto || 0), 0);
+    const multasPendientes = (multas || []).filter(m => m.estado === 'activa').reduce((sum, m) => sum + (m.monto || 0), 0);
 
     // No-shows del mes
     const noShowsMes = servicios.filter(s => s.estado === 'no_show' && estaEnRango(s.fecha, inicioMes, hoy));
@@ -533,7 +533,7 @@ export function AnalyticsProvider({ children }: AnalyticsProviderProps) {
     const totalNoShows = noShows.length;
 
     // Multas pendientes (Nota: se filtra por modelo ya que la multa no siempre tiene clienteId asociado)
-    const multasCliente = (multas || []).filter(m => m.modeloEmail === (cliente.email || '') && m.estado === 'pendiente');
+    const multasCliente = (multas || []).filter(m => m.modeloEmail === (cliente.email || '') && m.estado === 'activa');
     const multasPendientes = (multasCliente || []).reduce((sum, m) => sum + (m.monto || 0), 0);
 
     return {

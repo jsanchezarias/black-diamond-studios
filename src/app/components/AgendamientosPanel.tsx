@@ -30,6 +30,7 @@ export const ESTADO_CONFIG: Record<Agendamiento['estado'], { label: string; colo
   finalizado:           { label: 'Finalizado',  color: 'bg-green-500/20 text-green-400 border-green-500/30',    icon: <CheckCircle className="w-3 h-3" /> },
   cancelado:            { label: 'Cancelado',   color: 'bg-red-500/20 text-red-400 border-red-500/30',          icon: <XCircle className="w-3 h-3" /> },
   no_show:              { label: 'No Show',     color: 'bg-gray-500/20 text-gray-400 border-gray-500/30',       icon: <AlertCircle className="w-3 h-3" /> },
+  creado_por_modelo:    { label: 'Walk-In',     color: 'bg-green-500/20 text-green-400 border-green-500/30',    icon: <CheckCircle className="w-3 h-3" /> },
 };
 
 // ── Props ─────────────────────────────────────────────────────────────────────

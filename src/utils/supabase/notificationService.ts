@@ -9,7 +9,7 @@
  * - Al cancelar → se eliminan las notifs del agendamiento cancelado
  */
 
-import { supabase } from '../../supabase/functions/supabase';
+import { supabase } from '../supabase/info';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 

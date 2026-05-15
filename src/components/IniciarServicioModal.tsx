@@ -18,9 +18,9 @@ import {
 //  DollarSign, 
 //  Home, 
 //  Briefcase, 
-  ShoppingBag, 
-  Plus, 
-  Minus, 
+  ShoppingBag,
+  Plus,
+  Minus,
   X,
   Search,
   Upload,
@@ -28,7 +28,8 @@ import {
   PlayCircle,
   Trash2,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  CheckCircle
 } from 'lucide-react';
 import { useServicios } from '../app/components/ServiciosContext';
 import { useTurnos } from '../app/components/TurnosContext';

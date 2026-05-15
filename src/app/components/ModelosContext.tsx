@@ -42,6 +42,7 @@ export interface Modelo {
   serviciosDisponibles?: { name: string, duration: string, price: string, priceHome?: string, description: string }[];
   enPeriodo?: boolean; // ✅ NUEVO: Indica si la modelo está en un período activo
   servicios_modelo?: any[]; // ✅ NUEVO: Servicios específicos de la modelo
+  modelo_fotos?: any[]; // ✅ fotos desde join Supabase
 }
 
 // Tipo para crear una nueva modelo (sin campos auto-generados)
@@ -169,7 +170,7 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
         // ✅ FALLBACK: Usar datos mock si Supabase falla
         setModelos([
           {
-            id: 1,
+            id: 'mock-1',
             email: 'modelo1@blackdiamond.com',
             nombre: 'Isabella',
             nombreArtistico: 'Bella Diamond',

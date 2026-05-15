@@ -20,9 +20,9 @@ import {
 export function ModelosArchivadasPanel() {
   const { modelosArchivadas, restaurarModelo } = useModelos();
   const [searchTerm, setSearchTerm] = useState('');
-  const [modeloRestaurar, setModeloRestaurar] = useState<{id: number, nombre: string} | null>(null);
+  const [modeloRestaurar, setModeloRestaurar] = useState<{id: string, nombre: string} | null>(null);
 
-  const handleRestaurar = (id: number, nombre: string) => {
+  const handleRestaurar = (id: string, nombre: string) => {
     setModeloRestaurar({ id, nombre });
   };
 
