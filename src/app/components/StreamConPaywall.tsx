@@ -99,9 +99,6 @@ export function StreamConPaywall({ onRegistrarse }: StreamConPaywallProps) {
         maxBufferLength: 10,
         manifestLoadingTimeOut: 5000,
         manifestLoadingMaxRetry: 2,
-        xhrSetup: (xhr) => {
-          xhr.setRequestHeader('ngrok-skip-browser-warning', 'true');
-        },
       });
 
       hls.loadSource(STREAM_URL);

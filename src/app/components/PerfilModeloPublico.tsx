@@ -304,7 +304,7 @@ export function PerfilModeloPublico({ modeloId, onClose, currentUser, onLoginReq
       const { data: agendamiento, error } = await supabase
         .from('agendamientos')
         .insert(insertData)
-        .select()
+        .select('*')
         .single();
 
       if (error) throw error;

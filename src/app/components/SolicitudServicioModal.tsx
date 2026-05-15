@@ -151,7 +151,7 @@ export function SolicitudServicioModal({ isOpen, onClose, data, currentUser }: S
       const { data: agendamiento, error } = await supabase
         .from('agendamientos')
         .insert(insertData)
-        .select()
+        .select('*')
         .single();
 
       if (error) {
