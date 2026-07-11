@@ -114,10 +114,12 @@ export function TerminalChatProgramador({ userEmail }: TerminalChatProgramadorPr
       if (existingUser) {
         setProgramadorChatId(existingUser.id);
       } else {
+        const nombreUsuario = 'staff_' + userEmail.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '');
         const { data: newUser, error } = await supabase
           .from('clientes')
           .insert({
             nombre: 'Black Diamond',
+            nombre_usuario: nombreUsuario,
             email: userEmail,
             telefono: '3000000000',
             total_servicios: 0,
@@ -128,6 +130,8 @@ export function TerminalChatProgramador({ userEmail }: TerminalChatProgramadorPr
 
         if (!error && newUser) {
           setProgramadorChatId(newUser.id);
+        } else if (error) {
+          if (process.env.NODE_ENV === 'development') console.error('❌ Error creando identidad de chat del programador:', error);
         }
       }
     } catch (err) {
