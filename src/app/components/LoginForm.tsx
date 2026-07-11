@@ -47,16 +47,6 @@ export function LoginForm({ tipo, onLogin, onBackToLanding }: LoginFormProps) {
 
       if (data.user) {
         const tel10 = telefono.replace(/[^0-9]/g, '').slice(-10);
-        await supabase.from('usuarios').upsert({
-          id: data.user.id,
-          email: emailRegistro,
-          nombre,
-          role: 'cliente',
-          estado: 'activo',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'id' });
-
         await supabase.from('clientes').upsert({
           user_id: data.user.id,
           email: emailRegistro,
@@ -150,10 +140,15 @@ export function LoginForm({ tipo, onLogin, onBackToLanding }: LoginFormProps) {
       .eq('id', user!.id)
       .maybeSingle();
 
+    if (_userError) {
+      console.error('❌ Error consultando perfil en usuarios:', _userError);
+    }
+
     const role = usuario?.role;
     const rolesPermitidos = [
       'administrador', 'owner',
-      'programador', 'modelo'
+      'programador', 'modelo',
+      'contador', 'recepcionista', 'supervisor', 'moderador'
     ];
 
     if (!role || !rolesPermitidos.includes(role)) {

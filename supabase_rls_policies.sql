@@ -116,6 +116,12 @@ DROP POLICY IF EXISTS "usuario actualiza su perfil" ON usuarios;
 DROP POLICY IF EXISTS "admin gestiona usuarios" ON usuarios;
 DROP POLICY IF EXISTS "usuarios_self" ON usuarios;
 DROP POLICY IF EXISTS "usuarios_admin" ON usuarios;
+DROP POLICY IF EXISTS "publico ve perfiles modelo" ON usuarios;
+DROP POLICY IF EXISTS "cliente ve perfiles modelo" ON usuarios;
+-- Perfiles de modelos visibles públicamente (landing + ClienteDashboard anon client)
+CREATE POLICY "publico ve perfiles modelo"
+  ON usuarios FOR SELECT
+  USING (role = 'modelo' AND estado = 'activo');
 CREATE POLICY "usuario ve su perfil"
   ON usuarios FOR SELECT
   USING (id = auth.uid());

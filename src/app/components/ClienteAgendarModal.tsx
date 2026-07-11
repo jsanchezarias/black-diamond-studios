@@ -139,7 +139,7 @@ export function ClienteAgendarModal({
           creado_por: clienteEmail,
           fecha_creacion: new Date().toISOString(),
         })
-        .select()
+        .select('*')
         .single();
 
       if (insertError) {

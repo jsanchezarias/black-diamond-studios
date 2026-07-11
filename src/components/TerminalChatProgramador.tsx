@@ -123,7 +123,7 @@ export function TerminalChatProgramador({ userEmail }: TerminalChatProgramadorPr
             total_servicios: 0,
             total_gastado: 0
           })
-          .select()
+          .select('*')
           .single();
 
         if (!error && newUser) {

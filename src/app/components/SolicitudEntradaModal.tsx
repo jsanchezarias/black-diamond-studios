@@ -68,7 +68,7 @@ export function SolicitudEntradaModal({ solicitudId, onClose }: Props) {
           estado: 'en_curso',
           solicitud_entrada_id: solicitudId,
         })
-        .select()
+        .select('*')
         .single();
       if (jorErr) throw jorErr;
 

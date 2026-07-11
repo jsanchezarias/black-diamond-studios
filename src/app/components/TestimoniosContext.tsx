@@ -79,7 +79,7 @@ export function TestimoniosProvider({ children }: { children: ReactNode }) {
           rating: nuevoTestimonio.calificacion,
           aprobado: false,
         })
-        .select()
+        .select('*')
         .single();
 
       if (!error && data) {

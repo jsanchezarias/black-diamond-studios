@@ -736,7 +736,7 @@ export function PublicUsersProvider({ children }: { children: ReactNode }) {
       const { error, data } = await supabase
         .from('chat_mensajes_publicos')
         .insert(newMessage)
-        .select();
+        .select('*');
 
       if (error) {
         if (process.env.NODE_ENV === 'development') console.error('❌ Error enviando mensaje:', error);

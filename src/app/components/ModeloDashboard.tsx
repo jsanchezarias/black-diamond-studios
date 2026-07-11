@@ -807,11 +807,14 @@ export function ModeloDashboard({ accessToken: _accessToken, userId, userEmail, 
   const [misPedidos, setMisPedidos] = useState<any[]>([]);
   const [loadingPedidos, setLoadingPedidos] = useState(true);
 
+  // Rastrear IDs ya vistos para detectar nuevas citas sin duplicar toast
+  const citasVistasRef = useRef<Set<string>>(new Set());
+
   const { modelos } = useModelos();
   const { servicios, recargarServicios } = useServicios();
   const { multas, obtenerTotalMultasPendientesPorEmail } = useMultas();
   const { obtenerAdelantosPendientes } = usePagos();
-  const { obtenerAgendamientosPendientes, obtenerAgendamientosPorModelo, recargarAgendamientos } = useAgendamientos();
+  const { agendamientos, recargarAgendamientos } = useAgendamientos();
   const { registrarSalida, obtenerRegistroActual, obtenerSolicitudPorModelo, crearSolicitudEntrada, jornadas } = useAsistencia();
   const { inventario, recargarProductos } = useInventory();
   const { carrito } = useCarrito();
@@ -990,6 +993,10 @@ export function ModeloDashboard({ accessToken: _accessToken, userId, userEmail, 
     return () => { supabase.removeChannel(channel); };
   }, [userId]);
 
+  // ── Detectar nuevas citas vía el contexto (que ya tiene Realtime activo) ───
+  // agendamientosDeModelo se define más abajo; necesitamos el emailModelo primero.
+  // Por eso usamos un segundo useEffect que depende de agendamientosDeModelo.
+
   // ── Construir modeloActual: contexto → DB → fallback mínimo ───────────────
   const modeloDesdeContexto = (modelos || []).find(m =>
     m.email?.toLowerCase() === userEmail?.toLowerCase()
@@ -1089,8 +1096,50 @@ export function ModeloDashboard({ accessToken: _accessToken, userId, userEmail, 
   const ingresosMes = serviciosMes.reduce((sum, s) => sum + (s.montoPagado ?? s.montoPactado ?? 0), 0);
   const clientesMes = new Set(serviciosMes.map(s => s.clienteNombre)).size;
 
-  const agendamientosDeModelo = modeloActual ? obtenerAgendamientosPorModelo(emailModelo) : [];
-  const citasProximas = modeloActual ? obtenerAgendamientosPendientes(emailModelo) : [];
+  // Filtrar por email O por modelo_id (cuando modelo_email no se guardó)
+  const agendamientosDeModelo = modeloActual
+    ? agendamientos.filter(a =>
+        (emailModelo && a.modeloEmail === emailModelo) ||
+        (userId && a.modeloId === userId)
+      )
+    : [];
+  const citasProximas = agendamientosDeModelo.filter(a => {
+    const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+    return a.estado !== 'completado' && a.estado !== 'cancelado' && new Date(a.fecha) >= hoy;
+  });
+
+  // Solicitudes pendientes derivadas del contexto (sin query extra)
+  const ESTADOS_ACTIVOS = ['pendiente', 'solicitud_cliente', 'aceptado_programador', 'confirmado', 'aprobado'];
+  const solicitudesPendientes = agendamientosDeModelo.filter(a => ESTADOS_ACTIVOS.includes(a.estado || ''));
+
+  // Toast cuando llega una cita nueva (AgendamientosContext ya tiene Realtime activo)
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useEffect(() => {
+    const vistos = citasVistasRef.current;
+    // Primera carga: marcar todos como vistos sin mostrar toast
+    if (vistos.size === 0) {
+      agendamientosDeModelo.forEach(a => { if (a.id) vistos.add(String(a.id)); });
+      return;
+    }
+    agendamientosDeModelo.forEach(a => {
+      if (!a.id) return;
+      const id = String(a.id);
+      if (vistos.has(id)) return;
+      vistos.add(id);
+      const nombre = a.clienteNombre || 'Un cliente';
+      const servicio = a.tarifaNombre || 'servicio';
+      const precio = a.montoPago ? '$' + Number(a.montoPago).toLocaleString('es-CO') : '';
+      toast('📅 Nueva solicitud para ti — ' + nombre + ' · ' + servicio + (precio ? ' · ' + precio : '') + ' · ' + (a.fecha || '') + ' ' + (a.hora || ''), {
+        duration: 9000,
+        style: {
+          background: 'rgba(255,215,0,0.15)',
+          border: '1px solid rgba(255,215,0,0.4)',
+          color: 'white',
+        },
+      });
+    });
+  // agendamientosDeModelo cambia cada vez que AgendamientosContext recibe un INSERT via Realtime
+  }, [agendamientosDeModelo.length]);
   /*
   const citasHoy = citasProximas.filter(c => {
     const d = new Date(c.fecha);
@@ -1682,6 +1731,62 @@ export function ModeloDashboard({ accessToken: _accessToken, userId, userEmail, 
                 </div>
               );
             })()}
+
+            {/* ── Próximas citas / solicitudes pendientes ── */}
+            {solicitudesPendientes.length > 0 && (
+              <div style={{
+                background: 'rgba(255,215,0,0.06)',
+                border: '0.5px solid rgba(255,215,0,0.3)',
+                borderRadius: 12, padding: 16, marginBottom: 8,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                  <span style={{ fontSize: 18 }}>📅</span>
+                  <h4 style={{ margin: 0, color: '#FFD700', fontSize: 15, fontWeight: 700 }}>
+                    Tus próximas citas ({solicitudesPendientes.length})
+                  </h4>
+                </div>
+                {solicitudesPendientes.map(cita => (
+                  <div key={cita.id} style={{
+                    background: 'rgba(255,255,255,0.04)',
+                    borderRadius: 8, padding: 12, marginBottom: 8,
+                    borderLeft: '3px solid ' + (
+                      cita.estado === 'aprobado' ? '#4CAF50'
+                      : cita.estado === 'aceptado_programador' || cita.estado === 'confirmado' ? '#2196F3'
+                      : '#FFA500'
+                    ),
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: 14, color: 'white' }}>
+                          {cita.clienteNombre || 'Cliente'}
+                        </div>
+                        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 3 }}>
+                          📅 {String(cita.fecha || '').split('T')[0]} — 🕐 {cita.hora}
+                        </div>
+                        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
+                          ⏱ {cita.tarifaNombre || 'Servicio'} — 💰 ${(cita.montoPago || 0).toLocaleString('es-CO')}
+                        </div>
+                      </div>
+                      <span style={{
+                        fontSize: 10, fontWeight: 700,
+                        padding: '3px 10px', borderRadius: 20, whiteSpace: 'nowrap',
+                        background: cita.estado === 'aprobado' ? 'rgba(76,175,80,0.2)'
+                          : cita.estado === 'aceptado_programador' || cita.estado === 'confirmado' ? 'rgba(33,150,243,0.2)'
+                          : 'rgba(255,165,0,0.2)',
+                        color: cita.estado === 'aprobado' ? '#4CAF50'
+                          : cita.estado === 'aceptado_programador' || cita.estado === 'confirmado' ? '#2196F3'
+                          : '#FFA500',
+                      }}>
+                        {cita.estado === 'aprobado' ? '✓ Aprobada'
+                          : cita.estado === 'aceptado_programador' ? '📋 Por confirmar'
+                          : cita.estado === 'confirmado' ? '📋 Confirmada'
+                          : '⏳ Pendiente'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
 
             <IngresosWidget rol="modelo" modeloEmail={userEmail} mostrarDetalle={false} />
 

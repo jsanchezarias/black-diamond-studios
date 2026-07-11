@@ -36,7 +36,6 @@ interface ProgramadorDashboardProps {
   onLogout?: () => void;
 }
 
-const isDev = process.env.NODE_ENV === 'development';
 
 export function ProgramadorDashboard({ accessToken: _accessToken, userId, userEmail, onLogout }: ProgramadorDashboardProps) {
   // Estados locales
@@ -75,23 +74,21 @@ export function ProgramadorDashboard({ accessToken: _accessToken, userId, userEm
     agendamiento: Agendamiento | null;
   }>({ isOpen: false, agendamiento: null });
 
+  // Estados que antes estaban después del early return — ahora aquí para cumplir Rules of Hooks
+  const [notificaciones, setNotificaciones] = useState<any[]>([]);
+  const [solicitudesNuevas, setSolicitudesNuevas] = useState<any[]>([]);
+  const [aceptadas, setAceptadas] = useState<any[]>([]);
+  const [aprobadas, setAprobadas] = useState<any[]>([]);
+  const [modalAceptar, setModalAceptar] = useState<any>(null);
+  const [habitacionesDisponibles, setHabitacionesDisponibles] = useState<any[]>([]);
+  const [_habitacionSeleccionada, setHabitacionSeleccionada] = useState<any>(null);
+  const [loadingAceptar, setLoadingAceptar] = useState(false);
+
   // Hooks de contexto con valores por defecto
-  let agendamientosCtx, clientesCtx, modelosCtx;
+  const agendamientosCtx = useAgendamientos();
+  const clientesCtx = useClientes();
+  const modelosCtx = useModelos();
 
-  try {
-    agendamientosCtx = useAgendamientos();
-    clientesCtx = useClientes();
-    modelosCtx = useModelos();
-
-    // Valores seguros con fallbacks
-    // const agendamientos = agendamientosCtx?.agendamientos || [];
-    // const modelos = modelosCtx?.modelos || [];
-  } catch (error) {
-    if (isDev) console.error('❌ ERROR AL OBTENER CONTEXTOS:', error);
-    throw error;
-  }
-
-  // ✅ NUEVO: Mostrar indicador de carga si los contextos no están listos
   if (!agendamientosCtx || !clientesCtx || !modelosCtx) {
     return (
       <div className="min-h-screen w-full bg-background flex items-center justify-center">
@@ -104,15 +101,6 @@ export function ProgramadorDashboard({ accessToken: _accessToken, userId, userEm
   }
 
   const currentUser = { id: userId, email: userEmail };
-  const [notificaciones, setNotificaciones] = useState<any[]>([]);
-  // const [loading, setLoading] = useState(false);
-  const [solicitudesNuevas, setSolicitudesNuevas] = useState<any[]>([]);
-  const [aceptadas, setAceptadas] = useState<any[]>([]);
-  const [aprobadas, setAprobadas] = useState<any[]>([]);
-  const [modalAceptar, setModalAceptar] = useState<any>(null);
-  const [habitacionesDisponibles, setHabitacionesDisponibles] = useState<any[]>([]);
-  const [_habitacionSeleccionada, setHabitacionSeleccionada] = useState<any>(null);
-  const [loadingAceptar, setLoadingAceptar] = useState(false);
 
   const cargarAgendamientos = async () => {
     // setLoading(true)

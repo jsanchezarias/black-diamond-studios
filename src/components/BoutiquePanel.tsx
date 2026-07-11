@@ -78,7 +78,7 @@ export function BoutiquePanel({ accessToken: _accessToken, userId: _userId }: Bo
     try {
       const { data, error } = await supabase
         .from('ventas_boutique')
-        .select('*, modelo:usuarios!modelo_id(nombreArtistico, email)')
+        .select('*, modelo:usuarios!modelo_id(nombreArtistico, nombre_artistico, email)')
         .order('fecha', { ascending: false });
       if (error) throw error;
       setPedidosPendientes(data || []);
@@ -92,37 +92,37 @@ export function BoutiquePanel({ accessToken: _accessToken, userId: _userId }: Bo
   const handleAceptarPedido = async (pedido: any) => {
     setProcesandoAccion(pedido.id);
     try {
-      // 1. Obtener stock actual
-      const { data: prod } = await supabase.from('inventario_boutique').select('stock, nombre').eq('id', pedido.producto_id).single();
+      // 1. Obtener stock actual desde la tabla correcta
+      const { data: prod } = await supabase.from('productos').select('stock, nombre').eq('id', pedido.producto_id).single();
       if (!prod || prod.stock < pedido.cantidad) {
         toast.error(`Stock insuficiente para ${prod?.nombre || 'el producto'}`);
         return;
       }
 
-      // 2. Transacción: Actualizar pedido, descontar stock y registrar gasto
+      // 2. Actualizar pedido
       const { error: errorUpdate } = await supabase
         .from('ventas_boutique')
-        .update({ 
-          estado: 'aceptado', 
+        .update({
+          estado: 'aceptado',
           aceptado_en: new Date().toISOString(),
           aceptado_por: (await supabase.auth.getUser()).data.user?.id
         })
         .eq('id', pedido.id);
-      
+
       if (errorUpdate) throw errorUpdate;
 
-      // Descontar stock
-      await supabase.rpc('increment_inventory_stock', { 
-        row_id: pedido.producto_id, 
-        increment_by: -pedido.cantidad 
-      });
+      // 3. Descontar stock directamente (sin RPC)
+      await supabase
+        .from('productos')
+        .update({ stock: Math.max(0, prod.stock - pedido.cantidad) })
+        .eq('id', pedido.producto_id);
 
       // Registrar en gastos (como una salida de inventario / costo)
       await supabase.from('gastos').insert({
         tipo: 'operativo',
         categoria: 'inventario_boutique',
         monto: pedido.total,
-        descripcion: `Venta Boutique: ${pedido.cantidad}x ${pedido.producto_nombre} (Modelo: ${pedido.modelo?.nombreArtistico || 'N/A'})`,
+        descripcion: `Venta Boutique: ${pedido.cantidad}x ${pedido.producto_nombre} (Modelo: ${pedido.modelo?.nombreArtistico || pedido.modelo?.nombre_artistico || 'N/A'})`,
         fecha: new Date().toISOString().split('T')[0],
         metodo_pago: 'efectivo',
         estado: 'pagado'
@@ -697,7 +697,7 @@ export function BoutiquePanel({ accessToken: _accessToken, userId: _userId }: Bo
                             </td>
                             <td className="py-4">
                               <div className="flex flex-col">
-                                <span className="font-medium text-white">{pedido.modelo?.nombreArtistico || 'Modelo'}</span>
+                                <span className="font-medium text-white">{pedido.modelo?.nombreArtistico || pedido.modelo?.nombre_artistico || 'Modelo'}</span>
                                 <span className="text-[10px] text-muted-foreground">{pedido.modelo?.email}</span>
                               </div>
                             </td>

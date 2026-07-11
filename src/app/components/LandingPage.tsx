@@ -142,6 +142,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
   // Estado para Solicitud de Servicio
   const [solicitudData, setSolicitudData] = useState<{model: any, service?: any, location?: 'sede' | 'domicilio', price?: string} | null>(null);
   const [perfilVisibleId, setPerfilVisibleId] = useState<string | null>(null);
+  const [modeloPendienteId, setModeloPendienteId] = useState<string | null>(null);
 
   const [_streamActivo, setStreamActivo] = useState(false);
 
@@ -839,10 +840,19 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
               pb-8
             ">
               {modelos.map(modelo => (
-                <ModeloCard 
-                  key={modelo.id} 
-                  modelo={modelo} 
-                  onAgendar={() => setPerfilVisibleId(modelo.id)} 
+                <ModeloCard
+                  key={modelo.id}
+                  modelo={modelo}
+                  onAgendar={(m: any) => {
+                    const id = (m?.id || modelo.id) as string;
+                    if (!currentUserProp) {
+                      localStorage.setItem('pendingBookingModelId', id);
+                      setModeloPendienteId(id);
+                      setShowClienteLogin(true);
+                    } else {
+                      setPerfilVisibleId(id);
+                    }
+                  }}
                 />
               ))}
             </div>
@@ -1124,15 +1134,21 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
             setClienteActual(cliente);
             setShowClienteLogin(false);
             toast.success(`¡Bienvenido de nuevo, ${cliente.nombre}!`);
-            
+
+            // Si había un modelo pendiente, abrirlo al volver al perfil (usuario no-cliente)
+            // Para clientes, ClienteDashboard lo leerá de localStorage
+            if (modeloPendienteId && !onLoginSuccess) {
+              setPerfilVisibleId(modeloPendienteId);
+              setModeloPendienteId(null);
+            }
+
             // ✅ SINCRONIZACIÓN GLOBAL: Notificar a App.tsx
             if (onLoginSuccess) {
-              // Obtenemos la sesión actual de Supabase para pasar el accessToken
               supabase.auth.getSession().then(({ data: { session } }) => {
                 onLoginSuccess(
-                  session?.access_token || '', 
-                  cliente.user_id || cliente.id, 
-                  cliente.email || '', 
+                  session?.access_token || '',
+                  cliente.user_id || cliente.id,
+                  cliente.email || '',
                   'cliente'
                 );
               });
@@ -1156,6 +1172,10 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
           onClose={() => setPerfilVisibleId(null)}
           currentUser={currentUserProp}
           onLoginRequired={() => {
+            if (perfilVisibleId) {
+              localStorage.setItem('pendingBookingModelId', perfilVisibleId);
+              setModeloPendienteId(perfilVisibleId);
+            }
             setPerfilVisibleId(null);
             setShowClienteLogin(true);
           }}

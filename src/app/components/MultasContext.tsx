@@ -96,7 +96,7 @@ export function MultasProvider({ children }: { children: ReactNode }) {
         monto: multa.monto,
         estado: 'activa'
       })
-      .select()
+      .select('*')
       .single();
 
     if (error) {

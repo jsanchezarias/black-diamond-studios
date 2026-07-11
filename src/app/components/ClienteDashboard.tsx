@@ -133,7 +133,7 @@ function ModalReserva({
         monto_pago: precioActual,
         fecha,
         hora,
-        ubicacion: sede === 'sede_norte' ? 'Sede Norte' : 'Domicilio',
+        ubicacion: sede === 'sede_norte' ? 'sede' : 'domicilio',
         habitacion: sede === 'domicilio' ? direccion : 'Por asignar',
         notas: obs || null,
         estado: 'pendiente',
@@ -579,11 +579,12 @@ interface CarritoItem extends Producto {
   cantidad: number;
 }
 
-function BoutiqueTab() {
+function BoutiqueTab({ userId, userEmail }: { userId: string; userEmail: string }) {
   const { inventario, loading } = useInventory();
   const [carrito, setCarrito] = useState<CarritoItem[]>([]);
   const [carritoAbierto, setCarritoAbierto] = useState(false);
   const [categoriaActiva, setCategoriaActiva] = useState<string>('Todos');
+  const [enviandoPedido, setEnviandoPedido] = useState(false);
 
   const productosDisponibles = inventario.filter(p => p.stock > 0);
   const categorias = ['Todos', ...Array.from(new Set(productosDisponibles.map(p => p.categoria || 'General')))];
@@ -777,9 +778,60 @@ function BoutiqueTab() {
                     Los productos de boutique se pagan al momento del servicio. Informa a tu acompañante los productos que deseas.
                   </p>
                 </div>
-                <button onClick={() => { toast.success('✅ Lista de productos guardada. Tu acompañante la tendrá disponible.'); setCarritoAbierto(false); }}
-                  style={{ width: '100%', padding: 13, border: 'none', borderRadius: 10, background: `linear-gradient(135deg, ${C.gold}, #a07c3a)`, color: '#0f1014', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
-                  Confirmar Lista
+                <button
+                  disabled={enviandoPedido}
+                  onClick={async () => {
+                    if (enviandoPedido || carrito.length === 0) return;
+                    setEnviandoPedido(true);
+                    try {
+                      const { data: perfil } = await supabase
+                        .from('clientes')
+                        .select('nombre')
+                        .or(`user_id.eq.${userId},email.eq.${userEmail}`)
+                        .maybeSingle();
+                      const nombreCliente = perfil?.nombre || userEmail.split('@')[0];
+
+                      for (const item of carrito) {
+                        await supabase.from('ventas_boutique').insert({
+                          producto_id: item.id,
+                          producto_nombre: item.nombre,
+                          cliente_id: userId,
+                          cliente_nombre: nombreCliente,
+                          cantidad: item.cantidad,
+                          precio_unitario: item.precioRegular,
+                          total: (item.precioRegular || 0) * item.cantidad,
+                          estado: 'pendiente',
+                          tipo_solicitante: 'cliente',
+                          fecha: new Date().toISOString(),
+                        });
+                      }
+
+                      const { data: admins } = await supabase
+                        .from('usuarios')
+                        .select('id')
+                        .in('role', ['administrador', 'owner']);
+                      if (admins?.length) {
+                        const totalPedido = carrito.reduce((s, i) => s + (i.precioRegular || 0) * i.cantidad, 0);
+                        await supabase.from('notificaciones').insert(admins.map((a: any) => ({
+                          usuario_id: a.id,
+                          titulo: '🛍️ Solicitud de boutique (cliente)',
+                          mensaje: `${nombreCliente} solicitó ${carrito.length} producto(s) — Total: $${totalPedido.toLocaleString('es-CO')}`,
+                          tipo: 'pedido_boutique',
+                          leida: false,
+                        })));
+                      }
+
+                      setCarrito([]);
+                      setCarritoAbierto(false);
+                      toast.success('✅ Solicitud enviada — El equipo la procesará pronto');
+                    } catch (err: any) {
+                      toast.error('Error al enviar: ' + (err?.message || 'intenta de nuevo'));
+                    } finally {
+                      setEnviandoPedido(false);
+                    }
+                  }}
+                  style={{ width: '100%', padding: 13, border: 'none', borderRadius: 10, background: enviandoPedido ? 'rgba(201,169,97,0.4)' : `linear-gradient(135deg, ${C.gold}, #a07c3a)`, color: '#0f1014', fontWeight: 700, fontSize: 14, cursor: enviandoPedido ? 'wait' : 'pointer' }}>
+                  {enviandoPedido ? 'Enviando...' : 'Enviar Solicitud'}
                 </button>
               </div>
             )}
@@ -904,6 +956,18 @@ export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboa
       modeloEmail: modelo.email || '',
     });
   }, []);
+
+  // ── Reserva pendiente desde landing (login required flow) ─────────────────
+  useEffect(() => {
+    if (modelos.length === 0) return;
+    const pendingId = localStorage.getItem('pendingBookingModelId');
+    if (!pendingId) return;
+    const modeloPendiente = modelos.find((m: any) => m.id === pendingId);
+    if (modeloPendiente) {
+      localStorage.removeItem('pendingBookingModelId');
+      abrirModal(modeloPendiente);
+    }
+  }, [modelos, abrirModal]);
 
   // ── Nombre para mostrar ───────────────────────────────────────────────────
   const nombreMostrado = (() => {
@@ -1127,7 +1191,7 @@ export function ClienteDashboard({ userId, userEmail, onLogout }: ClienteDashboa
         )}
 
         {/* TAB: BOUTIQUE */}
-        {activeTab === 'boutique' && <BoutiqueTab />}
+        {activeTab === 'boutique' && <BoutiqueTab userId={userId} userEmail={userEmail} />}
 
         {/* TAB: MIS CITAS */}
         {activeTab === 'mis-citas' && (

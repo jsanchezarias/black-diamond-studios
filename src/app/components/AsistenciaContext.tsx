@@ -217,7 +217,7 @@ export function AsistenciaProvider({ children }: { children: ReactNode }) {
         fecha: new Date().toISOString().split('T')[0],
         hora_solicitud: new Date().toISOString(),
       })
-      .select()
+      .select('*')
       .single();
 
     if (error) throw error;
@@ -274,7 +274,7 @@ export function AsistenciaProvider({ children }: { children: ReactNode }) {
         estado: 'en_curso',
         solicitud_entrada_id: solicitudId
       })
-      .select()
+      .select('*')
       .single();
 
     if (jorErr) throw jorErr;
@@ -306,7 +306,7 @@ export function AsistenciaProvider({ children }: { children: ReactNode }) {
         solicitud_entrada_id: solicitudId,
         selfie_url: solicitud.selfieUrl,
       })
-      .select()
+      .select('*')
       .single();
     if (insErr) throw insErr;
 
@@ -428,7 +428,7 @@ export function AsistenciaProvider({ children }: { children: ReactNode }) {
           estado: 'activa',
           notas: notas
         })
-        .select()
+        .select('*')
         .single();
       
       if (!multaErr && multaData) {

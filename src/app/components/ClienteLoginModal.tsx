@@ -276,7 +276,7 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess, tabInicial 
       const { data: clienteData, error: clienteError } = await supabase
         .from('clientes')
         .upsert(nuevoCliente, { onConflict: 'user_id' })
-        .select()
+        .select('*')
         .single();
 
       if (clienteError) {

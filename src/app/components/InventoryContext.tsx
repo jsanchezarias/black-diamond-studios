@@ -124,7 +124,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
           descripcion: producto.descripcion || '',
           imagen: producto.imagen || '',
         })
-        .select()
+        .select('*')
         .single();
 
       if (error) {
@@ -196,7 +196,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
         .from('productos')
         .update(datosActualizar)
         .eq('id', id)
-        .select()
+        .select('*')
         .single();
 
       if (error) {
@@ -222,7 +222,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
         .from('productos')
         .update({ stock: cantidad })
         .eq('id', id)
-        .select()
+        .select('*')
         .single();
 
       if (error) {

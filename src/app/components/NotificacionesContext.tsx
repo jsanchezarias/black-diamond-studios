@@ -289,7 +289,7 @@ export const NotificacionesProvider = ({ children }: { children: ReactNode }) =>
           creado_por: notificacion.creadoPor ?? 'sistema',
           fecha_creacion: nuevaLocal.fechaCreacion,
         })
-        .select()
+        .select('*')
         .single();
 
       const notificacionFinal = error ? nuevaLocal : {

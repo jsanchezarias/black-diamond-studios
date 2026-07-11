@@ -281,7 +281,7 @@ export function ServiciosProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase
         .from('servicios_modelo')
         .insert(row)
-        .select()
+        .select('*')
         .single();
 
       if (error) {

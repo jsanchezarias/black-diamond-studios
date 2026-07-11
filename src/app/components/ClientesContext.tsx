@@ -236,7 +236,7 @@ export function ClientesProvider({ children }: { children: ReactNode }) {
     const { data, error } = await supabase
       .from('clientes')
       .insert(dbRow)
-      .select()
+      .select('*')
       .single();
 
     if (error) throw new Error(`Error al agregar cliente: ${error.message}`);
