@@ -117,10 +117,22 @@ export function ChatModeratorPanel({ userEmail, userId }: ChatModeratorPanelProp
   };
   */
 
+  // Sin selector de conversación activo: responder al cliente que escribió
+  // el mensaje más reciente (evita que la respuesta salga con receiver_id
+  // null e invisible para todos los clientes).
+  const getUltimoClienteId = (): string | undefined => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'user' && messages[i].userId) {
+        return messages[i].userId;
+      }
+    }
+    return undefined;
+  };
+
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (!messageInput.trim()) return;
-    sendMessage(messageInput, _selectedUserId || undefined);
+    sendMessage(messageInput, _selectedUserId || getUltimoClienteId());
     setMessageInput('');
   };
 
