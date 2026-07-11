@@ -50,7 +50,7 @@ export function ChatModeratorPanel({ userEmail, userId }: ChatModeratorPanelProp
       }
       const { data, error } = await query.maybeSingle();
       if (!error && data) {
-        loginUser(data);
+        loginUser(data, 'programador');
       }
     } catch (_) {}
   };

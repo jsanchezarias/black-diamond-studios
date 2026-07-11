@@ -36,7 +36,7 @@ interface ChatMessage {
 
 interface PublicUsersContextType {
   currentUser: PublicUser | null;
-  loginUser: (clienteData: any) => void; // ✅ Setear usuario directamente tras login
+  loginUser: (clienteData: any, roleOverride?: 'user' | 'programador') => void; // ✅ Setear usuario directamente tras login
   logout: () => Promise<void>;
   sendMessage: (message: string, receiverId?: string) => Promise<void>;
   messages: ChatMessage[];
@@ -503,7 +503,7 @@ export function PublicUsersProvider({ children }: { children: ReactNode }) {
   // ============================================
   // LOGIN DIRECTO (llamado desde ClienteLoginModal)
   // ============================================
-  const loginUser = useCallback((clienteData: any) => {
+  const loginUser = useCallback((clienteData: any, roleOverride?: 'user' | 'programador') => {
     const publicUser: PublicUser = {
       id: clienteData.id,
       username: clienteData.nombre || clienteData.nombre_usuario || 'Usuario',
@@ -511,7 +511,7 @@ export function PublicUsersProvider({ children }: { children: ReactNode }) {
       registeredAt: new Date(clienteData.fecha_registro || clienteData.created_at || clienteData.fecha_creacion || Date.now()),
       avatar: undefined,
       isVIP: false,
-      role: clienteData.email === PROGRAMADOR_EMAIL ? 'programador' : 'user',
+      role: roleOverride || (clienteData.email === PROGRAMADOR_EMAIL ? 'programador' : 'user'),
     };
     currentUserRef.current = publicUser;
     setCurrentUser(publicUser);
