@@ -95,8 +95,15 @@ export function OwnerDashboard({ accessToken, userId, userEmail = '', onLogout }
     // Verificar que la sesión sigue siendo válida
     const verificarSesion = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session || session.user.id !== userId) {
+
+      if (session && session.user.id === userId) return;
+
+      // Antes de desloguear: la pestaña pudo haber estado en segundo plano y
+      // el auto-refresh del token puede llegar retrasado. Forzar un refresh
+      // explícito antes de tratar la sesión como realmente inválida.
+      const { data: { session: refreshedSession } } = await supabase.auth.refreshSession();
+
+      if (!refreshedSession || refreshedSession.user.id !== userId) {
         console.warn('⚠️ Sesión inválida, cerrando...');
         onLogout?.();
       }
