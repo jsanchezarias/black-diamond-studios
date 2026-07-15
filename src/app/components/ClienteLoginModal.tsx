@@ -89,8 +89,11 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess, tabInicial 
 
         if (!authErrorEmail && authDataEmail.user) {
           authData = authDataEmail;
-        } else if (authErrorEmail?.message.includes('Invalid login')) {
-          setError('Credenciales incorrectas.');
+        } else if (authErrorEmail) {
+          const msg = authErrorEmail.message.includes('Invalid login')
+            ? 'Credenciales incorrectas.'
+            : translateSupabaseError(authErrorEmail);
+          setError(msg);
           setProcesando(false);
           return;
         }
@@ -117,8 +120,11 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess, tabInicial 
             });
             if (!authError2 && authData2.user) {
               authData = authData2;
-            } else if (authError2?.message.includes('Invalid login')) {
-              setError('Contraseña incorrecta.');
+            } else if (authError2) {
+              const msg = authError2.message.includes('Invalid login')
+                ? 'Contraseña incorrecta.'
+                : translateSupabaseError(authError2);
+              setError(msg);
               setProcesando(false);
               return;
             }
@@ -135,11 +141,11 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess, tabInicial 
       // Verificar rol (NO debe ser staff)
       const { data: userProfile } = await supabase
         .from('usuarios')
-        .select('rol')
+        .select('role')
         .eq('id', authData.user.id)
         .maybeSingle();
 
-      if (userProfile && ['admin', 'recepcion', 'superadmin', 'programador'].includes(userProfile.rol)) {
+      if (userProfile && ['administrador', 'admin', 'owner', 'recepcionista', 'programador'].includes(userProfile.role)) {
         await supabase.auth.signOut();
         setError('Usa "Acceso al sistema" para ingresar con cuenta de staff.');
         setProcesando(false);
