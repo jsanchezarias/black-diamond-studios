@@ -157,11 +157,24 @@ export function GestionUsuariosPanel({ userRole }: GestionUsuariosPanelProps) {
       });
 
       // La Edge Function devuelve error en el body con { error: '...' }
-      const responseError = fnError || (data?.error ? new Error(data.error) : null);
+      // fnError.message del SDK es genérico ("non-2xx status code"); el mensaje
+      // real viene en el body de la respuesta, accesible vía error.context.
+      let mensajeError: string | null = null;
+      if (fnError) {
+        try {
+          const bodyText = await (fnError as any)?.context?.text?.();
+          const parsed = bodyText ? JSON.parse(bodyText) : null;
+          mensajeError = parsed?.error || fnError.message;
+        } catch {
+          mensajeError = fnError.message;
+        }
+      } else if (data?.error) {
+        mensajeError = data.error;
+      }
 
-      if (responseError) {
-        if (process.env.NODE_ENV === 'development') console.error('Error creando usuario:', responseError);
-        setError(responseError.message || 'Error al crear el usuario');
+      if (mensajeError) {
+        if (process.env.NODE_ENV === 'development') console.error('Error creando usuario:', mensajeError);
+        setError(mensajeError);
         setCreando(false);
         return;
       }
