@@ -376,7 +376,7 @@ export function CrearModeloModal({ open, onClose }: CrearModeloModalProps) {
       const authToken = currentSession?.access_token || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt6ZGpyYXZ3Y2p1bW1lZ3h4cmtkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3NzY4ODIsImV4cCI6MjA4MzM1Mjg4Mn0.xC2QDsAzhYRRg8yakyRTChzHL_bleIT-u9mtKlNeBpc';
 
       const fnResponse = await fetch(
-        'https://kzdjravwcjummegxxrkd.supabase.co/functions/v1/server',
+        'https://kzdjravwcjummegxxrkd.supabase.co/functions/v1/bd-api',
         {
           method: 'POST',
           headers: {

@@ -144,7 +144,7 @@ export function GestionUsuariosPanel({ userRole }: GestionUsuariosPanelProps) {
     try {
       // Crear usuario vía Edge Function (usa Admin API con email_confirm: true)
       // Esto evita el problema de confirmación de email que bloquea el login
-      const { data, error: fnError } = await supabase.functions.invoke('server', {
+      const { data, error: fnError } = await supabase.functions.invoke('bd-api', {
         method: 'POST',
         headers: { 'x-invoke-path': '/make-server-9dadc017/administrador/crear-usuario' },
         body: {
