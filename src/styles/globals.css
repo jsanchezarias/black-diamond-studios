@@ -455,17 +455,40 @@
   50%       { transform: translateY(-6px);  }
 }
 
-/* Clases de animación reutilizables */
+/* Clases de animación reutilizables — se disparan al entrar en el viewport (ver clase .bd-inview,
+   agregada por IntersectionObserver), no al montar la página. Así cada sección se revela cuando
+   el scroll realmente llega a ella, en vez de aparecer ya "asentada" y de golpe. */
 .bd-animate-fade-up {
+  opacity: 0;
+  transform: translateY(32px);
+}
+.bd-animate-fade-up.bd-inview {
   animation: bd-fade-up 0.75s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .bd-animate-fade-in {
+  opacity: 0;
+}
+.bd-animate-fade-in.bd-inview {
   animation: bd-fade-in 0.6s ease both;
 }
 
 .bd-animate-scale-in {
+  opacity: 0;
+  transform: scale(0.92) translateY(16px);
+}
+.bd-animate-scale-in.bd-inview {
   animation: bd-scale-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bd-animate-fade-up,
+  .bd-animate-fade-in,
+  .bd-animate-scale-in {
+    opacity: 1;
+    transform: none;
+    animation: none;
+  }
 }
 
 .bd-animate-float {
@@ -484,12 +507,24 @@
 .bd-delay-4  { animation-delay: 320ms; }
 .bd-delay-5  { animation-delay: 400ms; }
 
-/* Línea shimmer dorada decorativa */
+/* Línea shimmer dorada decorativa — se dibuja al entrar en el viewport, junto con su título */
 .bd-shimmer-line {
   height: 1px;
   background: linear-gradient(90deg, transparent, var(--gold) 50%, transparent);
-  animation: bd-shimmer-line 1.8s ease forwards;
+  transform: scaleX(0);
+  opacity: 0;
   transform-origin: left center;
+}
+.bd-shimmer-line.bd-inview {
+  animation: bd-shimmer-line 1.8s ease forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bd-shimmer-line {
+    transform: scaleX(1);
+    opacity: 0.6;
+    animation: none;
+  }
 }
 
 /* Cards con hover premium */

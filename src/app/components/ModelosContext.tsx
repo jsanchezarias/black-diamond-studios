@@ -77,6 +77,7 @@ interface ModelosContextType {
   eliminarModelo: (id: string) => void;
   archivarModelo: (id: string, motivo?: string) => void;
   restaurarModelo: (id: string) => void;
+  eliminarModeloPermanentemente: (id: string) => Promise<void>;
   actualizarModelo: (id: string, datos: Partial<Modelo>) => void;
   obtenerModeloPorEmail: (email: string) => Modelo | undefined;
   validarCredenciales: (email: string, password: string) => Modelo | null;
@@ -486,6 +487,33 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const eliminarModeloPermanentemente = async (id: string) => {
+    const modelo = modelos.find(m => m.id === id) || modelosArchivadas.find(m => m.id === id);
+    if (!modelo) throw new Error('Modelo no encontrada localmente');
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error('No hay sesión activa.');
+
+    const response = await fetch('https://kzdjravwcjummegxxrkd.supabase.co/functions/v1/admin-delete-user', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ targetUserId: id }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || result.message || 'Error al eliminar permanentemente la modelo');
+    }
+
+    setModelos(prev => prev.filter(m => m.id !== id));
+    setModelosArchivadas(prev => prev.filter(m => m.id !== id));
+    CacheSystem.clear('modelos_v3');
+  };
+
   const actualizarModelo = async (id: string, datos: Partial<Modelo>) => {
     const modelo = modelos.find(m => m.id === id);
     if (!modelo) {
@@ -619,6 +647,7 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
     eliminarModelo,
     archivarModelo,
     restaurarModelo,
+    eliminarModeloPermanentemente,
     actualizarModelo,
     obtenerModeloPorEmail,
     validarCredenciales,
@@ -643,6 +672,7 @@ export function useModelos(): ModelosContextType {
       eliminarModelo: () => {},
       archivarModelo: () => {},
       restaurarModelo: () => {},
+      eliminarModeloPermanentemente: async () => {},
       actualizarModelo: () => {},
       obtenerModeloPorEmail: () => undefined,
       validarCredenciales: () => null,

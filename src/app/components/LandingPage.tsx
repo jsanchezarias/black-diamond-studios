@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '../../components/ui/badge';
 // Removed ModelCard import
 import { ModeloCard } from './ModeloCard';
 import { AppointmentModal } from './AppointmentModal';
-import { VideoShowcase } from './VideoShowcase';
+import { Hero3D } from './Hero3D';
 import { TestimoniosSection } from './TestimoniosSection';
 import { AgregarTestimonioModal } from './AgregarTestimonioModal';
 import { ClienteLoginModal } from './ClienteLoginModal';
@@ -59,7 +59,36 @@ interface LandingPageProps {
 
 export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLoginSuccess }: LandingPageProps) {
   const [menuAbierto, setMenuAbierto] = useState(false);
-  
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  // Revela cada sección/tarjeta justo cuando el scroll la trae a la vista, en vez de que
+  // ya aparezca "asentada" desde el primer render — evita el efecto de transición forzada
+  // entre secciones al bajar por la página.
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+
+    const targets = root.querySelectorAll<HTMLElement>(
+      '.bd-animate-fade-up, .bd-animate-scale-in, .bd-animate-fade-in, .bd-shimmer-line'
+    );
+    if (targets.length === 0) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('bd-inview');
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.15, rootMargin: '0px 0px -8% 0px' }
+    );
+
+    targets.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, []);
+
   const [modelos, setModelos] = useState<any[]>([]);
   const [cargandoModelos, setCargandoModelos] = useState(true);
   const [errorModelos, setErrorModelos] = useState<string | null>(null);
@@ -485,7 +514,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
   };
 
   return (
-    <div className="min-h-screen bg-background w-full max-w-full overflow-x-hidden box-border" style={{ fontFamily: "'Cormorant Garamond', 'Playfair Display', Georgia, serif" }}>
+    <div ref={rootRef} className="min-h-screen bg-background w-full max-w-full overflow-x-hidden box-border" style={{ fontFamily: "'Cormorant Garamond', 'Playfair Display', Georgia, serif" }}>
       {/* Overlay para menú móvil */}
       {menuAbierto && (
         <div 
@@ -496,7 +525,15 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
       )}
 
       {/* Navigation - Navbar responsivo solicitado */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-[#0a0b0d]/96 backdrop-blur-xl border-b border-[#c9a961]/10" style={{ boxShadow: '0 1px 32px rgba(0,0,0,0.7)' }}>
+      <nav
+        className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-b from-black/90 via-black/50 to-transparent"
+        style={{
+          WebkitMaskImage: 'linear-gradient(to bottom, black 0%, black 55%, transparent 100%)',
+          maskImage: 'linear-gradient(to bottom, black 0%, black 55%, transparent 100%)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+        }}
+      >
         <div className="flex items-center justify-between px-4 sm:px-6 lg:px-8 py-3.5 sm:py-4 max-w-7xl mx-auto">
 
           {/* LOGO */}
@@ -510,20 +547,20 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
           <div className="hidden md:flex items-center gap-7 lg:gap-9">
             {links.map(l => (
               <a key={l.href} href={l.href}
-                className="text-[#777] hover:text-[#c9a961] text-sm tracking-wider uppercase transition-all duration-300 relative group"
+                className="text-[#777] hover:text-[#c9385a] text-sm tracking-wider uppercase transition-all duration-300 relative group"
                 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.7rem', letterSpacing: '0.14em' }}
               >
                 {l.label}
-                <span className="absolute -bottom-0.5 left-0 w-0 h-px bg-[#c9a961] group-hover:w-full transition-all duration-400" />
+                <span className="absolute -bottom-0.5 left-0 w-0 h-px bg-[#A11D3A] group-hover:w-full transition-all duration-400" />
               </a>
             ))}
 
             <button
               onClick={() => onAccessSystem('cliente')}
-              className="relative px-6 py-2.5 rounded-lg font-bold text-[#0f1014] text-xs tracking-widest uppercase overflow-hidden group transition-all duration-300 hover:scale-105 active:scale-95"
+              className="relative px-6 py-2.5 rounded-lg font-bold text-white text-xs tracking-widest uppercase overflow-hidden group transition-all duration-300 hover:scale-105 active:scale-95"
               style={{
-                background: 'linear-gradient(135deg, #d4b86a 0%, #c9a961 50%, #a07c3a 100%)',
-                boxShadow: '0 4px 20px rgba(201,169,97,0.3)',
+                background: 'linear-gradient(135deg, #C23A54 0%, #A11D3A 50%, #6B1226 100%)',
+                boxShadow: '0 4px 20px rgba(161,29,58,0.4)',
                 fontFamily: "'Montserrat', sans-serif",
                 letterSpacing: '0.1em',
               }}
@@ -540,8 +577,8 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
               md:hidden
               w-10 h-10 rounded-lg
               flex items-center justify-center
-              text-[#c9a961] text-2xl
-              hover:bg-[#c9a961]/10
+              text-[#A11D3A] text-2xl
+              hover:bg-[#A11D3A]/10
               transition-colors
             "
             aria-label="Menú"
@@ -569,7 +606,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
                   block py-3 px-2
                   text-[#888] text-base
                   border-b border-[#2a2a2a]
-                  hover:text-[#c9a961]
+                  hover:text-[#c9385a]
                   transition-colors
                 "
               >
@@ -586,9 +623,9 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
                 }}
                 className="w-full py-3 rounded-xl font-black text-[11px] uppercase tracking-[0.15em] active:scale-95 transition-all duration-300"
                 style={{
-                  background: 'linear-gradient(135deg, #d4b86a 0%, #c9a961 60%, #a07c3a 100%)',
-                  color: '#0f1014',
-                  boxShadow: '0 4px 16px rgba(201,169,97,0.25)',
+                  background: 'linear-gradient(135deg, #C23A54 0%, #A11D3A 60%, #6B1226 100%)',
+                  color: '#fff',
+                  boxShadow: '0 4px 16px rgba(161,29,58,0.35)',
                   fontFamily: "'Montserrat', sans-serif",
                 }}
               >
@@ -610,11 +647,119 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
         )}
       </nav>
 
-      {/* Video Showcase Section - Full Screen Hero */}
-      <VideoShowcase />
+      {/* Hero cinematográfico controlado por scroll (canvas + secuencia de frames + GSAP ScrollTrigger) */}
+      <Hero3D id="inicio" />
 
-      {/* Live Stream Hero Section — siempre visible */}
-      <section id="inicio" className="pt-20 relative overflow-hidden bg-black">
+      {/* Models Section — partículas medias para galería */}
+      <section id="modelos" className="py-16 md:py-24 relative overflow-hidden">
+        <ParticlesBackground
+          density="medium"
+          showConnections={true}
+          showNebula={false}
+          mouseRadius={120}
+          className="opacity-35"
+        />
+        <div className="container mx-auto px-4 relative" style={{ zIndex: 1 }}>
+          <div className="text-center mb-12">
+            <Badge className="mb-4 bg-[#A11D3A]/20 text-[#c9385a] border-[#A11D3A]/30 bd-animate-fade-up bd-delay-0">
+              <Star className="w-4 h-4 mr-2 inline" />
+              {t.models.badge}
+            </Badge>
+            <h2 className="text-4xl md:text-6xl mb-4 bd-animate-fade-up bd-delay-1" style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 300, lineHeight: 1.1 }}>
+              {t.models.title} <span style={{ color: '#c9385a', fontWeight: 700 }}>{t.models.titleHighlight}</span>
+            </h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto bd-animate-fade-up bd-delay-2" style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.9rem' }}>
+              {t.models.subtitle}
+            </p>
+            <div className="bd-shimmer-line max-w-xs mx-auto mt-6" />
+          </div>
+
+          {/* CARGANDO */}
+          {cargandoModelos && (
+            <div className="grid grid-cols-1
+                            sm:grid-cols-2
+                            lg:grid-cols-3
+                            gap-4 px-4">
+              {[1,2,3,4,5,6].map(i => (
+                <div key={i} className="
+                  rounded-xl bg-[#16181c]
+                  animate-pulse overflow-hidden
+                ">
+                  <div className="h-[240px]
+                                  bg-[#2a2a2a]"/>
+                  <div className="p-3 space-y-2">
+                    <div className="h-4 bg-[#2a2a2a]
+                                    rounded w-3/4"/>
+                    <div className="h-4 bg-[#2a2a2a]
+                                    rounded w-1/2"/>
+                    <div className="h-10 bg-[#2a2a2a]
+                                    rounded"/>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ERROR */}
+          {!cargandoModelos && errorModelos && (
+            <div className="mx-4 p-6 text-center
+                            rounded-xl
+                            border border-red-500/30
+                            bg-red-500/5">
+              <p className="text-red-400 text-sm">
+                {errorModelos}
+              </p>
+            </div>
+          )}
+
+          {/* VACÍO */}
+          {!cargandoModelos && !errorModelos &&
+          modelos.length === 0 && (
+            <div className="py-16 text-center">
+              <p className="text-[#c9a961] text-xl
+                            font-bold">◆</p>
+              <p className="text-[#888] text-sm mt-2">
+                Próximamente disponible
+              </p>
+            </div>
+          )}
+
+          {/* MOSAICO */}
+          {!cargandoModelos && !errorModelos &&
+          modelos.length > 0 && (
+            <div className="
+              grid
+              grid-cols-1
+              sm:grid-cols-2
+              lg:grid-cols-3
+              gap-4 sm:gap-5
+              px-4 sm:px-6
+              pb-8
+            ">
+              {modelos.map(modelo => (
+                <ModeloCard
+                  key={modelo.id}
+                  modelo={modelo}
+                  onAgendar={(m: any) => {
+                    const id = (m?.id || modelo.id) as string;
+                    if (!currentUserProp) {
+                      localStorage.setItem('pendingBookingModelId', id);
+                      setModeloPendienteId(id);
+                      setShowClienteLogin(true);
+                    } else {
+                      setPerfilVisibleId(id);
+                    }
+                  }}
+                />
+              ))}
+            </div>
+          )}
+
+        </div>
+      </section>
+
+      {/* Live Stream Section — debajo del catálogo de modelos */}
+      <section className="pt-4 pb-16 relative overflow-hidden bg-black">
         <div className="w-full h-[calc(100vh-5rem)] flex flex-col lg:flex-row relative">
           <div className="w-full lg:w-[70%] h-[45vh] lg:h-full relative border-b lg:border-b-0 lg:border-r border-[#c9a961]/10">
             <StreamConPaywall
@@ -652,12 +797,12 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
         />
         <div className="container mx-auto px-4 relative" style={{ zIndex: 1 }}>
           <div className="text-center mb-12">
-            <Badge className="mb-4 bg-primary/20 text-primary border-primary/30 bd-animate-fade-up bd-delay-0">
+            <Badge className="mb-4 bg-[#A11D3A]/20 text-[#c9385a] border-[#A11D3A]/30 bd-animate-fade-up bd-delay-0">
               <Gem className="w-4 h-4 mr-2 inline" />
               {t.services.badge}
             </Badge>
             <h2 className="text-4xl md:text-6xl mb-4 bd-animate-fade-up bd-delay-1" style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 300, lineHeight: 1.1 }}>
-              {t.services.title} <span style={{ color: '#c9a961', fontWeight: 700 }}>{t.services.titleHighlight}</span>
+              {t.services.title} <span style={{ color: '#c9385a', fontWeight: 700 }}>{t.services.titleHighlight}</span>
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto bd-animate-fade-up bd-delay-2" style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.9rem', letterSpacing: '0.02em' }}>
               {t.services.subtitle}
@@ -670,7 +815,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
             <div className="group bd-animate-scale-in bd-delay-0 rounded-2xl p-6 flex flex-col gap-4 border border-[#c9a961]/12 bg-[#16181c] hover:border-[#c9a961]/40 hover:-translate-y-1 transition-all duration-400" style={{ boxShadow: 'none' }}
               onMouseEnter={e => (e.currentTarget.style.boxShadow='0 12px 40px rgba(201,169,97,0.12)')} onMouseLeave={e => (e.currentTarget.style.boxShadow='none')}>
               <div className="w-12 h-12 flex items-center justify-center flex-shrink-0" style={{ transform: 'rotate(45deg)', background: 'rgba(201,169,97,0.08)', border: '1px solid rgba(201,169,97,0.25)', borderRadius: 6 }}>
-                <Clock className="w-5 h-5 text-[#c9a961]" style={{ transform: 'rotate(-45deg)' }} />
+                <Clock className="w-5 h-5 text-[#c9385a]" style={{ transform: 'rotate(-45deg)' }} />
               </div>
               <h3 className="text-xl font-semibold text-white" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.35rem' }}>{t.services.personalMeetings.title}</h3>
               <p className="text-[#888] text-sm leading-relaxed flex-1" style={{ fontFamily: "'Montserrat', sans-serif" }}>{t.services.personalMeetings.description}</p>
@@ -684,7 +829,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
             <div className="group bd-animate-scale-in bd-delay-1 rounded-2xl p-6 flex flex-col gap-4 border border-[#c9a961]/12 bg-[#16181c] hover:border-[#c9a961]/40 hover:-translate-y-1 transition-all duration-400" style={{ boxShadow: 'none' }}
               onMouseEnter={e => (e.currentTarget.style.boxShadow='0 12px 40px rgba(201,169,97,0.12)')} onMouseLeave={e => (e.currentTarget.style.boxShadow='none')}>
               <div className="w-12 h-12 flex items-center justify-center flex-shrink-0" style={{ transform: 'rotate(45deg)', background: 'rgba(201,169,97,0.08)', border: '1px solid rgba(201,169,97,0.25)', borderRadius: 6 }}>
-                <MapPin className="w-5 h-5 text-[#c9a961]" style={{ transform: 'rotate(-45deg)' }} />
+                <MapPin className="w-5 h-5 text-[#c9385a]" style={{ transform: 'rotate(-45deg)' }} />
               </div>
               <h3 className="text-xl font-semibold text-white" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.35rem' }}>{t.services.homeService.title}</h3>
               <p className="text-[#888] text-sm leading-relaxed flex-1" style={{ fontFamily: "'Montserrat', sans-serif" }}>{t.services.homeService.description}</p>
@@ -698,7 +843,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
             <div className="group bd-animate-scale-in bd-delay-2 rounded-2xl p-6 flex flex-col gap-4 border border-[#c9a961]/12 bg-[#16181c] hover:border-[#c9a961]/40 hover:-translate-y-1 transition-all duration-400" style={{ boxShadow: 'none' }}
               onMouseEnter={e => (e.currentTarget.style.boxShadow='0 12px 40px rgba(201,169,97,0.12)')} onMouseLeave={e => (e.currentTarget.style.boxShadow='none')}>
               <div className="w-12 h-12 flex items-center justify-center flex-shrink-0" style={{ transform: 'rotate(45deg)', background: 'rgba(201,169,97,0.08)', border: '1px solid rgba(201,169,97,0.25)', borderRadius: 6 }}>
-                <Gem className="w-5 h-5 text-[#c9a961]" style={{ transform: 'rotate(-45deg)' }} />
+                <Gem className="w-5 h-5 text-[#c9385a]" style={{ transform: 'rotate(-45deg)' }} />
               </div>
               <h3 className="text-xl font-semibold text-white" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.35rem' }}>{t.services.vipSuites.title}</h3>
               <p className="text-[#888] text-sm leading-relaxed flex-1" style={{ fontFamily: "'Montserrat', sans-serif" }}>{t.services.vipSuites.description}</p>
@@ -712,7 +857,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
             <div className="group bd-animate-scale-in bd-delay-3 rounded-2xl p-6 flex flex-col gap-4 border border-[#c9a961]/12 bg-[#16181c] hover:border-[#c9a961]/40 hover:-translate-y-1 transition-all duration-400" style={{ boxShadow: 'none' }}
               onMouseEnter={e => (e.currentTarget.style.boxShadow='0 12px 40px rgba(201,169,97,0.12)')} onMouseLeave={e => (e.currentTarget.style.boxShadow='none')}>
               <div className="w-12 h-12 flex items-center justify-center flex-shrink-0" style={{ transform: 'rotate(45deg)', background: 'rgba(201,169,97,0.08)', border: '1px solid rgba(201,169,97,0.25)', borderRadius: 6 }}>
-                <Heart className="w-5 h-5 text-[#c9a961]" style={{ transform: 'rotate(-45deg)' }} />
+                <Heart className="w-5 h-5 text-[#c9385a]" style={{ transform: 'rotate(-45deg)' }} />
               </div>
               <h3 className="text-xl font-semibold text-white" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.35rem' }}>{t.services.gfeExperience.title}</h3>
               <p className="text-[#888] text-sm leading-relaxed flex-1" style={{ fontFamily: "'Montserrat', sans-serif" }}>{t.services.gfeExperience.description}</p>
@@ -726,7 +871,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
             <div className="group bd-animate-scale-in bd-delay-4 rounded-2xl p-6 flex flex-col gap-4 border border-[#c9a961]/12 bg-[#16181c] hover:border-[#c9a961]/40 hover:-translate-y-1 transition-all duration-400" style={{ boxShadow: 'none' }}
               onMouseEnter={e => (e.currentTarget.style.boxShadow='0 12px 40px rgba(201,169,97,0.12)')} onMouseLeave={e => (e.currentTarget.style.boxShadow='none')}>
               <div className="w-12 h-12 flex items-center justify-center flex-shrink-0" style={{ transform: 'rotate(45deg)', background: 'rgba(201,169,97,0.08)', border: '1px solid rgba(201,169,97,0.25)', borderRadius: 6 }}>
-                <Award className="w-5 h-5 text-[#c9a961]" style={{ transform: 'rotate(-45deg)' }} />
+                <Award className="w-5 h-5 text-[#c9385a]" style={{ transform: 'rotate(-45deg)' }} />
               </div>
               <h3 className="text-xl font-semibold text-white" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.35rem' }}>{t.services.specialEvents.title}</h3>
               <p className="text-[#888] text-sm leading-relaxed flex-1" style={{ fontFamily: "'Montserrat', sans-serif" }}>{t.services.specialEvents.description}</p>
@@ -740,7 +885,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
             <div className="group bd-animate-scale-in bd-delay-5 rounded-2xl p-6 flex flex-col gap-4 border border-[#c9a961]/12 bg-[#16181c] hover:border-[#c9a961]/40 hover:-translate-y-1 transition-all duration-400" style={{ boxShadow: 'none' }}
               onMouseEnter={e => (e.currentTarget.style.boxShadow='0 12px 40px rgba(201,169,97,0.12)')} onMouseLeave={e => (e.currentTarget.style.boxShadow='none')}>
               <div className="w-12 h-12 flex items-center justify-center flex-shrink-0" style={{ transform: 'rotate(45deg)', background: 'rgba(201,169,97,0.08)', border: '1px solid rgba(201,169,97,0.25)', borderRadius: 6 }}>
-                <Sparkles className="w-5 h-5 text-[#c9a961]" style={{ transform: 'rotate(-45deg)' }} />
+                <Sparkles className="w-5 h-5 text-[#c9385a]" style={{ transform: 'rotate(-45deg)' }} />
               </div>
               <h3 className="text-xl font-semibold text-white" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.35rem' }}>{t.services.boutique.title}</h3>
               <p className="text-[#888] text-sm leading-relaxed flex-1" style={{ fontFamily: "'Montserrat', sans-serif" }}>{t.services.boutique.description}</p>
@@ -753,114 +898,6 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
         </div>
       </section>
 
-      {/* Models Section — partículas medias para galería */}
-      <section id="modelos" className="py-16 md:py-24 relative overflow-hidden">
-        <ParticlesBackground
-          density="medium"
-          showConnections={true}
-          showNebula={false}
-          mouseRadius={120}
-          className="opacity-35"
-        />
-        <div className="container mx-auto px-4 relative" style={{ zIndex: 1 }}>
-          <div className="text-center mb-12">
-            <Badge className="mb-4 bg-primary/20 text-primary border-primary/30 bd-animate-fade-up bd-delay-0">
-              <Star className="w-4 h-4 mr-2 inline" />
-              {t.models.badge}
-            </Badge>
-            <h2 className="text-4xl md:text-6xl mb-4 bd-animate-fade-up bd-delay-1" style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 300, lineHeight: 1.1 }}>
-              {t.models.title} <span style={{ color: '#c9a961', fontWeight: 700 }}>{t.models.titleHighlight}</span>
-            </h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto bd-animate-fade-up bd-delay-2" style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.9rem' }}>
-              {t.models.subtitle}
-            </p>
-            <div className="bd-shimmer-line max-w-xs mx-auto mt-6" />
-          </div>
-
-          {/* CARGANDO */}
-          {cargandoModelos && (
-            <div className="grid grid-cols-1 
-                            sm:grid-cols-2 
-                            lg:grid-cols-3 
-                            gap-4 px-4">
-              {[1,2,3,4,5,6].map(i => (
-                <div key={i} className="
-                  rounded-xl bg-[#16181c] 
-                  animate-pulse overflow-hidden
-                ">
-                  <div className="h-[240px] 
-                                  bg-[#2a2a2a]"/>
-                  <div className="p-3 space-y-2">
-                    <div className="h-4 bg-[#2a2a2a] 
-                                    rounded w-3/4"/>
-                    <div className="h-4 bg-[#2a2a2a] 
-                                    rounded w-1/2"/>
-                    <div className="h-10 bg-[#2a2a2a] 
-                                    rounded"/>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* ERROR */}
-          {!cargandoModelos && errorModelos && (
-            <div className="mx-4 p-6 text-center
-                            rounded-xl
-                            border border-red-500/30
-                            bg-red-500/5">
-              <p className="text-red-400 text-sm">
-                {errorModelos}
-              </p>
-            </div>
-          )}
-
-          {/* VACÍO */}
-          {!cargandoModelos && !errorModelos && 
-          modelos.length === 0 && (
-            <div className="py-16 text-center">
-              <p className="text-[#c9a961] text-xl 
-                            font-bold">◆</p>
-              <p className="text-[#888] text-sm mt-2">
-                Próximamente disponible
-              </p>
-            </div>
-          )}
-
-          {/* MOSAICO */}
-          {!cargandoModelos && !errorModelos && 
-          modelos.length > 0 && (
-            <div className="
-              grid
-              grid-cols-1
-              sm:grid-cols-2
-              lg:grid-cols-3
-              gap-4 sm:gap-5
-              px-4 sm:px-6
-              pb-8
-            ">
-              {modelos.map(modelo => (
-                <ModeloCard
-                  key={modelo.id}
-                  modelo={modelo}
-                  onAgendar={(m: any) => {
-                    const id = (m?.id || modelo.id) as string;
-                    if (!currentUserProp) {
-                      localStorage.setItem('pendingBookingModelId', id);
-                      setModeloPendienteId(id);
-                      setShowClienteLogin(true);
-                    } else {
-                      setPerfilVisibleId(id);
-                    }
-                  }}
-                />
-              ))}
-            </div>
-          )}
-
-        </div>
-      </section>
-
       {/* Sede Selector Section - OCULTO TEMPORALMENTE (solo hay una sede activa) */}
       {/* <SedeSelector 
         sedes={sedes}
@@ -869,7 +906,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
       /> */}
 
       {/* About Section — con nebulosa y partículas refinadas */}
-      <section id="sobre-nosotros" className="py-16 md:py-24 bg-gradient-to-b from-primary/5 to-background relative overflow-hidden">
+      <section id="sobre-nosotros" className="py-16 md:py-24 bg-gradient-to-b from-[#A11D3A]/5 to-background relative overflow-hidden">
         <ParticlesBackground
           density="medium"
           showConnections={true}
@@ -880,12 +917,12 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
         <div className="container mx-auto px-4 relative" style={{ zIndex: 1 }}>
           <div className="max-w-4xl mx-auto">
             <div className="text-center mb-12">
-              <Badge className="mb-4 bg-primary/20 text-primary border-primary/30 bd-animate-fade-up bd-delay-0">
+              <Badge className="mb-4 bg-[#A11D3A]/20 text-[#c9385a] border-[#A11D3A]/30 bd-animate-fade-up bd-delay-0">
                 <Gem className="w-4 h-4 mr-2 inline" />
                 {t.about.badge}
               </Badge>
               <h2 className="text-4xl md:text-6xl mb-6 bd-animate-fade-up bd-delay-1" style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 300, lineHeight: 1.1 }}>
-                {t.about.title} <span style={{ color: '#c9a961', fontWeight: 700 }}>{t.about.titleHighlight}</span>
+                {t.about.title} <span style={{ color: '#c9385a', fontWeight: 700 }}>{t.about.titleHighlight}</span>
               </h2>
               <div className="bd-shimmer-line max-w-xs mx-auto" />
             </div>
@@ -893,14 +930,14 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
             <div className="grid md:grid-cols-2 gap-6 mb-8">
               <div className="rounded-2xl p-6 border border-[#c9a961]/15 bg-[#16181c] bd-animate-scale-in bd-delay-2">
                 <div className="w-10 h-10 flex items-center justify-center mb-4 flex-shrink-0" style={{ transform: 'rotate(45deg)', background: 'rgba(201,169,97,0.08)', border: '1px solid rgba(201,169,97,0.25)', borderRadius: 6 }}>
-                  <Shield className="w-5 h-5 text-[#c9a961] bd-animate-float" style={{ transform: 'rotate(-45deg)' }} />
+                  <Shield className="w-5 h-5 text-[#c9385a] bd-animate-float" style={{ transform: 'rotate(-45deg)' }} />
                 </div>
                 <h3 className="text-xl font-semibold text-white mb-2" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.3rem' }}>{t.about.totalSecurity.title}</h3>
                 <p className="text-[#888] text-sm leading-relaxed" style={{ fontFamily: "'Montserrat', sans-serif" }}>{t.about.totalSecurity.description}</p>
               </div>
               <div className="rounded-2xl p-6 border border-[#c9a961]/15 bg-[#16181c] bd-animate-scale-in bd-delay-3">
                 <div className="w-10 h-10 flex items-center justify-center mb-4 flex-shrink-0" style={{ transform: 'rotate(45deg)', background: 'rgba(201,169,97,0.08)', border: '1px solid rgba(201,169,97,0.25)', borderRadius: 6 }}>
-                  <Award className="w-5 h-5 text-[#c9a961] bd-animate-float" style={{ transform: 'rotate(-45deg)', animationDelay: '0.8s' }} />
+                  <Award className="w-5 h-5 text-[#c9385a] bd-animate-float" style={{ transform: 'rotate(-45deg)', animationDelay: '0.8s' }} />
                 </div>
                 <h3 className="text-xl font-semibold text-white mb-2" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.3rem' }}>{t.about.premiumQuality.title}</h3>
                 <p className="text-[#888] text-sm leading-relaxed" style={{ fontFamily: "'Montserrat', sans-serif" }}>{t.about.premiumQuality.description}</p>
@@ -914,21 +951,21 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
               <div className="grid md:grid-cols-3 gap-6">
                 <div className="text-center bd-animate-fade-up bd-delay-0">
                   <div className="w-12 h-12 flex items-center justify-center mx-auto mb-3" style={{ transform: 'rotate(45deg)', background: 'rgba(201,169,97,0.08)', border: '1px solid rgba(201,169,97,0.2)', borderRadius: 6 }}>
-                    <Heart className="w-5 h-5 text-[#c9a961] bd-animate-float" style={{ transform: 'rotate(-45deg)' }} />
+                    <Heart className="w-5 h-5 text-[#c9385a] bd-animate-float" style={{ transform: 'rotate(-45deg)' }} />
                   </div>
                   <h4 className="font-semibold mb-1 text-white" style={{ fontFamily: "'Cormorant Garamond', serif" }}>{t.about.respect.title}</h4>
                   <p className="text-xs text-[#888]" style={{ fontFamily: "'Montserrat', sans-serif" }}>{t.about.respect.description}</p>
                 </div>
                 <div className="text-center bd-animate-fade-up bd-delay-2">
                   <div className="w-12 h-12 flex items-center justify-center mx-auto mb-3" style={{ transform: 'rotate(45deg)', background: 'rgba(201,169,97,0.08)', border: '1px solid rgba(201,169,97,0.2)', borderRadius: 6 }}>
-                    <Shield className="w-5 h-5 text-[#c9a961] bd-animate-float" style={{ transform: 'rotate(-45deg)', animationDelay: '1s' }} />
+                    <Shield className="w-5 h-5 text-[#c9385a] bd-animate-float" style={{ transform: 'rotate(-45deg)', animationDelay: '1s' }} />
                   </div>
                   <h4 className="font-semibold mb-1 text-white" style={{ fontFamily: "'Cormorant Garamond', serif" }}>{t.about.confidentiality.title}</h4>
                   <p className="text-xs text-[#888]" style={{ fontFamily: "'Montserrat', sans-serif" }}>{t.about.confidentiality.description}</p>
                 </div>
                 <div className="text-center bd-animate-fade-up bd-delay-4">
                   <div className="w-12 h-12 flex items-center justify-center mx-auto mb-3" style={{ transform: 'rotate(45deg)', background: 'rgba(201,169,97,0.08)', border: '1px solid rgba(201,169,97,0.2)', borderRadius: 6 }}>
-                    <Sparkles className="w-5 h-5 text-[#c9a961] bd-animate-float" style={{ transform: 'rotate(-45deg)', animationDelay: '2s' }} />
+                    <Sparkles className="w-5 h-5 text-[#c9385a] bd-animate-float" style={{ transform: 'rotate(-45deg)', animationDelay: '2s' }} />
                   </div>
                   <h4 className="font-semibold mb-1 text-white" style={{ fontFamily: "'Cormorant Garamond', serif" }}>{t.about.excellence.title}</h4>
                   <p className="text-xs text-[#888]" style={{ fontFamily: "'Montserrat', sans-serif" }}>{t.about.excellence.description}</p>
@@ -954,12 +991,12 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
         <div className="container mx-auto px-4 relative" style={{ zIndex: 1 }}>
           <div className="max-w-4xl mx-auto">
             <div className="text-center mb-12">
-              <Badge className="mb-4 bg-primary/20 text-primary border-primary/30 bd-animate-fade-up bd-delay-0">
+              <Badge className="mb-4 bg-[#A11D3A]/20 text-[#c9385a] border-[#A11D3A]/30 bd-animate-fade-up bd-delay-0">
                 <Phone className="w-4 h-4 mr-2 inline" />
                 {t.contact.badge}
               </Badge>
               <h2 className="text-4xl md:text-6xl mb-4 bd-animate-fade-up bd-delay-1" style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 300, lineHeight: 1.1 }}>
-                {t.contact.title} <span style={{ color: '#c9a961', fontWeight: 700 }}>{t.contact.titleHighlight}</span>
+                {t.contact.title} <span style={{ color: '#c9385a', fontWeight: 700 }}>{t.contact.titleHighlight}</span>
               </h2>
               <p className="text-muted-foreground max-w-2xl mx-auto bd-animate-fade-up bd-delay-2" style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.9rem' }}>
                 {t.contact.subtitle}
@@ -1005,7 +1042,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
               <div className="rounded-2xl p-5 text-center border border-[#c9a961]/15 bg-[#16181c] bd-animate-scale-in bd-delay-3 hover:border-[#c9a961]/40 hover:-translate-y-0.5 transition-all duration-300" style={{ boxShadow: 'none' }}
                 onMouseEnter={e => (e.currentTarget.style.boxShadow='0 8px 32px rgba(201,169,97,0.1)')} onMouseLeave={e => (e.currentTarget.style.boxShadow='none')}>
                 <div className="w-12 h-12 rounded-xl bg-[#c9a961]/10 border border-[#c9a961]/25 flex items-center justify-center mx-auto mb-3">
-                  <Mail className="w-5 h-5 text-[#c9a961]" />
+                  <Mail className="w-5 h-5 text-[#c9385a]" />
                 </div>
                 <h3 className="font-semibold mb-1 text-white text-sm" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1rem' }}>{t.contact.email}</h3>
                 <p className="text-xs text-[#666] mb-2" style={{ fontFamily: "'Montserrat', sans-serif" }}>{t.contact.emailDesc}</p>
@@ -1016,7 +1053,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
             {/* CTA Final */}
             <div className="rounded-2xl border border-[#c9a961]/25 bg-[#0d0f12] p-8 md:p-12 text-center bd-animate-scale-in bd-delay-4" style={{ boxShadow: '0 0 60px rgba(201,169,97,0.05)' }}>
               <div className="w-14 h-14 flex items-center justify-center mx-auto mb-6" style={{ transform: 'rotate(45deg)', background: 'rgba(201,169,97,0.1)', border: '1px solid rgba(201,169,97,0.3)', borderRadius: 10 }}>
-                <Gem className="w-7 h-7 text-[#c9a961] bd-animate-float" style={{ transform: 'rotate(-45deg)' }} />
+                <Gem className="w-7 h-7 text-[#c9385a] bd-animate-float" style={{ transform: 'rotate(-45deg)' }} />
               </div>
               <h3 className="text-3xl md:text-4xl mb-4 text-white" style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 400 }}>
                 {t.contact.ctaTitle}
@@ -1026,7 +1063,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <button className="px-8 py-3.5 rounded-xl font-black text-[11px] uppercase tracking-[0.15em] active:scale-95 transition-all duration-300 hover:scale-105"
-                  style={{ background: 'linear-gradient(135deg, #d4b86a 0%, #c9a961 60%, #a07c3a 100%)', color: '#0f1014', boxShadow: '0 6px 24px rgba(201,169,97,0.3)', fontFamily: "'Montserrat', sans-serif" }}>
+                  style={{ background: 'linear-gradient(135deg, #C23A54 0%, #A11D3A 60%, #6B1226 100%)', color: '#fff', boxShadow: '0 6px 24px rgba(161,29,58,0.4)', fontFamily: "'Montserrat', sans-serif" }}>
                   <Phone className="w-4 h-4 inline mr-2" />
                   {t.contact.reserveNow}
                 </button>

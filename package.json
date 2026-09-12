@@ -7,6 +7,7 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
+    "@gsap/react": "^2.1.2",
     "@jsr/supabase__supabase-js": "^2.49.8",
     "@radix-ui/react-accordion": "^1.2.3",
     "@radix-ui/react-alert-dialog": "^1.1.6",
@@ -47,6 +48,7 @@
     "date-fns": "*",
     "embla-carousel-react": "^8.6.0",
     "fs": "*",
+    "gsap": "^3.15.0",
     "hls.js": "^1.6.15",
     "hono": "*",
     "input-otp": "^1.4.2",

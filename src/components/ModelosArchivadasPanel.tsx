@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Archive, RotateCcw, Search, Calendar } from 'lucide-react';
+import { Archive, RotateCcw, Search, Calendar, Trash2 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -18,9 +18,11 @@ import {
 } from "./ui/alert-dialog";
 
 export function ModelosArchivadasPanel() {
-  const { modelosArchivadas, restaurarModelo } = useModelos();
+  const { modelosArchivadas, restaurarModelo, eliminarModeloPermanentemente } = useModelos();
   const [searchTerm, setSearchTerm] = useState('');
   const [modeloRestaurar, setModeloRestaurar] = useState<{id: string, nombre: string} | null>(null);
+  const [modeloEliminar, setModeloEliminar] = useState<{id: string, nombre: string} | null>(null);
+  const [eliminando, setEliminando] = useState(false);
 
   const handleRestaurar = (id: string, nombre: string) => {
     setModeloRestaurar({ id, nombre });
@@ -33,6 +35,24 @@ export function ModelosArchivadasPanel() {
         description: `${modeloRestaurar.nombre} ha sido restaurada y puede volver a trabajar.`
       });
       setModeloRestaurar(null);
+    }
+  };
+
+  const handleEliminarPermanente = (id: string, nombre: string) => {
+    setModeloEliminar({ id, nombre });
+  };
+
+  const confirmarEliminarPermanente = async () => {
+    if (!modeloEliminar) return;
+    try {
+      setEliminando(true);
+      await eliminarModeloPermanentemente(modeloEliminar.id);
+      toast.success(`${modeloEliminar.nombre} fue eliminada permanentemente de la base de datos`);
+      setModeloEliminar(null);
+    } catch (error: any) {
+      toast.error('Error al eliminar la modelo: ' + (error?.message || 'error desconocido'));
+    } finally {
+      setEliminando(false);
     }
   };
 
@@ -177,6 +197,15 @@ export function ModelosArchivadasPanel() {
                         <RotateCcw className="w-4 h-4 mr-2" />
                         Restaurar
                       </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleEliminarPermanente(modelo.id, modelo.nombreArtistico || modelo.nombre)}
+                        className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Eliminar
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -212,6 +241,28 @@ export function ModelosArchivadasPanel() {
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction className="bg-green-500 hover:bg-green-600 text-white" onClick={confirmarRestaurar}>
               Sí, restaurar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Alerta de Eliminación Permanente */}
+      <AlertDialog open={!!modeloEliminar} onOpenChange={(open) => { if (!eliminando && !open) setModeloEliminar(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-red-400">⚠️ Eliminar permanentemente</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción borrará a <strong>{modeloEliminar?.nombre}</strong> de forma <strong>irreversible</strong>: su perfil, fotos, documentos, servicios, multas y agendamientos serán eliminados por completo de la base de datos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={eliminando}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 disabled:pointer-events-none"
+              disabled={eliminando}
+              onClick={(e) => { e.preventDefault(); confirmarEliminarPermanente(); }}
+            >
+              {eliminando ? 'Eliminando...' : 'Eliminar permanentemente'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -33,9 +33,11 @@ export function DetalleModeloPanel({ modelo, onClose, onEdit }: DetalleModeloPan
   const { servicios, serviciosFinalizados } = useServicios();
   const { multas, obtenerTotalMultasPendientes: _obtenerTotalMultasPendientes } = useMultas();
   const { adelantos, obtenerAdelantosPendientes: _obtenerAdelantosPendientes } = usePagos();
-  const { archivarModelo } = useModelos();
+  const { archivarModelo, eliminarModeloPermanentemente } = useModelos();
   const [mostrarArchivarDialog, setMostrarArchivarDialog] = useState(false);
   const [motivoArchivado, setMotivoArchivado] = useState('');
+  const [mostrarEliminarDialog, setMostrarEliminarDialog] = useState(false);
+  const [eliminando, setEliminando] = useState(false);
 
   // 🌸 Estados para Períodos
   const [periodos, setPeriodos] = useState<any[]>([]);
@@ -161,6 +163,29 @@ export function DetalleModeloPanel({ modelo, onClose, onEdit }: DetalleModeloPan
     }
   };
 
+  // Handler para eliminar modelo permanentemente
+  const handleEliminarPermanente = () => {
+    setMostrarArchivarDialog(false);
+    setMostrarEliminarDialog(true);
+  };
+
+  const nombreConfirmacion = modelo.nombreArtistico || modelo.nombre;
+
+  const confirmarEliminarPermanente = async () => {
+    try {
+      setEliminando(true);
+      await eliminarModeloPermanentemente(modelo.id);
+      toast.success(`${nombreConfirmacion} fue eliminada permanentemente de la base de datos`);
+      setMostrarEliminarDialog(false);
+      onClose();
+    } catch (error: any) {
+      if (process.env.NODE_ENV === 'development') console.error('Error eliminando modelo permanentemente:', error);
+      toast.error('Error al eliminar la modelo: ' + (error?.message || 'error desconocido'));
+    } finally {
+      setEliminando(false);
+    }
+  };
+
   // Estadísticas por periodo (último mes)
   const ahora = new Date();
   const hace30Dias = new Date(ahora.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -257,13 +282,29 @@ export function DetalleModeloPanel({ modelo, onClose, onEdit }: DetalleModeloPan
                 <Archive className="w-4 h-4 mr-2" />
                 Archivar
               </Button>
-              <Button 
-                variant="outline" 
-                size="icon" 
-                onClick={handleArchivar} 
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleArchivar}
                 className="sm:hidden border-orange-500/30 text-orange-400 hover:bg-orange-500/10"
               >
                 <Archive className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleEliminarPermanente}
+                className="hidden sm:flex border-red-500/30 text-red-400 hover:bg-red-500/10"
+              >
+                <Trash className="w-4 h-4 mr-2" />
+                Eliminar
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleEliminarPermanente}
+                className="sm:hidden border-red-500/30 text-red-400 hover:bg-red-500/10"
+              >
+                <Trash className="w-4 h-4" />
               </Button>
               <Button variant="ghost" size="icon" onClick={onClose}>
                 <X className="w-5 h-5" />
@@ -742,6 +783,28 @@ export function DetalleModeloPanel({ modelo, onClose, onEdit }: DetalleModeloPan
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction className="bg-orange-500 hover:bg-orange-600 text-white" onClick={confirmarArchivar}>
               Archivar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Alerta de Eliminación Permanente */}
+      <AlertDialog open={mostrarEliminarDialog} onOpenChange={(open) => { if (!eliminando) setMostrarEliminarDialog(open); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-red-400">⚠️ Eliminar permanentemente</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción borrará a <strong>{nombreConfirmacion}</strong> de forma <strong>irreversible</strong>: su perfil, fotos, documentos, servicios, multas y agendamientos serán eliminados por completo de la base de datos. No podrás recuperarla desde "Modelos Archivadas".
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={eliminando}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 disabled:pointer-events-none"
+              disabled={eliminando}
+              onClick={(e) => { e.preventDefault(); confirmarEliminarPermanente(); }}
+            >
+              {eliminando ? 'Eliminando...' : 'Eliminar permanentemente'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -9,9 +9,21 @@ interface Particle {
   opacity: number;
   opacitySpeed: number;
   color: string;
-  type: 'circle' | 'diamond' | 'spark';
   rotation: number;
   rotationSpeed: number;
+  life: number;
+  maxLife: number;
+  cyclePhase: number;
+  cycleDuration: number;
+}
+
+interface BurstSpark {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  radius: number;
+  color: string;
   life: number;
   maxLife: number;
 }
@@ -29,13 +41,16 @@ interface ParticlesBackgroundProps {
   showNebula?: boolean;
 }
 
+const RED = '#A11D3A';
+const RED_LIGHT = '#c9385a';
 const GOLD = '#d4af37';
 const GOLD_LIGHT = '#e5c158';
-const GOLD_DIM = '#b8941f';
-const GOLD_FAINT = '#7a6020';
 
-const COLORS = [GOLD, GOLD_LIGHT, GOLD_DIM, GOLD_FAINT, '#ffffff'];
+const COLORS = [RED, RED_LIGHT, GOLD, GOLD_LIGHT, '#ffffff'];
 const COLOR_WEIGHTS = [0.35, 0.25, 0.2, 0.15, 0.05];
+
+// Diagonal clásica de "flecha atraviesa el corazón" (de abajo-izquierda a arriba-derecha)
+const ARROW_BASE_ROTATION = -Math.PI / 4;
 
 function weightedRandom(colors: string[], weights: number[]): string {
   const r = Math.random();
@@ -56,6 +71,7 @@ export function ParticlesBackground({
 }: ParticlesBackgroundProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const particlesRef = useRef<Particle[]>([]);
+  const burstsRef = useRef<BurstSpark[]>([]);
   const mouseRef = useRef({ x: -9999, y: -9999 });
   const rafRef = useRef<number>(0);
   const timeRef = useRef(0);
@@ -63,11 +79,8 @@ export function ParticlesBackground({
   const DENSITY_MAP = { low: 60, medium: 100, high: 160 };
 
   const createParticle = useCallback((w: number, h: number, forced?: { x: number; y: number }): Particle => {
-    const types: Particle['type'][] = ['circle', 'circle', 'circle', 'diamond', 'spark'];
-    const type = types[Math.floor(Math.random() * types.length)];
-    const radius = type === 'spark' ? Math.random() * 1.2 + 0.3
-      : type === 'diamond' ? Math.random() * 3 + 1.5
-      : Math.random() * 2.5 + 0.5;
+    // Pequeñas, pero con tamaño suficiente para que el corazón + flecha se distingan
+    const radius = Math.random() * 3 + 4;
 
     return {
       x: forced?.x ?? Math.random() * w,
@@ -78,24 +91,101 @@ export function ParticlesBackground({
       opacity: Math.random() * 0.6 + 0.1,
       opacitySpeed: (Math.random() - 0.5) * 0.008,
       color: weightedRandom(COLORS, COLOR_WEIGHTS),
-      type,
-      rotation: Math.random() * Math.PI * 2,
-      rotationSpeed: (Math.random() - 0.5) * 0.02,
+      // Rotación base fija (diagonal clásica de flecha) + leve variación por partícula
+      rotation: ARROW_BASE_ROTATION + (Math.random() - 0.5) * 0.6,
+      rotationSpeed: (Math.random() - 0.5) * 0.0015,
       life: 0,
       maxLife: Math.random() * 600 + 300,
+      // Ciclo propio: cada corazón dispara su flecha en un momento distinto, sin sincronizarse
+      cyclePhase: Math.random() * 300,
+      cycleDuration: Math.random() * 150 + 110,
     };
   }, []);
 
-  const drawDiamond = (ctx: CanvasRenderingContext2D, x: number, y: number, r: number, rot: number) => {
+  // Pequeño estallido de chispas en el instante exacto en que la flecha atraviesa el corazón
+  const spawnBurst = (list: BurstSpark[], x: number, y: number, color: string) => {
+    const count = 7 + Math.floor(Math.random() * 4);
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 0.7 + Math.random() * 2;
+      list.push({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        radius: Math.random() * 1.3 + 0.6,
+        color,
+        life: 0,
+        maxLife: 16 + Math.random() * 14,
+      });
+    }
+    if (list.length > 400) list.splice(0, list.length - 400);
+  };
+
+  // Corazón + flecha que lo cruza en vuelo (armOffset: posición de la flecha relativa al centro del corazón;
+  // armAlpha: opacidad de la flecha, para que aparezca/desaparezca al entrar y salir; heartPulse: golpe de impacto)
+  const drawHeartArrow = (
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    r: number,
+    rot: number,
+    color: string,
+    armOffset: number,
+    armAlpha: number,
+    heartPulse: number
+  ) => {
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(rot);
+
+    // Corazón (apunta hacia -y en su eje local, antes de rotar), con un pequeño pulso al momento del impacto
+    const s = r * 1.15 * (1 + heartPulse * 0.35);
     ctx.beginPath();
-    ctx.moveTo(0, -r);
-    ctx.lineTo(r * 0.6, 0);
-    ctx.lineTo(0, r);
-    ctx.lineTo(-r * 0.6, 0);
+    ctx.moveTo(0, s * 0.65);
+    ctx.bezierCurveTo(-s * 1.1, -s * 0.2, -s * 0.55, -s * 1.2, 0, -s * 0.45);
+    ctx.bezierCurveTo(s * 0.55, -s * 1.2, s * 1.1, -s * 0.2, 0, s * 0.65);
     ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+
+    if (armAlpha > 0.01) {
+      ctx.save();
+      ctx.globalAlpha *= armAlpha;
+
+      // Asta de la flecha, desplazada por armOffset a lo largo del eje local X
+      const shaftLen = r * 2.4;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = Math.max(0.9, r * 0.22);
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(armOffset - shaftLen, 0);
+      ctx.lineTo(armOffset + shaftLen, 0);
+      ctx.stroke();
+
+      // Punta de flecha en el extremo delantero
+      const headSize = r * 0.55;
+      const headX = armOffset + shaftLen;
+      ctx.beginPath();
+      ctx.moveTo(headX, 0);
+      ctx.lineTo(headX - headSize, -headSize * 0.65);
+      ctx.moveTo(headX, 0);
+      ctx.lineTo(headX - headSize, headSize * 0.65);
+      ctx.stroke();
+
+      // Plumas en el extremo trasero
+      const featherSize = r * 0.4;
+      const tailX = armOffset - shaftLen;
+      ctx.beginPath();
+      ctx.moveTo(tailX, 0);
+      ctx.lineTo(tailX + featherSize, -featherSize * 0.7);
+      ctx.moveTo(tailX, 0);
+      ctx.lineTo(tailX + featherSize, featherSize * 0.7);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
     ctx.restore();
   };
 
@@ -205,6 +295,15 @@ export function ParticlesBackground({
         p.rotation += p.rotationSpeed;
         p.life++;
 
+        // Ciclo de la flecha: recorre el corazón una vez por ciclo y dispara el estallido al cruzarlo
+        const prevPhase = p.cyclePhase;
+        p.cyclePhase += 1;
+        const prevT = (prevPhase % p.cycleDuration) / p.cycleDuration;
+        const t = (p.cyclePhase % p.cycleDuration) / p.cycleDuration;
+        if (prevT < 0.5 && t >= 0.5) {
+          spawnBurst(burstsRef.current, p.x, p.y, p.color);
+        }
+
         p.opacity += p.opacitySpeed;
         if (p.opacity > 0.8 || p.opacity < 0.05) p.opacitySpeed *= -1;
 
@@ -227,39 +326,56 @@ export function ParticlesBackground({
         ctx.save();
         ctx.globalAlpha = Math.max(0, Math.min(1, finalOpacity));
 
-        if (p.type === 'circle') {
-          if (p.opacity > 0.45) {
-            const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.radius * 3);
-            glow.addColorStop(0, p.color.replace(')', ', 0.3)').replace('rgb', 'rgba'));
-            glow.addColorStop(1, 'rgba(0,0,0,0)');
-            ctx.fillStyle = glow;
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, p.radius * 3, 0, Math.PI * 2);
-            ctx.fill();
-          }
-          ctx.fillStyle = p.color;
+        if (p.opacity > 0.45) {
+          const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.radius * 3.5);
+          glow.addColorStop(0, p.color.replace(')', ', 0.3)').replace('rgb', 'rgba'));
+          glow.addColorStop(1, 'rgba(0,0,0,0)');
+          ctx.fillStyle = glow;
           ctx.beginPath();
-          ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+          ctx.arc(p.x, p.y, p.radius * 3.5, 0, Math.PI * 2);
           ctx.fill();
-        } else if (p.type === 'diamond') {
-          ctx.fillStyle = p.color;
-          ctx.shadowColor = p.color;
-          ctx.shadowBlur = 6;
-          drawDiamond(ctx, p.x, p.y, p.radius, p.rotation);
-          ctx.fill();
-        } else {
-          ctx.strokeStyle = p.color;
-          ctx.lineWidth = 0.8;
-          ctx.shadowColor = p.color;
-          ctx.shadowBlur = 4;
-          ctx.beginPath();
-          ctx.moveTo(p.x - p.radius * 2, p.y);
-          ctx.lineTo(p.x + p.radius * 2, p.y);
-          ctx.moveTo(p.x, p.y - p.radius * 2);
-          ctx.lineTo(p.x, p.y + p.radius * 2);
-          ctx.stroke();
         }
 
+        // Ventana en la que la flecha está en vuelo, centrada en el instante del impacto (t = 0.5)
+        const ARM_WINDOW = 0.22;
+        let armOffset = 0;
+        let armAlpha = 0;
+        if (t > 0.5 - ARM_WINDOW && t < 0.5 + ARM_WINDOW) {
+          const armT = (t - (0.5 - ARM_WINDOW)) / (ARM_WINDOW * 2); // 0..1
+          const travelRange = p.radius * 6.5;
+          armOffset = (armT - 0.5) * travelRange * 2;
+          armAlpha = Math.sin(armT * Math.PI); // aparece y desaparece suavemente en los bordes
+        }
+        const heartPulse = Math.max(0, 1 - Math.abs(t - 0.5) * 18);
+
+        drawHeartArrow(ctx, p.x, p.y, p.radius, p.rotation, p.color, armOffset, armAlpha, heartPulse);
+
+        ctx.restore();
+      }
+
+      // Chispas del estallido al cruzar la flecha
+      const bursts = burstsRef.current;
+      for (let i = bursts.length - 1; i >= 0; i--) {
+        const b = bursts[i];
+        b.life++;
+        if (b.life > b.maxLife) {
+          bursts.splice(i, 1);
+          continue;
+        }
+        b.x += b.vx;
+        b.y += b.vy;
+        b.vx *= 0.94;
+        b.vy *= 0.94;
+
+        const lifeRatio = b.life / b.maxLife;
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, 1 - lifeRatio);
+        ctx.fillStyle = b.color;
+        ctx.shadowColor = b.color;
+        ctx.shadowBlur = 5;
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.radius * (1 - lifeRatio * 0.5), 0, Math.PI * 2);
+        ctx.fill();
         ctx.restore();
       }
 
