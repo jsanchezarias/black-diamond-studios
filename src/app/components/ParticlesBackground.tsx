@@ -243,7 +243,13 @@ export function ParticlesBackground({
     window.addEventListener('mousemove', onMouseMove);
     canvas.addEventListener('mouseleave', onMouseLeave);
 
+    // Pausa por completo la animación (y el trabajo de canvas) cuando la sección no está
+    // en pantalla, para no gastar CPU/batería de más mientras el usuario ve otra parte de la página.
+    const isVisibleRef = { current: false };
+
     const animate = (ts: number) => {
+      if (!isVisibleRef.current) return; // se reanuda solo desde el IntersectionObserver
+
       timeRef.current = ts;
       ctx.clearRect(0, 0, w, h);
 
@@ -382,11 +388,23 @@ export function ParticlesBackground({
       rafRef.current = requestAnimationFrame(animate);
     };
 
-    rafRef.current = requestAnimationFrame(animate);
+    const io = new IntersectionObserver(
+      (entries) => {
+        const wasVisible = isVisibleRef.current;
+        isVisibleRef.current = entries[0]?.isIntersecting ?? false;
+        if (!wasVisible && isVisibleRef.current) {
+          cancelAnimationFrame(rafRef.current);
+          rafRef.current = requestAnimationFrame(animate);
+        }
+      },
+      { threshold: 0 }
+    );
+    io.observe(canvas);
 
     return () => {
       cancelAnimationFrame(rafRef.current);
       ro.disconnect();
+      io.disconnect();
       window.removeEventListener('mousemove', onMouseMove);
       canvas.removeEventListener('mouseleave', onMouseLeave);
     };
