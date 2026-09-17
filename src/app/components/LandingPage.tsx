@@ -106,6 +106,8 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
             estado,
             descripcion,
             foto_url,
+            fotoPerfil,
+            fotosAdicionales,
             modelo_fotos!modelo_fotos_modelo_id_fkey (
               id, url, es_principal, orden
             ),
@@ -116,7 +118,11 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
             )
           `)
           .eq('role', 'modelo')
-          .eq('estado', 'activo')
+          // Modelos nuevas quedan con "estado" vacío hasta que alguien las archive —
+          // no debe excluirlas de la página pública. Solo se ocultan las explícitamente
+          // archivadas/inactivas (eso ya lo maneja el resto de la app al filtrar por
+          // fechaArchivado). Aceptamos null o cualquier variación de "activo".
+          .or('estado.is.null,estado.ilike.activo')
           .order('nombre_artistico')
 
         console.log('📊 Modelos:', { 
@@ -130,7 +136,31 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
           return
         }
 
-        setModelos(data || [])
+        // Algunas modelos tienen su foto guardada en fotoPerfil/fotosAdicionales
+        // en vez de en la tabla modelo_fotos (según cómo se les haya cargado la
+        // foto). Si la tabla vino vacía, armamos la galería a partir de esas
+        // columnas para no mostrarlas sin foto teniendo una real disponible.
+        const modelosConFotos = (data || []).map((m: any) => {
+          if (m.modelo_fotos && m.modelo_fotos.length > 0) return m;
+
+          const principal = m.fotoPerfil || m.foto_url;
+          const adicionales: string[] = Array.isArray(m.fotosAdicionales) ? m.fotosAdicionales : [];
+          if (!principal && adicionales.length === 0) return m;
+
+          const modelo_fotos = [
+            ...(principal ? [{ id: `${m.id}-principal`, url: principal, es_principal: true, orden: 0 }] : []),
+            ...adicionales.map((url: string, i: number) => ({ id: `${m.id}-adicional-${i}`, url, es_principal: false, orden: i + 1 })),
+          ];
+          return { ...m, modelo_fotos };
+        });
+
+        // Una modelo sin ninguna foto real no debe verse en la página pública
+        // (sí sigue apareciendo en los dashboards de administración, sin cambios ahí).
+        const modelosConAlMenosUnaFoto = modelosConFotos.filter(
+          (m: any) => m.modelo_fotos && m.modelo_fotos.length > 0
+        );
+
+        setModelos(modelosConAlMenosUnaFoto)
 
       } catch (err: any) {
         console.error('❌ Error:', err)
@@ -760,8 +790,8 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
 
       {/* Live Stream Section — debajo del catálogo de modelos */}
       <section className="pt-4 pb-16 relative overflow-hidden bg-black">
-        <div className="w-full h-[calc(100vh-5rem)] flex flex-col lg:flex-row relative">
-          <div className="w-full lg:w-[70%] h-[45vh] lg:h-full relative border-b lg:border-b-0 lg:border-r border-[#c9a961]/10">
+        <div className="w-full h-[calc(100dvh-5rem)] flex flex-col lg:flex-row relative">
+          <div className="w-full lg:w-[70%] h-[45dvh] lg:h-full relative border-b lg:border-b-0 lg:border-r border-[#c9a961]/10">
             <StreamConPaywall
               onRegistrarse={(tipo) => {
                 // ✅ PAYWALL: abrir modal en tab correcto según si pidió registro o login
@@ -770,7 +800,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
               }}
             />
           </div>
-          <div className="w-full lg:w-[30%] h-[55vh] lg:h-full">
+          <div className="w-full lg:w-[30%] h-[55dvh] lg:h-full">
             <LiveChat
               onTipClick={handleTipClick}
               recentTips={recentTips}

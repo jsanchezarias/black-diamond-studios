@@ -308,12 +308,12 @@ export function EditarModeloModal({ open, onClose, modelo }: EditarModeloModalPr
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <Tabs defaultValue="basica" className="w-full">
-            <TabsList className="grid w-full grid-cols-5">
-              <TabsTrigger value="basica">Información Básica</TabsTrigger>
-              <TabsTrigger value="perfil">Perfil Público</TabsTrigger>
-              <TabsTrigger value="tarifas">Tarifas</TabsTrigger>
-              <TabsTrigger value="documentos">Documentos</TabsTrigger>
-              <TabsTrigger value="galeria">Galería</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5 h-auto">
+              <TabsTrigger value="basica" className="text-[11px] sm:text-sm px-1.5 py-2 truncate overflow-hidden">Información Básica</TabsTrigger>
+              <TabsTrigger value="perfil" className="text-[11px] sm:text-sm px-1.5 py-2 truncate overflow-hidden">Perfil Público</TabsTrigger>
+              <TabsTrigger value="tarifas" className="text-[11px] sm:text-sm px-1.5 py-2 truncate overflow-hidden">Tarifas</TabsTrigger>
+              <TabsTrigger value="documentos" className="text-[11px] sm:text-sm px-1.5 py-2 truncate overflow-hidden">Documentos</TabsTrigger>
+              <TabsTrigger value="galeria" className="text-[11px] sm:text-sm px-1.5 py-2 truncate overflow-hidden">Galería</TabsTrigger>
             </TabsList>
 
             {/* TAB: INFORMACIÓN BÁSICA */}

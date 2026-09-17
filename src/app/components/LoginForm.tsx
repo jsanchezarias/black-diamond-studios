@@ -35,7 +35,7 @@ export function LoginForm({ tipo, onLogin, onBackToLanding }: LoginFormProps) {
     setRegistrando(true);
     try {
       const { data, error: signUpError } = await supabase.auth.signUp({
-        email: emailRegistro,
+        email: emailRegistro.trim().toLowerCase(),
         password: passwordRegistro,
         options: { data: { nombre, telefono, role: 'cliente' } },
       });
@@ -168,7 +168,9 @@ export function LoginForm({ tipo, onLogin, onBackToLanding }: LoginFormProps) {
     setLoading(true);
     setError('');
 
-    let emailParaLogin = identificador.trim();
+    // En celular, los teclados suelen poner en mayúscula la primera letra de un campo de texto libre
+    // (a diferencia de un input type="email"), lo que rompe el login si el usuario no se da cuenta.
+    let emailParaLogin = identificador.trim().toLowerCase();
 
     try {
       if (!esEmail(emailParaLogin)) {
@@ -339,6 +341,9 @@ export function LoginForm({ tipo, onLogin, onBackToLanding }: LoginFormProps) {
                     disabled={loading}
                     required
                     autoComplete="username"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
                     className="h-12 text-base"
                   />
                   <p className="text-xs text-muted-foreground">Puedes usar tu email o número de celular</p>

@@ -6,6 +6,11 @@ import { useIsMobile } from '../../components/ui/use-mobile';
 
 gsap.registerPlugin(ScrollTrigger, useGSAP);
 
+// En móviles, mostrar/ocultar la barra de direcciones cambia la altura de la ventana.
+// Sin esto, ScrollTrigger recalcula el pin a mitad de scroll y deja un hueco negro
+// entre el video y la siguiente sección.
+ScrollTrigger.config({ ignoreMobileResize: true });
+
 const DESKTOP_FRAME_COUNT = 181;
 const MOBILE_FRAME_COUNT = 80;
 const PRELOAD_BLOCKING_COUNT = 10;
@@ -145,7 +150,7 @@ export function Hero3D({ id }: { id?: string }) {
   );
 
   return (
-    <section id={id} ref={sectionRef} className="relative w-full h-screen overflow-hidden bg-black">
+    <section id={id} ref={sectionRef} className="relative w-full h-[100dvh] overflow-hidden bg-black">
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full block" />
 
       {/* Desvanece el propio video a negro cerca del final, para que la transición a la siguiente sección no se vea cortada */}

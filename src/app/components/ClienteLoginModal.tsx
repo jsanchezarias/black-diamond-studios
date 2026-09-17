@@ -82,8 +82,10 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess, tabInicial 
       let authData: any = null;
 
       if (isEmail) {
+        // En celular el teclado suele poner en mayúscula la primera letra del campo, lo que
+        // rompe el login si el usuario no se da cuenta — normalizamos antes de autenticar.
         const { data: authDataEmail, error: authErrorEmail } = await supabase.auth.signInWithPassword({
-          email: emailTelefono.trim(),
+          email: emailTelefono.trim().toLowerCase(),
           password: password,
         });
 
@@ -223,7 +225,7 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess, tabInicial 
 
     try {
       const isEmail = emailTelefono.includes('@');
-      const emailReal = isEmail ? emailTelefono.trim() : null;
+      const emailReal = isEmail ? emailTelefono.trim().toLowerCase() : null;
       const telNormalizado = normalizarTelefono(telefono);
       const emailParaAuth = emailReal || telefonoToEmail(telNormalizado);
       const telefonoLimpio = telefono.replace(/[^0-9]/g, '').slice(-10);
@@ -415,6 +417,9 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess, tabInicial 
                 placeholder="ejemplo@email.com o 3017626768"
                 className="bg-[#0f1014] border-[#2a2a2a] text-[#e8e6e3] focus:border-[#c9a961]"
                 disabled={procesando}
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
               />
             </div>
 

@@ -12,6 +12,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/ta
 import { Separator } from '../../components/ui/separator';
 import { ScrollArea } from '../../components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../../components/ui/alert-dialog';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -24,6 +34,8 @@ export function NotificacionesPanel() {
     marcarComoLeida,
     marcarTodasComoLeidas,
     eliminarNotificacion,
+    eliminarTodasLasNotificaciones,
+    eliminarNotificacionesLeidas,
     limpiarNotificacionesAntiguas,
     actualizarPreferencias
   } = useNotificaciones();
@@ -32,6 +44,8 @@ export function NotificacionesPanel() {
   const [filtroEstado, setFiltroEstado] = useState<'todas' | 'leidas' | 'no_leidas'>('todas');
   const [busqueda, setBusqueda] = useState('');
   const [solicitudModalId, setSolicitudModalId] = useState<string | null>(null);
+  const [confirmarEliminarTodas, setConfirmarEliminarTodas] = useState(false);
+  const [confirmarEliminarLeidas, setConfirmarEliminarLeidas] = useState(false);
 
   const handleNotificacionClick = async (notif: Notificacion) => {
     if (!notif.leida) await marcarComoLeida(notif.id);
@@ -77,6 +91,28 @@ export function NotificacionesPanel() {
       toast.success('Notificaciones antiguas eliminadas');
     } catch (error) {
       toast.error('Error al limpiar notificaciones');
+    }
+  };
+
+  const handleEliminarTodas = async () => {
+    try {
+      await eliminarTodasLasNotificaciones();
+      toast.success('Todas las notificaciones fueron eliminadas');
+    } catch (error) {
+      toast.error('Error al eliminar las notificaciones');
+    } finally {
+      setConfirmarEliminarTodas(false);
+    }
+  };
+
+  const handleEliminarLeidas = async () => {
+    try {
+      await eliminarNotificacionesLeidas();
+      toast.success('Notificaciones leídas eliminadas');
+    } catch (error) {
+      toast.error('Error al eliminar las notificaciones leídas');
+    } finally {
+      setConfirmarEliminarLeidas(false);
     }
   };
 
@@ -182,7 +218,7 @@ export function NotificacionesPanel() {
                 </Select>
 
                 {/* Acciones */}
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   {noLeidas > 0 && (
                     <Button
                       variant="outline"
@@ -201,8 +237,30 @@ export function NotificacionesPanel() {
                     className="flex-1"
                   >
                     <Trash2 className="w-4 h-4 mr-2" />
-                    Limpiar
+                    Limpiar antiguas
                   </Button>
+                  {(listadoNotificaciones || []).some(n => n.leida) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setConfirmarEliminarLeidas(true)}
+                      className="flex-1"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Eliminar leídas
+                    </Button>
+                  )}
+                  {(listadoNotificaciones || []).length > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setConfirmarEliminarTodas(true)}
+                      className="flex-1 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Eliminar todas
+                    </Button>
+                  )}
                 </div>
               </div>
 
@@ -490,6 +548,48 @@ export function NotificacionesPanel() {
           onClose={() => setSolicitudModalId(null)}
         />
       )}
+
+      {/* Confirmar eliminar todas */}
+      <AlertDialog open={confirmarEliminarTodas} onOpenChange={setConfirmarEliminarTodas}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar todas las notificaciones?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminarán las {(listadoNotificaciones || []).length} notificaciones de esta lista (leídas y no leídas). Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive hover:bg-destructive/90 text-white"
+              onClick={(e) => { e.preventDefault(); handleEliminarTodas(); }}
+            >
+              Sí, eliminar todas
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirmar eliminar leídas */}
+      <AlertDialog open={confirmarEliminarLeidas} onOpenChange={setConfirmarEliminarLeidas}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar las notificaciones leídas?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminarán las {(listadoNotificaciones || []).filter(n => n.leida).length} notificaciones ya leídas. Las no leídas se mantienen. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive hover:bg-destructive/90 text-white"
+              onClick={(e) => { e.preventDefault(); handleEliminarLeidas(); }}
+            >
+              Sí, eliminar leídas
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -11,6 +11,17 @@ import {
 import { ScrollArea } from '../../components/ui/scroll-area';
 import { Badge } from '../../components/ui/badge';
 import { Separator } from '../../components/ui/separator';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../../components/ui/alert-dialog';
+import { Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -26,10 +37,17 @@ export function NotificacionBell() {
     noLeidas = 0,
     marcarComoLeida,
     marcarTodasComoLeidas,
+    eliminarTodasLasNotificaciones,
     obtenerNotificacionesRecientes
   } = useNotificaciones();
 
   const [solicitudModalId, setSolicitudModalId] = useState<string | null>(null);
+  const [confirmarEliminarTodas, setConfirmarEliminarTodas] = useState(false);
+
+  const handleEliminarTodas = async () => {
+    await eliminarTodasLasNotificaciones();
+    setConfirmarEliminarTodas(false);
+  };
 
   const notificacionesRecientes = typeof obtenerNotificacionesRecientes === 'function'
     ? obtenerNotificacionesRecientes(10)
@@ -86,20 +104,34 @@ export function NotificacionBell() {
         >
           {/* Header */}
           <div className="p-4 border-b border-primary/20">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <h3 className="font-semibold text-lg text-foreground">
                 Notificaciones
               </h3>
-              {noLeidas > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={marcarTodasComoLeidas}
-                  className="text-xs text-primary hover:text-primary/80 hover:bg-primary/10"
-                >
-                  Marcar todas leídas
-                </Button>
-              )}
+              <div className="flex items-center gap-1">
+                {noLeidas > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={marcarTodasComoLeidas}
+                    className="text-xs text-primary hover:text-primary/80 hover:bg-primary/10"
+                  >
+                    Marcar todas leídas
+                  </Button>
+                )}
+                {(listadoNotificaciones || []).length > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setConfirmarEliminarTodas(true)}
+                    className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                    aria-label="Eliminar todas las notificaciones"
+                    title="Eliminar todas"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
             </div>
             {noLeidas > 0 && (
               <p className="text-sm text-muted-foreground mt-1">
@@ -207,6 +239,27 @@ export function NotificacionBell() {
           onClose={() => setSolicitudModalId(null)}
         />
       )}
+
+      {/* Confirmar eliminar todas */}
+      <AlertDialog open={confirmarEliminarTodas} onOpenChange={setConfirmarEliminarTodas}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar todas las notificaciones?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminarán todas tus notificaciones (leídas y no leídas). Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive hover:bg-destructive/90 text-white"
+              onClick={(e) => { e.preventDefault(); handleEliminarTodas(); }}
+            >
+              Sí, eliminar todas
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

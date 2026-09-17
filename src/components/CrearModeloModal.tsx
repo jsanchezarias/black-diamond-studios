@@ -427,6 +427,9 @@ export function CrearModeloModal({ open, onClose }: CrearModeloModalProps) {
           .update({
             nombre_artistico: nombreArtistico || nombre,
             foto_url: fotoPerfilUrl,
+            // Sin esto, "estado" queda vacío y la modelo no aparece en la página pública
+            // (aunque sí se vea en los dashboards), hasta que alguien la archive y restaure.
+            estado: 'activo',
             updated_at: new Date().toISOString()
           })
           .eq('id', userId);

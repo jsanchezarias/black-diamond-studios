@@ -36,7 +36,8 @@ import {
   RefreshCw,
   LogOut,
   Video,
-  History
+  History,
+  Image as ImageIcon
 } from 'lucide-react';
 import {
   BarChart, Bar, PieChart as RechartsPie, Pie, Cell,
@@ -89,50 +90,14 @@ const CHART_COLORS = ['#c9a84c', '#e8c97a', '#a07830', '#7c5c1e', '#f0d890', '#d
 const formatCOP = (v: number) => `$${v.toLocaleString('es-CO')}`;
 
 // ─── Helper: imagen de producto ───────────────────────────────────────────────
-const getFotoProducto = (producto: { nombre?: string; imagen?: string; categoria?: string }): string => {
-  if (producto.imagen) return producto.imagen;
-
-  const nombre = producto.nombre?.toLowerCase() || '';
-  const categoria = producto.categoria?.toLowerCase() || '';
-
-  if (nombre.includes('perfume') || nombre.includes('fragancia') || categoria.includes('perfume'))
-    return 'https://images.unsplash.com/photo-1541643600914-78b084683702?w=400&q=80';
-  if (nombre.includes('labial') || nombre.includes('labios') || categoria.includes('maquillaje'))
-    return 'https://images.unsplash.com/photo-1586495777744-4e6232bf2263?w=400&q=80';
-  if (nombre.includes('ropa') || nombre.includes('vestido') || nombre.includes('outfit') || categoria.includes('ropa'))
-    return 'https://images.unsplash.com/photo-1445205170230-053b83016050?w=400&q=80';
-  if (nombre.includes('lenceria') || nombre.includes('lencería') || categoria.includes('lenceria') || categoria.includes('ropa interior'))
-    return 'https://images.unsplash.com/photo-1616763355548-1b606f439f86?w=400&q=80';
-  if (nombre.includes('zapato') || nombre.includes('tacon') || nombre.includes('tacón') || nombre.includes('calzado'))
-    return 'https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=400&q=80';
-  if (nombre.includes('accesorio') || nombre.includes('collar') || nombre.includes('aretes') || nombre.includes('joya') || categoria.includes('accesorios'))
-    return 'https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&q=80';
-  if (nombre.includes('bolso') || nombre.includes('cartera') || nombre.includes('bolsa'))
-    return 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=400&q=80';
-  if (nombre.includes('crema') || nombre.includes('locion') || nombre.includes('loción') || nombre.includes('cuidado'))
-    return 'https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=400&q=80';
-  if (nombre.includes('kit') || nombre.includes('set') || nombre.includes('combo'))
-    return 'https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=400&q=80';
-  if (nombre.includes('vela') || nombre.includes('aromatica') || nombre.includes('aromática'))
-    return 'https://images.unsplash.com/photo-1602523961358-f9f03dd557db?w=400&q=80';
-  if (nombre.includes('toalla') || nombre.includes('sabana') || nombre.includes('sábana'))
-    return 'https://images.unsplash.com/photo-1584100936595-c0654b55a2e2?w=400&q=80';
-  if (nombre.includes('copa') || nombre.includes('vino') || nombre.includes('champagne') || nombre.includes('bebida') || categoria.includes('bebidas'))
-    return 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=400&q=80';
-  if (nombre.includes('chocolate') || nombre.includes('dulce') || nombre.includes('snack') || categoria.includes('snacks'))
-    return 'https://images.unsplash.com/photo-1481391319762-47dff72954d9?w=400&q=80';
-  if (nombre.includes('masaje') || nombre.includes('aceite') || nombre.includes('spa'))
-    return 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=400&q=80';
-  if (nombre.includes('preservativo') || nombre.includes('condon') || nombre.includes('condón') || categoria.includes('preservativos'))
-    return 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=400&q=80';
-  if (nombre.includes('lubricante') || categoria.includes('lubricantes'))
-    return 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=400&q=80';
-  if (nombre.includes('cigarro') || nombre.includes('cigarrillo') || nombre.includes('tabaco') || categoria.includes('cigarrillos'))
-    return 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=400&q=80';
-  if (nombre.includes('juguete') || categoria.includes('juguetes'))
-    return 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=400&q=80';
-
-  return 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=400&q=80';
+// Antes esta función "adivinaba" una foto genérica de internet según palabras clave
+// del nombre cuando el producto no tenía foto propia — el problema es que varias
+// categorías completamente distintas (juguetes, cigarrillos, preservativos, y
+// cualquier producto sin coincidencia) terminaban mostrando la MISMA imagen
+// genérica, sin relación real con el producto. Ahora, si no hay foto real
+// subida, simplemente no se muestra ninguna (ver render: ícono de "sin imagen").
+const getFotoProducto = (producto: { imagen?: string }): string | null => {
+  return producto.imagen || null;
 };
 
 // ─── Skeletons ────────────────────────────────────────────────────────────────
@@ -2265,14 +2230,21 @@ export function ModeloDashboard({ accessToken: _accessToken, userId, userEmail, 
                       return (
                         <div key={item.id} className={`bg-card/60 border rounded-xl overflow-hidden hover:shadow-lg transition-all group ${agotado ? 'border-red-500/20 opacity-70' : 'border-white/10 hover:border-primary/30'}`}>
                           <div className="relative overflow-hidden bg-black/30" style={{ height: '180px' }}>
-                            <img
-                              src={getFotoProducto(item)}
-                              alt={item.nombre}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                              loading="lazy"
-                              style={{ width: '100%', height: '180px', objectFit: 'cover' }}
-                              onError={(e) => { e.currentTarget.src = 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=400&q=80'; }}
-                            />
+                            {getFotoProducto(item) ? (
+                              <img
+                                src={getFotoProducto(item)!}
+                                alt={item.nombre}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                loading="lazy"
+                                style={{ width: '100%', height: '180px', objectFit: 'cover' }}
+                                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                              />
+                            ) : (
+                              <div className="w-full h-full flex flex-col items-center justify-center gap-2">
+                                <ImageIcon className="w-10 h-10 text-muted-foreground/30" />
+                                <p className="text-[10px] text-muted-foreground/50">Sin imagen de producto</p>
+                              </div>
+                            )}
                             {/* Badges de stock */}
                             {agotado && (
                               <div className="absolute top-2 left-2">

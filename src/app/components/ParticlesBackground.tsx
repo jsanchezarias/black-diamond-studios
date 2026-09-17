@@ -220,8 +220,12 @@ export function ParticlesBackground({
     const resize = () => {
       w = canvas.offsetWidth;
       h = canvas.offsetHeight;
-      canvas.width = w;
-      canvas.height = h;
+      // Dibuja a la resolución real de la pantalla (retina/alta densidad, típico en celulares),
+      // para que los corazones y flechas no se vean borrosos en móviles.
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       const count = Math.floor((w * h) / (1920 * 1080 / DENSITY_MAP[density]));
       particlesRef.current = Array.from({ length: Math.min(count, DENSITY_MAP[density]) }, () =>
         createParticle(w, h)

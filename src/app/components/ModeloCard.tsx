@@ -12,12 +12,17 @@ export const ModeloCard = ({ modelo, onAgendar }: { modelo: any; onAgendar?: (m:
 
   // Normaliza el array de fotos: acepta modelo_fotos (Supabase join) o fotos (legado)
   const rawFotos: any[] = modelo.modelo_fotos || modelo.fotos || [];
-  const fotos: { url: string }[] =
+  const fotosOrdenadas =
     rawFotos.length > 0
       ? [...rawFotos].sort((a, b) => (b.es_principal ? 1 : 0) - (a.es_principal ? 1 : 0))
       : modelo.foto_url
       ? [{ url: modelo.foto_url }]
       : [];
+  // Quita fotos duplicadas (misma URL guardada más de una vez), conservando la primera
+  // ocurrencia — así la foto principal no se pierde si también está repetida.
+  const fotos: { url: string }[] = Array.from(
+    new Map(fotosOrdenadas.filter(f => f?.url).map(f => [f.url, f])).values()
+  );
 
   // Precios desde servicios_modelo (real) o fallback fijo
   const serviciosActivos = (modelo.servicios_modelo || []).filter((s: any) => s.activo);

@@ -104,6 +104,8 @@ interface NotificacionesContextType {
   marcarComoLeida: (id: string) => Promise<void>;
   marcarTodasComoLeidas: () => Promise<void>;
   eliminarNotificacion: (id: string) => Promise<void>;
+  eliminarTodasLasNotificaciones: () => Promise<void>;
+  eliminarNotificacionesLeidas: () => Promise<void>;
   limpiarNotificacionesAntiguas: () => Promise<void>;
   
   // Preferencias
@@ -128,6 +130,8 @@ const NOTIFICACIONES_FALLBACK: NotificacionesContextType = {
   marcarComoLeida: async () => {},
   marcarTodasComoLeidas: async () => {},
   eliminarNotificacion: async () => {},
+  eliminarTodasLasNotificaciones: async () => {},
+  eliminarNotificacionesLeidas: async () => {},
   limpiarNotificacionesAntiguas: async () => {},
   obtenerPreferencias: async () => null,
   actualizarPreferencias: async () => {},
@@ -354,6 +358,39 @@ export const NotificacionesProvider = ({ children }: { children: ReactNode }) =>
     }
   };
 
+  // 🗑️ Eliminar TODAS las notificaciones del usuario actual (soft delete)
+  const eliminarTodasLasNotificaciones = async () => {
+    if (!usuarioActual) return;
+
+    try {
+      await (supabase as any)
+        .from('notificaciones')
+        .update({ eliminado: true })
+        .or(`usuario_id.eq.${usuarioActual},usuario_email.eq.${usuarioActual},para_usuario_id.eq.${usuarioActual}`);
+
+      setNotificaciones([]);
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') console.error('❌ Error eliminando todas las notificaciones:', error);
+    }
+  };
+
+  // 🗑️ Eliminar solo las notificaciones ya leídas (soft delete)
+  const eliminarNotificacionesLeidas = async () => {
+    if (!usuarioActual) return;
+
+    try {
+      await (supabase as any)
+        .from('notificaciones')
+        .update({ eliminado: true })
+        .or(`usuario_id.eq.${usuarioActual},usuario_email.eq.${usuarioActual},para_usuario_id.eq.${usuarioActual}`)
+        .eq('leida', true);
+
+      setNotificaciones(prev => prev.filter(n => !n.leida));
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') console.error('❌ Error eliminando notificaciones leídas:', error);
+    }
+  };
+
   // 🧹 Limpiar notificaciones antiguas (más de 30 días, soft delete)
   const limpiarNotificacionesAntiguas = async () => {
     if (!usuarioActual) return;
@@ -547,6 +584,8 @@ export const NotificacionesProvider = ({ children }: { children: ReactNode }) =>
     marcarComoLeida,
     marcarTodasComoLeidas,
     eliminarNotificacion,
+    eliminarTodasLasNotificaciones,
+    eliminarNotificacionesLeidas,
     limpiarNotificacionesAntiguas,
     obtenerPreferencias,
     actualizarPreferencias,
