@@ -65,11 +65,8 @@ export function SolicitudServicioModal({ isOpen, onClose, data, currentUser }: S
 
   const hoy = new Date().toISOString().split('T')[0];
 
-  const horasDisponibles = [
-    '10:00','11:00','12:00','13:00','14:00',
-    '15:00','16:00','17:00','18:00','19:00','20:00','21:00',
-    '22:00','23:00'
-  ];
+  // Las 24 horas del día completas
+  const horasDisponibles = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}:00`);
 
   const enviarReserva = async () => {
     if (!servicioSeleccionado) { toast.error('Selecciona un servicio'); return; }
