@@ -7,7 +7,7 @@ interface LightboxState {
   nombreModelo: string;
 }
 
-const WHATSAPP_NUMERO = '573017626768';
+import { getWhatsAppModeloUrl } from '../../utils/whatsapp';
 
 export const ModeloCard = ({ modelo, onAgendar }: { modelo: any; onAgendar?: (m: any) => void }) => {
   const [fotoActual, setFotoActual] = useState(0);
@@ -63,14 +63,7 @@ export const ModeloCard = ({ modelo, onAgendar }: { modelo: any; onAgendar?: (m:
     setLightbox({ fotos, indice, nombreModelo });
 
   const agendarPorWhatsApp = (servicio?: { nombre: string; precio: number }) => {
-    let mensaje = '';
-    if (servicio) {
-      const precioFmt = '$' + servicio.precio.toLocaleString('es-CO');
-      mensaje = `Hola Black Diamond, deseo agendar una cita con *${nombreModelo}* para el servicio de *${servicio.nombre}* (${precioFmt}). ¿Tienen disponibilidad?`;
-    } else {
-      mensaje = `Hola Black Diamond, deseo agendar una cita con *${nombreModelo}*. ¿Tienen disponibilidad?`;
-    }
-    const url = `https://wa.me/${WHATSAPP_NUMERO}?text=${encodeURIComponent(mensaje)}`;
+    const url = getWhatsAppModeloUrl(nombreModelo, servicio);
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 

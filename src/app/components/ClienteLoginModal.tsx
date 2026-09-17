@@ -435,7 +435,7 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess, tabInicial 
                 type="text"
                 value={emailTelefono}
                 onChange={(e) => setEmailTelefono(e.target.value)}
-                placeholder="ejemplo@email.com o 3017626768"
+                placeholder="ejemplo@email.com o 3143107403"
                 className="bg-[#0f1014] border-[#2a2a2a] text-[#e8e6e3] focus:border-[#c9a961]"
                 disabled={procesando}
                 autoCapitalize="none"
@@ -476,7 +476,7 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess, tabInicial 
                     type="tel"
                     value={telefono}
                     onChange={(e) => setTelefono(e.target.value)}
-                    placeholder="3017626768"
+                    placeholder="3143107403"
                     className="bg-[#0f1014] border-[#2a2a2a] text-[#e8e6e3] focus:border-[#c9a961]"
                     disabled={procesando}
                     onKeyDown={(e) => e.key === 'Enter' && handleAuth()}

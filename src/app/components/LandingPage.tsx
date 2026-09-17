@@ -15,13 +15,15 @@ import { ParticlesBackground } from './ParticlesBackground'; // ✅ Fondo de par
 import { GoldenCursor } from './GoldenCursor'; // ✅ Cursor personalizado dorado
 import { ScrollUI } from './ScrollUI'; // ✅ Barra de progreso y back-to-top
 import { HeroStats } from './HeroStats'; // ✅ Estadísticas de impacto visual
-import { Gem, Clock, MapPin, Shield, Award, Star, X, Phone, Mail, Sparkles, Heart, Send, Search } from 'lucide-react';
+import { FloatingWhatsApp } from './FloatingWhatsApp';
+import { Gem, Clock, MapPin, Shield, Award, Star, X, Phone, Mail, Sparkles, Heart, Send, Search, MessageCircle } from 'lucide-react';
 import { useLanguage } from './LanguageContext';
 
 import { LiveChat } from './LiveChat';
 import { TipModal } from './TipModal';
 import { usePublicUsers } from './PublicUsersContext';
 import { supabase } from '../../utils/supabase/info';
+import { getWhatsAppGeneralUrl, WHATSAPP_CONFIG } from '../../utils/whatsapp';
 
 
 // ✅ Agregar tipos necesarios
@@ -570,6 +572,19 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
               </a>
             ))}
 
+            {/* BOTÓN WHATSAPP NAVBAR DESKTOP */}
+            <a
+              href={getWhatsAppGeneralUrl()}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-[#25D366]/40 text-[#25D366] hover:bg-[#25D366]/10 text-xs font-semibold tracking-wider transition-all duration-300 hover:scale-105"
+              style={{ fontFamily: "'Montserrat', sans-serif" }}
+              title="Atención personalizada por WhatsApp"
+            >
+              <MessageCircle className="w-3.5 h-3.5 fill-[#25D366]" />
+              <span>WhatsApp</span>
+            </a>
+
             <button
               onClick={() => onAccessSystem('cliente')}
               className="relative px-6 py-2.5 rounded-lg font-bold text-white text-xs tracking-widest uppercase overflow-hidden group transition-all duration-300 hover:scale-105 active:scale-95"
@@ -585,21 +600,33 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
             </button>
           </div>
 
-          {/* HAMBURGUESA MÓVIL */}
-          <button
-            onClick={() => setMenuAbierto(!menuAbierto)}
-            className="
-              md:hidden
-              w-10 h-10 rounded-lg
-              flex items-center justify-center
-              text-[#A11D3A] text-2xl
-              hover:bg-[#A11D3A]/10
-              transition-colors
-            "
-            aria-label="Menú"
-          >
-            {menuAbierto ? '✕' : '☰'}
-          </button>
+          {/* BOTONES MÓVIL (WHATSAPP + HAMBURGUESA) */}
+          <div className="flex md:hidden items-center gap-2">
+            <a
+              href={getWhatsAppGeneralUrl()}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Contactar por WhatsApp"
+              className="w-10 h-10 rounded-lg flex items-center justify-center text-[#25D366] hover:bg-[#25D366]/10 transition-colors"
+              title="Atención directa por WhatsApp"
+            >
+              <MessageCircle className="w-5 h-5 fill-[#25D366]" />
+            </a>
+
+            <button
+              onClick={() => setMenuAbierto(!menuAbierto)}
+              className="
+                w-10 h-10 rounded-lg
+                flex items-center justify-center
+                text-[#A11D3A] text-2xl
+                hover:bg-[#A11D3A]/10
+                transition-colors
+              "
+              aria-label="Menú"
+            >
+              {menuAbierto ? '✕' : '☰'}
+            </button>
+          </div>
 
         </div>
 
@@ -631,6 +658,23 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
 
             {/* BOTONES EN MENÚ MÓVIL */}
             <div className="flex flex-col gap-3 mt-4 pt-3 border-t border-[#2a2a2a]">
+              <a
+                href={getWhatsAppGeneralUrl()}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setMenuAbierto(false)}
+                className="w-full py-3 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all active:scale-95"
+                style={{
+                  background: 'linear-gradient(135deg, #25D366 0%, #1ea952 100%)',
+                  color: '#fff',
+                  boxShadow: '0 4px 16px rgba(37, 211, 102, 0.25)',
+                  fontFamily: "'Montserrat', sans-serif",
+                }}
+              >
+                <MessageCircle className="w-4 h-4 fill-white" />
+                Contactar por WhatsApp
+              </a>
+
               <button
                 onClick={() => {
                   setMenuAbierto(false)
@@ -1101,7 +1145,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
                 </div>
                 <h3 className="font-semibold mb-1 text-white text-sm" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1rem' }}>{t.contact.whatsapp}</h3>
                 <p className="text-xs text-[#666] mb-2" style={{ fontFamily: "'Montserrat', sans-serif" }}>{t.contact.whatsappDesc}</p>
-                <a href="https://wa.me/573017626768" target="_blank" rel="noopener noreferrer" className="text-xs hover:underline" style={{ color: '#25D366', fontFamily: "'Montserrat', sans-serif" }}>+57 301 762 6768</a>
+                <a href={getWhatsAppGeneralUrl()} target="_blank" rel="noopener noreferrer" className="text-xs hover:underline font-medium" style={{ color: '#25D366', fontFamily: "'Montserrat', sans-serif" }}>{WHATSAPP_CONFIG.display}</a>
               </div>
 
               {/* X / Twitter */}
@@ -1357,6 +1401,9 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
 
       {/* ✨ Scroll Progress Bar & Back to top */}
       <ScrollUI />
+
+      {/* 💬 Botón Flotante de WhatsApp */}
+      <FloatingWhatsApp />
 
     </div>
   );

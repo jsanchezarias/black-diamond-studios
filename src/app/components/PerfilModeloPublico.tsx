@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '../../utils/supabase/info';
+import { getWhatsAppReservaCompletaUrl, getWhatsAppModeloUrl } from '../../utils/whatsapp';
 import {
   X, Star, MapPin, Clock, ChevronLeft, ChevronRight,
   Calendar, Home, Building, DollarSign, Ruler, Languages,
@@ -212,16 +213,22 @@ export function PerfilModeloPublico({ modeloId, onClose, currentUser, onLoginReq
   };
 
   const agendarReservaWhatsApp = () => {
-    if (!servicioSeleccionado) return;
+    if (!servicioSeleccionado) {
+      const url = getWhatsAppModeloUrl(perfil.nombre_display);
+      window.open(url, '_blank', 'noopener,noreferrer');
+      return;
+    }
     const precio = ubicacion === 'sede' ? servicioSeleccionado.precio_sede : servicioSeleccionado.precio_domicilio;
-    const precioFmt = '$' + Number(precio).toLocaleString('es-CO');
-    const sedeLabel = ubicacion === 'domicilio' ? `A domicilio (${direccion || 'dirección a coordinar'})` : 'En sede';
-    const fechaTexto = fecha ? `el día ${fecha}` : '';
-    const horaTexto = hora ? `a las ${hora}` : '';
-
-    const msg = `Hola Black Diamond, deseo agendar con *${perfil.nombre_display}*:\n• Servicio: *${servicioSeleccionado.nombre}* (${precioFmt})\n• Modalidad: ${sedeLabel}\n${fechaTexto ? '• Fecha: ' + fechaTexto + '\n' : ''}${horaTexto ? '• Hora: ' + horaTexto + '\n' : ''}${notas ? '• Notas: ' + notas + '\n' : ''}¿Tienen disponibilidad?`;
-
-    const url = `https://wa.me/573017626768?text=${encodeURIComponent(msg)}`;
+    const url = getWhatsAppReservaCompletaUrl({
+      nombreModelo: perfil.nombre_display,
+      servicioNombre: servicioSeleccionado.nombre,
+      precio: Number(precio),
+      modalidad: ubicacion,
+      direccion,
+      fecha,
+      hora,
+      notas,
+    });
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
