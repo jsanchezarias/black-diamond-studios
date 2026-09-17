@@ -45,6 +45,16 @@ export function LoginForm({ tipo, onLogin, onBackToLanding }: LoginFormProps) {
         return;
       }
 
+      // Supabase no da error cuando el correo ya tiene cuenta (para no revelar qué
+      // correos existen) — en su lugar devuelve "éxito" con identities vacío y sin
+      // sesión. Sin este chequeo seguíamos de largo y sobrescribíamos el perfil de
+      // la cuenta real ya existente con los datos de este formulario.
+      if (data.user && (data.user.identities?.length ?? 0) === 0) {
+        await supabase.auth.signOut();
+        toast.error('Ya existe una cuenta con ese correo. Inicia sesión en su lugar.');
+        return;
+      }
+
       if (data.user) {
         const tel10 = telefono.replace(/[^0-9]/g, '').slice(-10);
         await supabase.from('clientes').upsert({

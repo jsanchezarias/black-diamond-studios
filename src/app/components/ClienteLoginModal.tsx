@@ -230,14 +230,21 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess, tabInicial 
       const emailParaAuth = emailReal || telefonoToEmail(telNormalizado);
       const telefonoLimpio = telefono.replace(/[^0-9]/g, '').slice(-10);
 
+      const filtroExistente = emailReal
+        ? `telefono.eq.${telefonoLimpio},telefono.eq.57${telefonoLimpio},telefono.eq.+57${telefonoLimpio},email.eq.${emailReal}`
+        : `telefono.eq.${telefonoLimpio},telefono.eq.57${telefonoLimpio},telefono.eq.+57${telefonoLimpio}`;
+
       const { data: clienteExistente } = await supabase
         .from('clientes')
-        .select('id, email')
-        .or(`telefono.eq.${telefonoLimpio},telefono.eq.57${telefonoLimpio},telefono.eq.+57${telefonoLimpio}`)
+        .select('id, email, telefono')
+        .or(filtroExistente)
         .maybeSingle();
 
       if (clienteExistente) {
-        setError('Ya existe una cuenta con ese número de teléfono. Inicia sesión.');
+        const msg = emailReal && clienteExistente.email?.toLowerCase() === emailReal
+          ? 'Ya existe una cuenta con ese correo. Inicia sesión.'
+          : 'Ya existe una cuenta con ese número de teléfono. Inicia sesión.';
+        setError(msg);
         setProcesando(false);
         return;
       }
@@ -263,6 +270,20 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess, tabInicial 
 
       if (!authData.user) {
         const msg = 'Error al crear el usuario. Intenta nuevamente.';
+        setError(msg);
+        toast.error(msg);
+        setProcesando(false);
+        return;
+      }
+
+      // Supabase no da error cuando el correo ya tiene cuenta (para no revelar qué
+      // correos existen) — en su lugar devuelve un "éxito" con identities vacío y
+      // sin sesión. Sin este chequeo, seguíamos de largo y sobrescribíamos el
+      // perfil de la cuenta real ya existente con los datos de este formulario.
+      const emailYaExistia = (authData.user.identities?.length ?? 0) === 0;
+      if (emailYaExistia) {
+        await supabase.auth.signOut();
+        const msg = 'Ya existe una cuenta con ese correo. Inicia sesión en su lugar.';
         setError(msg);
         toast.error(msg);
         setProcesando(false);
