@@ -1,9 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, Loader2 } from 'lucide-react';
-import { Label } from '../../components/ui/label';
-import { Input } from '../../components/ui/input';
-import { Button } from '../../components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
+import { ArrowLeft, Loader2, Lock, Mail, Phone, User, Eye, EyeOff, ShieldCheck, Sparkles, AlertCircle } from 'lucide-react';
 import { Logo } from './Logo';
 import { supabase } from '../../utils/supabase/info';
 import { translateSupabaseError } from '../../utils/supabase/errors';
@@ -15,11 +11,12 @@ interface LoginFormProps {
   onBackToLanding?: () => void;
 }
 
-// Formulario de login con Supabase Auth
+// Formulario de login premium con Supabase Auth
 export function LoginForm({ tipo, onLogin, onBackToLanding }: LoginFormProps) {
   const [tab, setTab] = useState<'login' | 'registro'>('login');
   const [identificador, setIdentificador] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -28,11 +25,13 @@ export function LoginForm({ tipo, onLogin, onBackToLanding }: LoginFormProps) {
   const [telefono, setTelefono] = useState('');
   const [emailRegistro, setEmailRegistro] = useState('');
   const [passwordRegistro, setPasswordRegistro] = useState('');
+  const [showPasswordRegistro, setShowPasswordRegistro] = useState(false);
   const [registrando, setRegistrando] = useState(false);
 
   const handleRegistro = async (e: React.FormEvent) => {
     e.preventDefault();
     setRegistrando(true);
+    setError('');
     try {
       const { data, error: signUpError } = await supabase.auth.signUp({
         email: emailRegistro.trim().toLowerCase(),
@@ -41,17 +40,17 @@ export function LoginForm({ tipo, onLogin, onBackToLanding }: LoginFormProps) {
       });
 
       if (signUpError) {
-        toast.error(translateSupabaseError(signUpError));
+        const msg = translateSupabaseError(signUpError);
+        setError(msg);
+        toast.error(msg);
         return;
       }
 
-      // Supabase no da error cuando el correo ya tiene cuenta (para no revelar qué
-      // correos existen) — en su lugar devuelve "éxito" con identities vacío y sin
-      // sesión. Sin este chequeo seguíamos de largo y sobrescribíamos el perfil de
-      // la cuenta real ya existente con los datos de este formulario.
       if (data.user && (data.user.identities?.length ?? 0) === 0) {
         await supabase.auth.signOut();
-        toast.error('Ya existe una cuenta con ese correo. Inicia sesión en su lugar.');
+        const msg = 'Ya existe una cuenta con ese correo. Inicia sesión en su lugar.';
+        setError(msg);
+        toast.error(msg);
         return;
       }
 
@@ -83,7 +82,9 @@ export function LoginForm({ tipo, onLogin, onBackToLanding }: LoginFormProps) {
         }
       }
     } catch (err: any) {
-      toast.error(translateSupabaseError(err));
+      const msg = translateSupabaseError(err);
+      setError(msg);
+      toast.error(msg);
     } finally {
       setRegistrando(false);
     }
@@ -103,7 +104,7 @@ export function LoginForm({ tipo, onLogin, onBackToLanding }: LoginFormProps) {
     }
 
     // Buscar en usuarios primero
-    const { data: usuario, error: _userError } = await supabase
+    const { data: usuario } = await supabase
       .from('usuarios')
       .select('role')
       .eq('id', user!.id)
@@ -123,7 +124,7 @@ export function LoginForm({ tipo, onLogin, onBackToLanding }: LoginFormProps) {
 
     // Validar que es cliente
     if (role !== 'cliente') {
-      const msg = 'Usa Acceso al sistema para ingresar';
+      const msg = 'Usa el Acceso al Sistema administrativo para ingresar.';
       setError(msg);
       toast.error(msg);
       await supabase.auth.signOut();
@@ -162,14 +163,13 @@ export function LoginForm({ tipo, onLogin, onBackToLanding }: LoginFormProps) {
     ];
 
     if (!role || !rolesPermitidos.includes(role)) {
-      const msg = 'Acceso no autorizado. Si eres cliente usa Iniciar sesión';
+      const msg = 'Acceso no autorizado. Si eres cliente usa Iniciar sesión.';
       setError(msg);
       toast.error(msg);
       await supabase.auth.signOut();
       return;
     }
 
-    // Usar el rol REAL de Supabase
     onLogin(session!.access_token, user!.id, emailParaLogin, role);
   };
 
@@ -178,8 +178,6 @@ export function LoginForm({ tipo, onLogin, onBackToLanding }: LoginFormProps) {
     setLoading(true);
     setError('');
 
-    // En celular, los teclados suelen poner en mayúscula la primera letra de un campo de texto libre
-    // (a diferencia de un input type="email"), lo que rompe el login si el usuario no se da cuenta.
     let emailParaLogin = identificador.trim().toLowerCase();
 
     try {
@@ -191,7 +189,7 @@ export function LoginForm({ tipo, onLogin, onBackToLanding }: LoginFormProps) {
           .rpc('get_email_by_telefono', { p_telefono: tel10 });
 
         if (!emailData) {
-          setError('No encontramos una cuenta con ese número.');
+          setError('No encontramos una cuenta asociada a ese número de teléfono.');
           setLoading(false);
           return;
         }
@@ -214,138 +212,246 @@ export function LoginForm({ tipo, onLogin, onBackToLanding }: LoginFormProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-[#1a1a1a] to-background flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Efectos de fondo premium */}
-      <div className="absolute top-0 left-0 w-full h-full">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl animate-glow-pulse"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-accent/5 rounded-full blur-3xl animate-glow-pulse" style={{ animationDelay: '2s' }}></div>
-      </div>
-      
+    <div
+      className="min-h-screen flex items-center justify-center p-4 sm:p-6 relative overflow-hidden"
+      style={{
+        background: 'radial-gradient(ellipse at 50% 15%, rgba(201, 56, 90, 0.15) 0%, rgba(13, 15, 20, 0.98) 55%, #050608 100%)',
+      }}
+    >
+      {/* Luces volumétricas ambientales de lujo */}
+      <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[600px] h-[350px] bg-[#c9385a]/10 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute -bottom-40 right-10 w-[400px] h-[300px] bg-[#d4af37]/5 rounded-full blur-[100px] pointer-events-none" />
+
       <div className="w-full max-w-md relative z-10">
         {/* Botón para volver */}
         {onBackToLanding && (
           <button
             onClick={onBackToLanding}
-            className="mb-6 flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-all duration-300 hover:translate-x-[-4px]"
+            className="mb-5 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-white/50 hover:text-white transition-all duration-300 hover:-translate-x-1 group"
+            style={{ fontFamily: "'Montserrat', sans-serif" }}
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="w-4 h-4 text-[#c9385a] transition-transform group-hover:-translate-x-0.5" />
             Volver al inicio
           </button>
         )}
 
-        <div className="relative">
-          <Card className="relative backdrop-blur-premium bg-gradient-card border-primary/15 shadow-premium hover:shadow-premium hover:border-primary/25 transition-all duration-500">
-            <CardHeader className="space-y-4 pb-4">
-              <div className="flex justify-center mb-2 animate-luxury-fade-in">
-                <Logo size="md" />
-              </div>
-              <div className="text-center space-y-2">
-                <CardTitle className="text-3xl font-['Cormorant_Garamond'] text-foreground">
-                  {tipo === 'cliente' ? '◆ Bienvenido' : '🔒 Acceso al Sistema'}
-                </CardTitle>
-                <CardDescription className="text-base text-muted-foreground">
-                  {tipo === 'cliente'
-                    ? 'Inicia sesión para reservar tu cita'
-                    : 'Solo personal autorizado'}
-                </CardDescription>
-              </div>
-            </CardHeader>
+        {/* Tarjeta Glassmorphic de Lujo */}
+        <div
+          className="relative rounded-3xl overflow-hidden p-6 sm:p-8 transition-all duration-500"
+          style={{
+            background: 'linear-gradient(165deg, rgba(22, 25, 33, 0.88) 0%, rgba(12, 14, 18, 0.94) 100%)',
+            backdropFilter: 'blur(24px)',
+            WebkitBackdropFilter: 'blur(24px)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.9), 0 0 40px rgba(201, 56, 90, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+          }}
+        >
+          {/* Cabecera / Identidad */}
+          <div className="text-center space-y-3 pb-6 border-b border-white/5">
+            <div className="flex justify-center mb-1">
+              <Logo size="md" variant="vertical" />
+            </div>
 
-            <CardContent>
-              {/* ── Tabs login / registro (solo clientes) ── */}
-              {tipo === 'cliente' && (
-                <div className="flex gap-1 mb-6 bg-[#0f1014] rounded-lg p-1">
+            <div className="flex items-center justify-center">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-[#c9385a]/30 bg-[#c9385a]/10 text-[10px] uppercase font-bold tracking-[0.2em] text-[#e8a2af]">
+                <ShieldCheck className="w-3.5 h-3.5 text-[#c9385a]" />
+                {tipo === 'cliente' ? 'Acceso Exclusivo' : 'Portal Corporativo'}
+              </div>
+            </div>
+
+            <h1
+              className="text-2xl sm:text-3xl font-bold text-white tracking-wide mt-2"
+              style={{ fontFamily: "'Cormorant Garamond', serif" }}
+            >
+              {tipo === 'cliente' ? 'Bienvenido a Black Diamond' : 'Acceso al Sistema'}
+            </h1>
+
+            <p
+              className="text-xs text-white/55 font-light max-w-xs mx-auto leading-relaxed"
+              style={{ fontFamily: "'Montserrat', sans-serif" }}
+            >
+              {tipo === 'cliente'
+                ? 'Ingresa para agendar citas privadas y acceder a contenido exclusivo'
+                : 'Autenticación confidencial y segura para personal autorizado'}
+            </p>
+          </div>
+
+          {/* Segmented Control Tabs (solo clientes) */}
+          {tipo === 'cliente' && (
+            <div className="p-1 rounded-2xl bg-white/[0.04] border border-white/10 flex gap-1 mt-6 mb-6">
+              <button
+                type="button"
+                onClick={() => { setTab('login'); setError(''); }}
+                className={`flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-300 ${
+                  tab === 'login'
+                    ? 'bg-gradient-to-r from-[#C23A54] to-[#A11D3A] text-white shadow-lg'
+                    : 'text-white/50 hover:text-white hover:bg-white/5'
+                }`}
+                style={{ fontFamily: "'Montserrat', sans-serif" }}
+              >
+                Iniciar sesión
+              </button>
+              <button
+                type="button"
+                onClick={() => { setTab('registro'); setError(''); }}
+                className={`flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-300 ${
+                  tab === 'registro'
+                    ? 'bg-gradient-to-r from-[#C23A54] to-[#A11D3A] text-white shadow-lg'
+                    : 'text-white/50 hover:text-white hover:bg-white/5'
+                }`}
+                style={{ fontFamily: "'Montserrat', sans-serif" }}
+              >
+                Crear cuenta
+              </button>
+            </div>
+          )}
+
+          {/* Alerta de Error estilizada */}
+          {error && (
+            <div className="mt-4 p-3.5 rounded-xl bg-red-500/10 border border-red-500/25 flex items-start gap-2.5 text-xs text-red-300 animate-fadeIn">
+              <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+              <p className="leading-relaxed">{error}</p>
+            </div>
+          )}
+
+          {/* ── Formulario de registro (Clientes) ── */}
+          {tab === 'registro' && tipo === 'cliente' && (
+            <form onSubmit={handleRegistro} className="space-y-4 mt-6">
+              {/* Nombre completo */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-semibold tracking-wider text-white/80 uppercase block">
+                  Nombre completo
+                </label>
+                <div className="relative group/field">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-white/40 group-focus-within/field:text-[#c9385a] transition-colors">
+                    <User className="w-4 h-4" />
+                  </div>
+                  <input
+                    type="text"
+                    value={nombre}
+                    onChange={e => setNombre(e.target.value)}
+                    required
+                    placeholder="Tu nombre completo"
+                    className="w-full h-12 pl-10 pr-4 rounded-xl bg-white/[0.04] border border-white/10 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-[#c9385a] focus:ring-2 focus:ring-[#c9385a]/25 focus:bg-white/[0.06] transition-all duration-200"
+                  />
+                </div>
+              </div>
+
+              {/* Teléfono */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-semibold tracking-wider text-white/80 uppercase block">
+                  Teléfono de contacto
+                </label>
+                <div className="relative group/field">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-white/40 group-focus-within/field:text-[#c9385a] transition-colors">
+                    <Phone className="w-4 h-4" />
+                  </div>
+                  <input
+                    type="tel"
+                    value={telefono}
+                    onChange={e => setTelefono(e.target.value)}
+                    required
+                    placeholder="3143107403"
+                    className="w-full h-12 pl-10 pr-4 rounded-xl bg-white/[0.04] border border-white/10 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-[#c9385a] focus:ring-2 focus:ring-[#c9385a]/25 focus:bg-white/[0.06] transition-all duration-200"
+                  />
+                </div>
+              </div>
+
+              {/* Email */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-semibold tracking-wider text-white/80 uppercase block">
+                  Correo electrónico
+                </label>
+                <div className="relative group/field">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-white/40 group-focus-within/field:text-[#c9385a] transition-colors">
+                    <Mail className="w-4 h-4" />
+                  </div>
+                  <input
+                    type="email"
+                    value={emailRegistro}
+                    onChange={e => setEmailRegistro(e.target.value)}
+                    required
+                    placeholder="ejemplo@correo.com"
+                    className="w-full h-12 pl-10 pr-4 rounded-xl bg-white/[0.04] border border-white/10 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-[#c9385a] focus:ring-2 focus:ring-[#c9385a]/25 focus:bg-white/[0.06] transition-all duration-200"
+                  />
+                </div>
+              </div>
+
+              {/* Contraseña con botón de mostrar/ocultar */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-semibold tracking-wider text-white/80 uppercase block">
+                  Contraseña
+                </label>
+                <div className="relative group/field">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-white/40 group-focus-within/field:text-[#c9385a] transition-colors">
+                    <Lock className="w-4 h-4" />
+                  </div>
+                  <input
+                    type={showPasswordRegistro ? 'text' : 'password'}
+                    value={passwordRegistro}
+                    onChange={e => setPasswordRegistro(e.target.value)}
+                    required
+                    minLength={6}
+                    placeholder="Mínimo 6 caracteres"
+                    className="w-full h-12 pl-10 pr-11 rounded-xl bg-white/[0.04] border border-white/10 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-[#c9385a] focus:ring-2 focus:ring-[#c9385a]/25 focus:bg-white/[0.06] transition-all duration-200"
+                  />
                   <button
                     type="button"
-                    onClick={() => setTab('login')}
-                    className={`flex-1 py-2 rounded-md text-sm font-medium transition-colors ${
-                      tab === 'login' ? 'bg-[#c9a961] text-[#0f1014]' : 'text-[#888]'
-                    }`}
+                    onClick={() => setShowPasswordRegistro(!showPasswordRegistro)}
+                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-white/40 hover:text-white transition-colors"
+                    title={showPasswordRegistro ? 'Ocultar contraseña' : 'Ver contraseña'}
                   >
-                    Iniciar sesión
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTab('registro')}
-                    className={`flex-1 py-2 rounded-md text-sm font-medium transition-colors ${
-                      tab === 'registro' ? 'bg-[#c9a961] text-[#0f1014]' : 'text-[#888]'
-                    }`}
-                  >
-                    Crear cuenta
+                    {showPasswordRegistro ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-              )}
+              </div>
 
-              {/* ── Formulario de registro ── */}
-              {tab === 'registro' && tipo === 'cliente' && (
-                <form onSubmit={handleRegistro} className="space-y-4">
-                  <div>
-                    <label className="text-[#888] text-sm">Nombre completo</label>
-                    <input
-                      type="text"
-                      value={nombre}
-                      onChange={e => setNombre(e.target.value)}
-                      required
-                      className="w-full mt-1 px-4 py-3 rounded-lg bg-[#0f1014] border border-[#2a2a2a] text-[#e8e6e3] text-sm focus:border-[#c9a961] outline-none"
-                      placeholder="Tu nombre"
-                    />
+              <button
+                type="submit"
+                disabled={registrando}
+                className="w-full h-12 rounded-xl font-bold text-xs uppercase tracking-widest text-white transition-all duration-300 hover:scale-[1.02] active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 relative overflow-hidden group shadow-lg mt-2"
+                style={{
+                  background: 'linear-gradient(135deg, #C23A54 0%, #A11D3A 50%, #6B1226 100%)',
+                  boxShadow: '0 4px 20px rgba(161, 29, 58, 0.4)',
+                  fontFamily: "'Montserrat', sans-serif",
+                }}
+              >
+                <span className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                {registrando ? (
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    <span>Creando membresía...</span>
                   </div>
-                  <div>
-                    <label className="text-[#888] text-sm">Teléfono</label>
-                    <input
-                      type="tel"
-                      value={telefono}
-                      onChange={e => setTelefono(e.target.value)}
-                      required
-                      className="w-full mt-1 px-4 py-3 rounded-lg bg-[#0f1014] border border-[#2a2a2a] text-[#e8e6e3] text-sm focus:border-[#c9a961] outline-none"
-                      placeholder="+57 300 000 0000"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[#888] text-sm">Email</label>
-                    <input
-                      type="email"
-                      value={emailRegistro}
-                      onChange={e => setEmailRegistro(e.target.value)}
-                      required
-                      className="w-full mt-1 px-4 py-3 rounded-lg bg-[#0f1014] border border-[#2a2a2a] text-[#e8e6e3] text-sm focus:border-[#c9a961] outline-none"
-                      placeholder="tu@email.com"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[#888] text-sm">Contraseña</label>
-                    <input
-                      type="password"
-                      value={passwordRegistro}
-                      onChange={e => setPasswordRegistro(e.target.value)}
-                      required
-                      minLength={6}
-                      className="w-full mt-1 px-4 py-3 rounded-lg bg-[#0f1014] border border-[#2a2a2a] text-[#e8e6e3] text-sm focus:border-[#c9a961] outline-none"
-                      placeholder="Mínimo 6 caracteres"
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={registrando}
-                    className="w-full py-3.5 rounded-xl bg-[#c9a961] text-[#0f1014] font-bold text-base disabled:opacity-50 hover:bg-[#d4b86a] transition-colors"
-                  >
-                    {registrando ? '⏳ Creando cuenta...' : '◆ Crear mi cuenta'}
-                  </button>
-                </form>
-              )}
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 text-white" />
+                    <span>Crear mi cuenta</span>
+                  </>
+                )}
+              </button>
+            </form>
+          )}
 
-              {/* ── Formulario de login ── */}
-              {(tab === 'login' || tipo === 'sistema') && (
-              <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Email o teléfono */}
-                <div className="space-y-2">
-                  <Label htmlFor="identificador" className="text-sm font-medium">
-                    Email o número de teléfono
-                  </Label>
-                  <Input
+          {/* ── Formulario de login (Clientes y Sistema) ── */}
+          {(tab === 'login' || tipo === 'sistema') && (
+            <form onSubmit={handleSubmit} className="space-y-5 mt-6">
+              {/* Email o teléfono */}
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="identificador"
+                  className="text-[11px] font-semibold tracking-wider text-white/80 uppercase block"
+                  style={{ fontFamily: "'Montserrat', sans-serif" }}
+                >
+                  Email o número de teléfono
+                </label>
+                <div className="relative group/field">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-white/40 group-focus-within/field:text-[#c9385a] transition-colors">
+                    <Mail className="w-4 h-4" />
+                  </div>
+                  <input
                     id="identificador"
                     type="text"
-                    placeholder="tu@email.com o 3001234567"
+                    placeholder="tu@email.com o 3143107403"
                     value={identificador}
                     onChange={(e) => setIdentificador(e.target.value)}
                     disabled={loading}
@@ -354,60 +460,90 @@ export function LoginForm({ tipo, onLogin, onBackToLanding }: LoginFormProps) {
                     autoCapitalize="none"
                     autoCorrect="off"
                     spellCheck={false}
-                    className="h-12 text-base"
+                    className="w-full h-12 pl-10 pr-4 rounded-xl bg-white/[0.04] border border-white/10 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-[#c9385a] focus:ring-2 focus:ring-[#c9385a]/25 focus:bg-white/[0.06] transition-all duration-200"
                   />
-                  <p className="text-xs text-muted-foreground">Puedes usar tu email o número de celular</p>
                 </div>
+                <p className="text-[10px] text-white/40 pl-1">Puedes usar tu correo electrónico o tu número de celular</p>
+              </div>
 
-                {/* Password */}
-                <div className="space-y-2">
-                  <Label htmlFor="password" className="text-sm font-medium">
+              {/* Contraseña con botón de mostrar/ocultar */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label
+                    htmlFor="password"
+                    className="text-[11px] font-semibold tracking-wider text-white/80 uppercase block"
+                    style={{ fontFamily: "'Montserrat', sans-serif" }}
+                  >
                     Contraseña
-                  </Label>
-                  <Input
+                  </label>
+                </div>
+                <div className="relative group/field">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-white/40 group-focus-within/field:text-[#c9385a] transition-colors">
+                    <Lock className="w-4 h-4" />
+                  </div>
+                  <input
                     id="password"
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     disabled={loading}
                     required
-                    className="h-12 text-base"
+                    autoComplete="current-password"
+                    className="w-full h-12 pl-10 pr-11 rounded-xl bg-white/[0.04] border border-white/10 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-[#c9385a] focus:ring-2 focus:ring-[#c9385a]/25 focus:bg-white/[0.06] transition-all duration-200"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-white/40 hover:text-white transition-colors"
+                    title={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+                    aria-label={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
+              </div>
 
-                {/* Error message */}
-                {error && (
-                  <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
-                    <p className="text-sm text-destructive font-semibold">{error}</p>
+              {/* Botón de acción principal */}
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full h-12 rounded-xl font-bold text-xs uppercase tracking-widest text-white transition-all duration-300 hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 relative overflow-hidden group shadow-lg mt-2"
+                style={{
+                  background: 'linear-gradient(135deg, #C23A54 0%, #A11D3A 50%, #6B1226 100%)',
+                  boxShadow: '0 4px 20px rgba(161, 29, 58, 0.4)',
+                  fontFamily: "'Montserrat', sans-serif",
+                  letterSpacing: '0.12em',
+                }}
+              >
+                <span className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                {loading ? (
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    <span>Verificando credenciales...</span>
                   </div>
+                ) : (
+                  <>
+                    <Lock className="w-4 h-4 text-white" />
+                    <span>{tipo === 'cliente' ? 'Entrar al Club' : 'Acceder al Sistema'}</span>
+                  </>
                 )}
+              </button>
 
-                {/* Submit button */}
-                <Button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full h-12 text-base font-medium bg-primary hover:bg-primary/90"
-                >
-                  {loading ? (
-                    <div className="flex items-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Iniciando sesión...
-                    </div>
-                  ) : tipo === 'cliente' ? (
-                    '◆ Entrar'
-                  ) : (
-                    '🔒 Acceder'
-                  )}
-                </Button>
-
-                <p className="text-xs text-center text-muted-foreground">
-                  Si olvidaste tu contraseña, contacta al administrador del sistema.
+              {/* Pie de seguridad y recuperación */}
+              <div className="pt-3 text-center space-y-3 border-t border-white/5 mt-4">
+                <p className="text-[11px] text-white/45">
+                  ¿Problemas para acceder?{' '}
+                  <span className="text-[#c9385a] font-semibold cursor-default">Contacta al administrador del sistema</span>
                 </p>
-              </form>
-              )}
-            </CardContent>
-          </Card>
+
+                <div className="flex items-center justify-center gap-1.5 text-[10px] text-white/30 uppercase tracking-wider pt-1">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Conexión cifrada SSL 256-bit · Black Diamond Security</span>
+                </div>
+              </div>
+            </form>
+          )}
         </div>
       </div>
     </div>

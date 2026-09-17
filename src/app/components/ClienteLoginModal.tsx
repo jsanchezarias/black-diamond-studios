@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Loader2, CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react';
+import { Loader2, CheckCircle, AlertCircle, ArrowLeft, Lock, Mail, User, Phone, Eye, EyeOff, ShieldCheck, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../components/ui/dialog';
 import { Button } from '../../components/ui/button';
@@ -30,6 +30,7 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess, tabInicial 
   // Campos unificados
   const [emailTelefono, setEmailTelefono] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   // Solo para registro
   const [nombre, setNombre] = useState('');
@@ -342,25 +343,39 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess, tabInicial 
   if (exitoso) {
     return (
       <Dialog open={isOpen} onOpenChange={handleClose}>
-        <DialogContent className="max-w-md bg-[#16181c] border-[#2a2a2a]">
-          <DialogHeader>
-            <DialogTitle className="sr-only">
+        <DialogContent
+          className="max-w-md bg-[#0e1017] border border-white/10 rounded-3xl p-8 overflow-hidden shadow-2xl text-center"
+          style={{
+            backdropFilter: 'blur(20px)',
+            boxShadow: '0 25px 60px rgba(0,0,0,0.9), 0 0 30px rgba(201,56,90,0.15)',
+          }}
+        >
+          <DialogHeader className="sr-only">
+            <DialogTitle>
               {tab === 'login' ? 'Inicio de sesión exitoso' : 'Registro exitoso'}
             </DialogTitle>
-            <DialogDescription className="sr-only">Bienvenido</DialogDescription>
+            <DialogDescription>Bienvenido</DialogDescription>
           </DialogHeader>
-          <div className="text-center py-8 space-y-6">
+
+          <div className="py-6 space-y-6">
             <div className="flex justify-center">
-              <Logo variant="horizontal" size="lg" />
+              <Logo variant="vertical" size="sm" />
             </div>
-            <div className="w-20 h-20 rounded-full border-2 bg-[#c9a961]/20 border-[#c9a961] flex items-center justify-center mx-auto animate-pulse">
-              <CheckCircle className="w-12 h-12 text-[#c9a961]" />
+
+            <div className="w-16 h-16 rounded-full border-2 bg-emerald-500/15 border-emerald-400 flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/20">
+              <CheckCircle className="w-8 h-8 text-emerald-400" />
             </div>
-            <div>
-              <h2 className="text-2xl font-bold mb-2 text-[#c9a961]">
-                {tab === 'login' ? '¡Bienvenido de vuelta!' : '¡Registro Exitoso!'}
+
+            <div className="space-y-1">
+              <h2
+                className="text-2xl font-bold text-white tracking-wide"
+                style={{ fontFamily: "'Cormorant Garamond', serif" }}
+              >
+                {tab === 'login' ? '¡Bienvenido de vuelta!' : '¡Membresía Creada!'}
               </h2>
-              <p className="text-[#888]">Ingresando...</p>
+              <p className="text-xs text-white/50" style={{ fontFamily: "'Montserrat', sans-serif" }}>
+                Iniciando sesión segura...
+              </p>
             </div>
           </div>
         </DialogContent>
@@ -370,141 +385,208 @@ export function ClienteLoginModal({ isOpen, onClose, onLoginSuccess, tabInicial 
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-md w-[calc(100vw-2rem)] sm:w-full bg-[#16181c] border-[#2a2a2a] p-0 overflow-hidden">
+      <DialogContent
+        className="max-w-md w-[calc(100vw-2rem)] sm:w-full bg-[#0d0f15] border border-white/10 rounded-3xl p-0 overflow-hidden shadow-2xl"
+        style={{
+          backdropFilter: 'blur(24px)',
+          boxShadow: '0 25px 60px rgba(0,0,0,0.9), 0 0 40px rgba(201,56,90,0.1)',
+        }}
+      >
         <DialogHeader className="sr-only">
-          <DialogTitle>Acceso</DialogTitle>
+          <DialogTitle>Acceso a Black Diamond</DialogTitle>
           <DialogDescription>Acceso para clientes de Black Diamond</DialogDescription>
         </DialogHeader>
 
-        <div className="p-6 pb-4 border-b border-[#2a2a2a]">
-          <div className="flex justify-center mb-6">
-            <Logo variant="horizontal" size="sm" />
+        {/* Cabecera del modal */}
+        <div className="p-6 pb-5 text-center border-b border-white/5 bg-gradient-to-b from-white/[0.03] to-transparent">
+          <div className="flex justify-center mb-3">
+            <Logo variant="vertical" size="sm" />
           </div>
-          <h2 className="text-xl font-bold text-center text-[#e8e6e3]" style={{ fontFamily: "'Playfair Display', serif" }}>
-            Bienvenido
+
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-[#c9385a]/30 bg-[#c9385a]/10 text-[10px] uppercase font-bold tracking-[0.2em] text-[#e8a2af] mb-2">
+            <ShieldCheck className="w-3.5 h-3.5 text-[#c9385a]" />
+            Acceso Exclusivo Clientes
+          </div>
+
+          <h2
+            className="text-2xl font-bold text-white tracking-wide"
+            style={{ fontFamily: "'Cormorant Garamond', serif" }}
+          >
+            Bienvenido a Black Diamond
           </h2>
+          <p className="text-xs text-white/50 font-light mt-1" style={{ fontFamily: "'Montserrat', sans-serif" }}>
+            Reserva tus experiencias y accede a beneficios privados
+          </p>
         </div>
 
-        <div style={{ display: 'flex', gap: 0, padding: '0 24px', marginBottom: '20px', marginTop: '16px' }}>
-          <button
-            onClick={() => { setTab('login'); setError(''); }}
-            disabled={procesando}
-            style={{
-              flex: 1, padding: '10px',
-              background: tab === 'login' ? 'rgba(255,215,0,0.15)' : 'transparent',
-              border: '0.5px solid rgba(255,215,0,0.3)',
-              borderRadius: '8px 0 0 8px',
-              color: tab === 'login' ? '#FFD700' : 'rgba(255,255,255,0.5)',
-              fontWeight: tab === 'login' ? 700 : 400,
-              cursor: procesando ? 'not-allowed' : 'pointer',
-              transition: 'all 0.2s'
-            }}
-          >
-            Iniciar sesión
-          </button>
-          <button
-            onClick={() => { setTab('registro'); setError(''); }}
-            disabled={procesando}
-            style={{
-              flex: 1, padding: '10px',
-              background: tab === 'registro' ? 'rgba(255,215,0,0.15)' : 'transparent',
-              border: '0.5px solid rgba(255,215,0,0.3)',
-              borderRadius: '0 8px 8px 0',
-              color: tab === 'registro' ? '#FFD700' : 'rgba(255,255,255,0.5)',
-              fontWeight: tab === 'registro' ? 700 : 400,
-              cursor: procesando ? 'not-allowed' : 'pointer',
-              transition: 'all 0.2s'
-            }}
-          >
-            Crear cuenta
-          </button>
+        {/* Segmented Control Tabs */}
+        <div className="px-6 pt-4">
+          <div className="p-1 rounded-2xl bg-white/[0.04] border border-white/10 flex gap-1">
+            <button
+              onClick={() => { setTab('login'); setError(''); }}
+              disabled={procesando}
+              className={`flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-300 ${
+                tab === 'login'
+                  ? 'bg-gradient-to-r from-[#C23A54] to-[#A11D3A] text-white shadow-lg'
+                  : 'text-white/50 hover:text-white hover:bg-white/5'
+              }`}
+              style={{ fontFamily: "'Montserrat', sans-serif" }}
+            >
+              Iniciar sesión
+            </button>
+            <button
+              onClick={() => { setTab('registro'); setError(''); }}
+              disabled={procesando}
+              className={`flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-300 ${
+                tab === 'registro'
+                  ? 'bg-gradient-to-r from-[#C23A54] to-[#A11D3A] text-white shadow-lg'
+                  : 'text-white/50 hover:text-white hover:bg-white/5'
+              }`}
+              style={{ fontFamily: "'Montserrat', sans-serif" }}
+            >
+              Crear cuenta
+            </button>
+          </div>
         </div>
 
-        <div className="p-6 space-y-6">
+        {/* Cuerpo del formulario */}
+        <div className="p-6 pt-4 space-y-5">
           {error && (
-            <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-red-400 break-words">{error}</p>
+            <div className="p-3.5 bg-red-500/10 border border-red-500/25 rounded-xl flex items-start gap-2.5 text-xs text-red-300 animate-fadeIn">
+              <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+              <p className="leading-relaxed break-words">{error}</p>
             </div>
           )}
 
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label className="text-[#888]">Email o Teléfono</Label>
-              <Input
-                type="text"
-                value={emailTelefono}
-                onChange={(e) => setEmailTelefono(e.target.value)}
-                placeholder="ejemplo@email.com o 3143107403"
-                className="bg-[#0f1014] border-[#2a2a2a] text-[#e8e6e3] focus:border-[#c9a961]"
-                disabled={procesando}
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-[#888]">Contraseña</Label>
-              <Input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="bg-[#0f1014] border-[#2a2a2a] text-[#e8e6e3] focus:border-[#c9a961]"
-                disabled={procesando}
-                onKeyDown={(e) => e.key === 'Enter' && handleAuth()}
-              />
-            </div>
-
+            {/* Solo Registro: Nombre Completo */}
             {tab === 'registro' && (
-              <>
-                <div className="space-y-2">
-                  <Label className="text-[#888]">Nombre Completo</Label>
-                  <Input
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-semibold tracking-wider text-white/80 uppercase block">
+                  Nombre Completo
+                </label>
+                <div className="relative group/field">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-white/40 group-focus-within/field:text-[#c9385a] transition-colors">
+                    <User className="w-4 h-4" />
+                  </div>
+                  <input
                     type="text"
                     value={nombre}
                     onChange={(e) => setNombre(e.target.value)}
-                    placeholder="Juan Pérez"
-                    className="bg-[#0f1014] border-[#2a2a2a] text-[#e8e6e3] focus:border-[#c9a961]"
+                    placeholder="Tu nombre completo"
                     disabled={procesando}
+                    className="w-full h-12 pl-10 pr-4 rounded-xl bg-white/[0.04] border border-white/10 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-[#c9385a] focus:ring-2 focus:ring-[#c9385a]/25 focus:bg-white/[0.06] transition-all duration-200"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-[#888]">Teléfono</Label>
-                  <Input
+              </div>
+            )}
+
+            {/* Email o Teléfono */}
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-semibold tracking-wider text-white/80 uppercase block">
+                {tab === 'registro' ? 'Teléfono Móvil' : 'Email o Teléfono'}
+              </label>
+              <div className="relative group/field">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-white/40 group-focus-within/field:text-[#c9385a] transition-colors">
+                  {tab === 'registro' ? <Phone className="w-4 h-4" /> : <Mail className="w-4 h-4" />}
+                </div>
+                {tab === 'registro' ? (
+                  <input
                     type="tel"
                     value={telefono}
                     onChange={(e) => setTelefono(e.target.value)}
                     placeholder="3143107403"
-                    className="bg-[#0f1014] border-[#2a2a2a] text-[#e8e6e3] focus:border-[#c9a961]"
                     disabled={procesando}
                     onKeyDown={(e) => e.key === 'Enter' && handleAuth()}
+                    className="w-full h-12 pl-10 pr-4 rounded-xl bg-white/[0.04] border border-white/10 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-[#c9385a] focus:ring-2 focus:ring-[#c9385a]/25 focus:bg-white/[0.06] transition-all duration-200"
                   />
+                ) : (
+                  <input
+                    type="text"
+                    value={emailTelefono}
+                    onChange={(e) => setEmailTelefono(e.target.value)}
+                    placeholder="ejemplo@email.com o 3143107403"
+                    disabled={procesando}
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    className="w-full h-12 pl-10 pr-4 rounded-xl bg-white/[0.04] border border-white/10 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-[#c9385a] focus:ring-2 focus:ring-[#c9385a]/25 focus:bg-white/[0.06] transition-all duration-200"
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* Contraseña con toggle Eye/EyeOff */}
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-semibold tracking-wider text-white/80 uppercase block">
+                Contraseña
+              </label>
+              <div className="relative group/field">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-white/40 group-focus-within/field:text-[#c9385a] transition-colors">
+                  <Lock className="w-4 h-4" />
                 </div>
-              </>
-            )}
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  disabled={procesando}
+                  onKeyDown={(e) => e.key === 'Enter' && handleAuth()}
+                  className="w-full h-12 pl-10 pr-11 rounded-xl bg-white/[0.04] border border-white/10 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-[#c9385a] focus:ring-2 focus:ring-[#c9385a]/25 focus:bg-white/[0.06] transition-all duration-200"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-white/40 hover:text-white transition-colors"
+                  title={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+                  aria-label={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
           </div>
 
-          <Button
+          {/* Botón de acción principal */}
+          <button
             onClick={handleAuth}
             disabled={procesando}
-            className="w-full h-12 bg-[#c9a961] hover:bg-[#d4b86a] text-[#0f1014] font-bold"
+            className="w-full h-12 rounded-xl font-bold text-xs uppercase tracking-widest text-white transition-all duration-300 hover:scale-[1.02] active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 relative overflow-hidden group shadow-lg"
+            style={{
+              background: 'linear-gradient(135deg, #C23A54 0%, #A11D3A 50%, #6B1226 100%)',
+              boxShadow: '0 4px 20px rgba(161, 29, 58, 0.4)',
+              fontFamily: "'Montserrat', sans-serif",
+            }}
           >
+            <span className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             {procesando ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
+              <div className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin text-white" />
+                <span>Procesando...</span>
+              </div>
             ) : (
-              <>◆ Continuar</>
+              <>
+                <Sparkles className="w-4 h-4 text-white" />
+                <span>{tab === 'login' ? 'Entrar al Club' : 'Crear mi cuenta'}</span>
+              </>
             )}
-          </Button>
+          </button>
 
+          {/* Botón volver */}
           <button
             onClick={handleClose}
-            className="w-full py-2 flex items-center justify-center gap-2 text-sm text-[#888] hover:text-[#e8e6e3] transition-colors"
+            className="w-full py-2 flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-wider text-white/45 hover:text-white transition-colors"
             disabled={procesando}
+            style={{ fontFamily: "'Montserrat', sans-serif" }}
           >
-            <ArrowLeft className="w-4 h-4" /> Volver a la landing
+            <ArrowLeft className="w-3.5 h-3.5 text-[#c9385a]" /> Volver a la página
           </button>
+
+          {/* Badge de seguridad SSL */}
+          <div className="pt-2 border-t border-white/5 flex items-center justify-center gap-1.5 text-[10px] text-white/30 uppercase tracking-wider">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Cifrado SSL 256-bit · Black Diamond Security</span>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
