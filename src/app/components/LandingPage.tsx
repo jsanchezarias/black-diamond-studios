@@ -568,9 +568,9 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
 
           {/* LOGO */}
           <span className="flex-shrink-0 flex items-center gap-2" style={{ fontFamily: "'Cormorant Garamond', serif", letterSpacing: '0.06em' }}>
-            <span style={{ color: '#c9a961', fontSize: 18, lineHeight: 1 }}>◆</span>
+            <span style={{ color: '#c9385a', fontSize: 18, lineHeight: 1 }}>◆</span>
             <span style={{ color: '#fff', fontWeight: 300, fontSize: '1.1rem' }}>BLACK</span>
-            <span style={{ color: '#c9a961', fontWeight: 700, fontSize: '1.1rem' }}>DIAMOND</span>
+            <span style={{ color: '#c9385a', fontWeight: 700, fontSize: '1.1rem' }}>DIAMOND</span>
           </span>
 
           {/* DESKTOP */}
@@ -1115,9 +1115,9 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
             {/* Logo & Description */}
             <div className="md:col-span-2">
               <span className="flex items-center gap-2 mb-4 justify-center md:justify-start" style={{ fontFamily: "'Cormorant Garamond', serif", letterSpacing: '0.06em' }}>
-                <span style={{ color: '#c9a961', fontSize: 18 }}>◆</span>
+                <span style={{ color: '#c9385a', fontSize: 18 }}>◆</span>
                 <span style={{ color: '#fff', fontWeight: 300, fontSize: '1.05rem' }}>BLACK</span>
-                <span style={{ color: '#c9a961', fontWeight: 700, fontSize: '1.05rem' }}>DIAMOND</span>
+                <span style={{ color: '#c9385a', fontWeight: 700, fontSize: '1.05rem' }}>DIAMOND</span>
               </span>
               <p className="text-sm text-[#555] max-w-md mx-auto md:mx-0" style={{ fontFamily: "'Montserrat', sans-serif", lineHeight: 1.8 }}>
                 {t.footer.description}
