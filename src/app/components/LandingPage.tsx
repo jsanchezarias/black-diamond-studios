@@ -598,10 +598,100 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
               <span className="relative z-10">◆ Iniciar sesión</span>
               <span className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             </button>
+
+            {/* BOTÓN SECRETO ACCESO AL SISTEMA (DESKTOP) */}
+            <button
+              onClick={() => onAccessSystem('sistema')}
+              aria-label="Acceso privado"
+              title=""
+              className="w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-300 relative group overflow-hidden border ml-1 hover:border-[#c9385a]/50"
+              style={{
+                background: 'linear-gradient(145deg, #14161a 0%, #08090b 100%)',
+                borderColor: 'rgba(255, 255, 255, 0.1)',
+                boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 2px 8px rgba(0,0,0,0.7)',
+              }}
+            >
+              <div className="absolute inset-0 bg-[#c9385a]/15 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <svg
+                viewBox="0 0 24 24"
+                className="w-5 h-5 transition-transform duration-300 group-hover:scale-110 active:scale-95"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                {/* Silueta Diamante Negro */}
+                <path
+                  d="M12 2L21 8.5L12 22L3 8.5L12 2Z"
+                  fill="#060709"
+                  stroke="rgba(255, 255, 255, 0.35)"
+                  strokeWidth="1.2"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M7 8.5L12 2L17 8.5H7Z"
+                  fill="#11141a"
+                  stroke="rgba(255, 255, 255, 0.15)"
+                  strokeWidth="0.8"
+                />
+                <path
+                  d="M7 8.5L12 22L17 8.5H7Z"
+                  fill="#040507"
+                  stroke="rgba(255, 255, 255, 0.15)"
+                  strokeWidth="0.8"
+                />
+                {/* Silueta de cerradura en el centro */}
+                <path
+                  d="M12 9.2a2 2 0 0 0-1.4 3.42V15.2a1.4 1.4 0 0 0 2.8 0v-2.58A2 2 0 0 0 12 9.2z"
+                  fill="#ffffff"
+                  className="group-hover:fill-[#c9385a] transition-colors duration-300"
+                  style={{
+                    filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.9))',
+                  }}
+                />
+              </svg>
+            </button>
           </div>
 
-          {/* BOTONES MÓVIL (WHATSAPP + HAMBURGUESA) */}
+          {/* BOTONES MÓVIL (WHATSAPP + SECRETO + HAMBURGUESA) */}
           <div className="flex md:hidden items-center gap-2">
+            {/* BOTÓN SECRETO ACCESO AL SISTEMA (MÓVIL) */}
+            <button
+              onClick={() => onAccessSystem('sistema')}
+              aria-label="Acceso privado"
+              title=""
+              className="w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-300 relative group overflow-hidden border active:scale-95"
+              style={{
+                background: 'linear-gradient(145deg, #14161a 0%, #08090b 100%)',
+                borderColor: 'rgba(255, 255, 255, 0.1)',
+                boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 2px 8px rgba(0,0,0,0.7)',
+              }}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="w-5 h-5"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M12 2L21 8.5L12 22L3 8.5L12 2Z"
+                  fill="#060709"
+                  stroke="rgba(255, 255, 255, 0.35)"
+                  strokeWidth="1.2"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M7 8.5L12 22L17 8.5H7Z"
+                  fill="#040507"
+                  stroke="rgba(255, 255, 255, 0.15)"
+                  strokeWidth="0.8"
+                />
+                <path
+                  d="M12 9.2a2 2 0 0 0-1.4 3.42V15.2a1.4 1.4 0 0 0 2.8 0v-2.58A2 2 0 0 0 12 9.2z"
+                  fill="#ffffff"
+                  className="group-hover:fill-[#c9385a] transition-colors duration-300"
+                />
+              </svg>
+            </button>
+
             <a
               href={getWhatsAppGeneralUrl()}
               target="_blank"
