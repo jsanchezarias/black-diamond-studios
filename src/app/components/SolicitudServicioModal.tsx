@@ -65,8 +65,8 @@ export function SolicitudServicioModal({ isOpen, onClose, data, currentUser }: S
 
   const hoy = new Date().toISOString().split('T')[0];
 
-  // Las 24 horas del día completas
-  const horasDisponibles = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}:00`);
+  // Las 24 horas del día completas, numeradas de 01 a 24 (24 = medianoche)
+  const horasDisponibles = Array.from({ length: 24 }, (_, i) => `${String(i + 1).padStart(2, '0')}:00`);
 
   const enviarReserva = async () => {
     if (!servicioSeleccionado) { toast.error('Selecciona un servicio'); return; }
@@ -385,17 +385,17 @@ export function SolicitudServicioModal({ isOpen, onClose, data, currentUser }: S
           <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', margin: '0 0 10px' }}>
             4. Selecciona la hora
           </p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 5 }}>
             {horasDisponibles.map(h => (
               <button
                 key={h}
                 onClick={() => setHora(h)}
                 style={{
-                  padding: '9px 4px', borderRadius: 6, cursor: 'pointer',
-                  border: hora === h ? '1.5px solid #FFD700 !important' : '1px solid rgba(255,255,255,0.1) !important',
-                  background: hora === h ? 'rgba(255,215,0,0.25) !important' : '#1a1a1a !important',
-                  color: hora === h ? '#FFD700 !important' : 'white !important',
-                  fontWeight: hora === h ? 700 : 400, fontSize: 12
+                  padding: '8px 2px', borderRadius: 6, cursor: 'pointer',
+                  border: hora === h ? '1.5px solid #A11D3A !important' : '1px solid rgba(255,255,255,0.1) !important',
+                  background: hora === h ? 'rgba(161,29,58,0.3) !important' : '#1a1a1a !important',
+                  color: hora === h ? '#ff5577 !important' : 'white !important',
+                  fontWeight: hora === h ? 700 : 400, fontSize: 11
                 }}
               >
                 {h}
