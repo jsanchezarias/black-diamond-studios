@@ -433,6 +433,27 @@ export function CrearModeloModal({ open, onClose }: CrearModeloModalProps) {
             updated_at: new Date().toISOString()
           })
           .eq('id', userId);
+
+        // Indexar las fotos en modelo_fotos desde la creación — antes solo quedaban
+        // guardadas en las columnas fotoPerfil/fotosAdicionales de usuarios, y la
+        // página pública (y otras vistas) leen de esta tabla. Sin esto, una modelo
+        // podía quedar "sin fotos" hasta que alguien las volviera a subir manualmente
+        // desde la pestaña Galería.
+        const fotosParaIndexar = [
+          ...(fotoPerfilUrl ? [{ url: fotoPerfilUrl, es_principal: true, orden: 0 }] : []),
+          ...(fotosAdicionalesUrls || []).map((url: string, i: number) => ({ url, es_principal: false, orden: i + 1 })),
+        ];
+        if (fotosParaIndexar.length > 0) {
+          await supabase.from('modelo_fotos').insert(
+            fotosParaIndexar.map(f => ({
+              modelo_id: userId,
+              modelo_email: email,
+              url: f.url,
+              orden: f.orden,
+              es_principal: f.es_principal,
+            }))
+          );
+        }
       }
 
       // Paso 4: Recargar lista de modelos

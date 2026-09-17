@@ -619,6 +619,35 @@ export function ModelosProvider({ children }: { children: ReactNode }) {
 
       console.log('✅ Actualización exitosa:', result);
 
+      // Mantener modelo_fotos sincronizada con la foto de perfil — sin esto, cambiar
+      // la foto aquí solo actualizaba las columnas de usuarios, y la página pública
+      // (que lee de modelo_fotos) podía seguir mostrando la foto vieja o ninguna.
+      if (datos.fotoPerfil) {
+        try {
+          await supabase.from('modelo_fotos').update({ es_principal: false }).eq('modelo_id', id);
+          const { data: fotoExistente } = await supabase
+            .from('modelo_fotos')
+            .select('id')
+            .eq('modelo_id', id)
+            .eq('url', datos.fotoPerfil)
+            .maybeSingle();
+
+          if (fotoExistente) {
+            await supabase.from('modelo_fotos').update({ es_principal: true }).eq('id', fotoExistente.id);
+          } else {
+            await supabase.from('modelo_fotos').insert({
+              modelo_id: id,
+              modelo_email: modelo.email,
+              url: datos.fotoPerfil,
+              es_principal: true,
+              orden: 0,
+            });
+          }
+        } catch (e) {
+          console.warn('⚠️ No se pudo sincronizar modelo_fotos:', e);
+        }
+      }
+
       // Actualizar estado local
       setModelos(prev => prev.map(m => (m.id === id ? { ...m, ...datos } : m)));
       
