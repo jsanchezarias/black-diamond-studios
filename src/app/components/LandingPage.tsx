@@ -564,11 +564,11 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
           <div className="hidden md:flex items-center gap-7 lg:gap-9">
             {links.map(l => (
               <a key={l.href} href={l.href}
-                className="text-[#777] hover:text-[#c9385a] text-sm tracking-wider uppercase transition-all duration-300 relative group"
-                style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.7rem', letterSpacing: '0.14em' }}
+                className="nav-link-glow text-white text-sm tracking-wider uppercase transition-all duration-300 relative group font-medium"
+                style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.72rem', letterSpacing: '0.14em' }}
               >
                 {l.label}
-                <span className="absolute -bottom-0.5 left-0 w-0 h-px bg-[#A11D3A] group-hover:w-full transition-all duration-400" />
+                <span className="nav-link-glow-line absolute -bottom-0.5 left-0 w-0 h-[2px] bg-[#c9385a] transition-all duration-300" />
               </a>
             ))}
 
@@ -645,11 +645,11 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
                 href={l.href}
                 onClick={() => setMenuAbierto(false)}
                 className="
+                  nav-link-glow
                   block py-3 px-2
-                  text-[#888] text-base
+                  text-white text-base font-medium
                   border-b border-[#2a2a2a]
-                  hover:text-[#c9385a]
-                  transition-colors
+                  transition-all duration-300
                 "
               >
                 {l.label}
