@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../../utils/supabase/info';
 import { toast } from 'sonner';
 
@@ -160,7 +161,12 @@ export function SolicitudEntradaModal({ solicitudId, onClose }: Props) {
 
   const nombreModelo = solicitud?.usuarios?.nombre_artistico ?? solicitud?.usuarios?.nombre ?? 'Modelo';
 
-  return (
+  // Se renderiza directo sobre document.body (portal) para que su z-index se compare
+  // a nivel de página completa — si se queda dentro del árbol normal, un ancestro con
+  // su propio contexto de apilamiento (ej. el header del dashboard) lo puede dejar
+  // atrapado detrás de otros elementos como el popover de notificaciones, sin importar
+  // qué tan alto sea su z-index.
+  return createPortal(
     <div
       className="fixed inset-0 z-[200] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4"
       onClick={(e) => e.target === e.currentTarget && onClose()}
@@ -281,6 +287,7 @@ export function SolicitudEntradaModal({ solicitudId, onClose }: Props) {
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
