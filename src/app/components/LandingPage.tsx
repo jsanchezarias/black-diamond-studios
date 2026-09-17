@@ -1,9 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '../../components/ui/badge';
-// Removed ModelCard import
 import { ModeloCard } from './ModeloCard';
-import { AppointmentModal } from './AppointmentModal';
+import { AgeVerificationModal } from './AgeVerificationModal';
 import { Hero3D } from './Hero3D';
 import { TestimoniosSection } from './TestimoniosSection';
 import { AgregarTestimonioModal } from './AgregarTestimonioModal';
@@ -16,7 +15,7 @@ import { ParticlesBackground } from './ParticlesBackground'; // ✅ Fondo de par
 import { GoldenCursor } from './GoldenCursor'; // ✅ Cursor personalizado dorado
 import { ScrollUI } from './ScrollUI'; // ✅ Barra de progreso y back-to-top
 import { HeroStats } from './HeroStats'; // ✅ Estadísticas de impacto visual
-import { Gem, Clock, MapPin, Shield, Award, Star, X, Phone, Mail, Sparkles, Heart, Send } from 'lucide-react';
+import { Gem, Clock, MapPin, Shield, Award, Star, X, Phone, Mail, Sparkles, Heart, Send, Search } from 'lucide-react';
 import { useLanguage } from './LanguageContext';
 
 import { LiveChat } from './LiveChat';
@@ -92,6 +91,8 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
   const [modelos, setModelos] = useState<any[]>([]);
   const [cargandoModelos, setCargandoModelos] = useState(true);
   const [errorModelos, setErrorModelos] = useState<string | null>(null);
+  const [filtroCategoria, setFiltroCategoria] = useState<'todas' | 'disponibles' | 'sede' | 'domicilio'>('todas');
+  const [busquedaNombre, setBusquedaNombre] = useState('');
 
   useEffect(() => {
     const cargarModelos = async () => {
@@ -173,8 +174,22 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
     cargarModelos()
   }, [])
 
-  const [showAppointmentModal, setShowAppointmentModal] = useState(false);
-
+  const modelosFiltrados = modelos.filter(m => {
+    const nombre = (m.nombre_artistico || m.nombre || '').toLowerCase();
+    if (busquedaNombre.trim() && !nombre.includes(busquedaNombre.toLowerCase().trim())) {
+      return false;
+    }
+    if (filtroCategoria === 'disponibles') {
+      return m.estado !== 'inactivo' && m.estado !== 'ocupada';
+    }
+    if (filtroCategoria === 'sede') {
+      return m.sede || (m.servicios_modelo && m.servicios_modelo.some((s: any) => s.precio_sede > 0));
+    }
+    if (filtroCategoria === 'domicilio') {
+      return m.domicilio !== false;
+    }
+    return true;
+  });
 
   const [_isScrolled, setIsScrolled] = useState(false);
   const [_streamFallido, setStreamFallido] = useState(false);
@@ -203,7 +218,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
   const [perfilVisibleId, setPerfilVisibleId] = useState<string | null>(null);
   const [modeloPendienteId, setModeloPendienteId] = useState<string | null>(null);
 
-  const [_streamActivo, setStreamActivo] = useState(false);
+  const [streamActivo, setStreamActivo] = useState(false);
 
   const { currentUser: chatUser, logout: _logout, logoutRef: _logoutRef, sendMessage: _sendMessage } = usePublicUsers(); // ✅ Renombrado para evitar conflicto
 
@@ -283,34 +298,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
 
   // Hook para modelos - Eliminado para usar query directa
   
-  // Función para convertir modelo de Supabase al formato de ModelCard
-  const convertirModeloParaCard = (modelo: any) => {
-    // Buscar el perfil completo en sedesData.ts usando el nombre artístico
-    // Sede type doesn't have models — lookup skipped, use Supabase data directly
-    const perfilCompleto: any = null;
-    
-    return {
-      id: modelo.id.toString(),
-      name: modelo.nombre_artistico || modelo.nombreArtistico || modelo.nombre,
-      age: modelo.edad,
-      photo: modelo.fotoPerfil || modelo.photo || (modelo.gallery && modelo.gallery[0]) || '',
-      gallery: modelo.gallery && modelo.gallery.length > 0 ? modelo.gallery : [modelo.fotoPerfil].filter(Boolean),
-      rating: 5.0,
-      height: modelo.altura || '165 cm',
-      measurements: modelo.medidas || '90-60-90',
-      languages: ['Español'],
-      location: modelo.sede || 'Sede Norte',
-      available: modelo.activa && modelo.disponible, // ✅ Considerar ambos campos
-      description: modelo.descripcion || perfilCompleto?.description || 'Modelo profesional',
-      services: modelo.serviciosDisponibles && modelo.serviciosDisponibles.length > 0 
-        ? modelo.serviciosDisponibles  // ✅ PRIMERO: Usar servicios de Supabase si existen
-        : perfilCompleto?.services || [], // ⚠️ FALLBACK: Usar servicios de sedesData si no hay en Supabase
-      specialties: perfilCompleto?.specialties || [],
-      domicilio: modelo.domicilio !== undefined ? modelo.domicilio : true, // ✅ NUEVO: Tomar del campo domicilio de la BD
-      email: modelo.email,
-      servicios_modelo: modelo.servicios_modelo || [],
-    };
-  };
+
   
   // Hook para traducciones
   const { t, language: _language } = useLanguage();
@@ -471,9 +459,6 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
       setRegistrando(false);
     }
   };
-
-  const todosLosModelos = modelos.map(convertirModeloParaCard);
-
 
 
   // Handler para abrir modal de propinas
@@ -742,43 +727,104 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
             </div>
           )}
 
-          {/* VACÍO */}
-          {!cargandoModelos && !errorModelos &&
-          modelos.length === 0 && (
-            <div className="py-16 text-center">
-              <p className="text-[#c9a961] text-xl
-                            font-bold">◆</p>
-              <p className="text-[#888] text-sm mt-2">
-                Próximamente disponible
-              </p>
+          {/* BARRA DE BÚSQUEDA Y FILTROS RÁPIDOS */}
+          {!cargandoModelos && !errorModelos && modelos.length > 0 && (
+            <div className="max-w-4xl mx-auto mb-8 px-4 flex flex-col sm:flex-row items-center gap-3 justify-between">
+              {/* Buscador */}
+              <div className="relative w-full sm:w-72">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#888]" />
+                <input
+                  type="text"
+                  placeholder="Buscar por nombre..."
+                  value={busquedaNombre}
+                  onChange={(e) => setBusquedaNombre(e.target.value)}
+                  className="w-full bg-[#16181c] border border-white/10 focus:border-[#c9a961]/50 rounded-xl pl-10 pr-4 py-2 text-sm text-white placeholder-[#666] outline-none transition-colors"
+                  style={{ fontFamily: "'Montserrat', sans-serif" }}
+                />
+                {busquedaNombre && (
+                  <button
+                    onClick={() => setBusquedaNombre('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#888] hover:text-white"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              {/* Píldoras de Filtro */}
+              <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0 scrollbar-none">
+                {[
+                  { id: 'todas', label: 'Todas' },
+                  { id: 'disponibles', label: '🟢 Disponibles' },
+                  { id: 'sede', label: '🏢 En Sede' },
+                  { id: 'domicilio', label: '🚗 A Domicilio' },
+                ].map((f) => (
+                  <button
+                    key={f.id}
+                    onClick={() => setFiltroCategoria(f.id as any)}
+                    className="px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all duration-200 cursor-pointer"
+                    style={{
+                      fontFamily: "'Montserrat', sans-serif",
+                      background: filtroCategoria === f.id
+                        ? 'linear-gradient(135deg, #C23A54 0%, #A11D3A 100%)'
+                        : 'rgba(255, 255, 255, 0.05)',
+                      color: filtroCategoria === f.id ? '#ffffff' : '#888888',
+                      border: filtroCategoria === f.id
+                        ? '1px solid rgba(194, 58, 84, 0.5)'
+                        : '1px solid rgba(255, 255, 255, 0.08)',
+                      boxShadow: filtroCategoria === f.id ? '0 2px 10px rgba(161, 29, 58, 0.3)' : 'none',
+                    }}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
-          {/* MOSAICO */}
+          {/* VACÍO (Sin modelos en general) */}
           {!cargandoModelos && !errorModelos &&
-          modelos.length > 0 && (
+          modelos.length === 0 && (
+            <div className="py-16 text-center">
+              <p className="text-[#c9a961] text-xl font-bold">◆</p>
+              <p className="text-[#888] text-sm mt-2">Próximamente disponible</p>
+            </div>
+          )}
+
+          {/* VACÍO (Sin coincidencias en el filtro) */}
+          {!cargandoModelos && !errorModelos &&
+          modelos.length > 0 && modelosFiltrados.length === 0 && (
+            <div className="py-12 text-center">
+              <p className="text-[#888] text-sm mb-3">No se encontraron modelos con los filtros seleccionados.</p>
+              <button
+                onClick={() => { setFiltroCategoria('todas'); setBusquedaNombre(''); }}
+                className="px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider text-[#c9a961] border border-[#c9a961]/30 hover:bg-[#c9a961]/10 transition-colors"
+                style={{ fontFamily: "'Montserrat', sans-serif" }}
+              >
+                Ver todas las modelos
+              </button>
+            </div>
+          )}
+
+          {/* MOSAICO DE MODELOS FILTRADAS */}
+          {!cargandoModelos && !errorModelos &&
+          modelosFiltrados.length > 0 && (
             <div className="
               grid
               grid-cols-1
               sm:grid-cols-2
               lg:grid-cols-3
-              gap-4 sm:gap-5
+              gap-4 sm:gap-6
               px-4 sm:px-6
               pb-8
             ">
-              {modelos.map(modelo => (
+              {modelosFiltrados.map(modelo => (
                 <ModeloCard
                   key={modelo.id}
                   modelo={modelo}
                   onAgendar={(m: any) => {
                     const id = (m?.id || modelo.id) as string;
-                    if (!currentUserProp) {
-                      localStorage.setItem('pendingBookingModelId', id);
-                      setModeloPendienteId(id);
-                      setShowClienteLogin(true);
-                    } else {
-                      setPerfilVisibleId(id);
-                    }
+                    setPerfilVisibleId(id);
                   }}
                 />
               ))}
@@ -788,30 +834,31 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
         </div>
       </section>
 
-      {/* Live Stream Section — debajo del catálogo de modelos */}
-      <section className="pt-4 pb-16 relative overflow-hidden bg-black">
-        <div className="w-full h-[calc(100dvh-5rem)] flex flex-col lg:flex-row relative">
-          <div className="w-full lg:w-[70%] h-[45dvh] lg:h-full relative border-b lg:border-b-0 lg:border-r border-[#c9a961]/10">
-            <StreamConPaywall
-              onRegistrarse={(tipo) => {
-                // ✅ PAYWALL: abrir modal en tab correcto según si pidió registro o login
-                setTabLoginInicial(tipo);
-                setShowClienteLogin(true);
-              }}
-            />
+      {/* Live Stream Section — solo visible cuando hay transmisión activa */}
+      {streamActivo && (
+        <section className="pt-4 pb-16 relative overflow-hidden bg-black">
+          <div className="w-full h-[calc(100dvh-5rem)] flex flex-col lg:flex-row relative">
+            <div className="w-full lg:w-[70%] h-[45dvh] lg:h-full relative border-b lg:border-b-0 lg:border-r border-[#c9a961]/10">
+              <StreamConPaywall
+                onRegistrarse={(tipo) => {
+                  setTabLoginInicial(tipo);
+                  setShowClienteLogin(true);
+                }}
+              />
+            </div>
+            <div className="w-full lg:w-[30%] h-[55dvh] lg:h-full">
+              <LiveChat
+                onTipClick={handleTipClick}
+                recentTips={recentTips}
+                onLoginClick={() => {
+                  localStorage.setItem('loginRedirect', 'chat');
+                  setShowClienteLogin(true);
+                }}
+              />
+            </div>
           </div>
-          <div className="w-full lg:w-[30%] h-[55dvh] lg:h-full">
-            <LiveChat
-              onTipClick={handleTipClick}
-              recentTips={recentTips}
-              onLoginClick={() => {
-                localStorage.setItem('loginRedirect', 'chat');
-                setShowClienteLogin(true);
-              }}
-            />
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* ✅ Estadísticas de Alto Impacto (Animadas) */}
       <HeroStats />
@@ -1161,12 +1208,6 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
         </div>
       </footer>
 
-      {/* Modal de Agendamiento */}
-      <AppointmentModal 
-        isOpen={showAppointmentModal}
-        onClose={() => setShowAppointmentModal(false)}
-        availableModels={todosLosModelos}
-      />
 
       {/* Modal de Propinas */}
       <TipModal 
@@ -1307,6 +1348,9 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
       )}
 
 
+
+      {/* 🔞 Modal de Verificación de Mayoría de Edad (+18) */}
+      <AgeVerificationModal />
 
       {/* ✨ Cursor personalizado dorado — solo desktop */}
       <GoldenCursor />

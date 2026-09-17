@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
+import { MessageCircle, Eye, ShieldCheck, Building2, Car } from 'lucide-react';
 
 interface LightboxState {
   fotos: { url: string }[];
   indice: number;
   nombreModelo: string;
 }
+
+const WHATSAPP_NUMERO = '573017626768';
 
 export const ModeloCard = ({ modelo, onAgendar }: { modelo: any; onAgendar?: (m: any) => void }) => {
   const [fotoActual, setFotoActual] = useState(0);
@@ -19,7 +22,6 @@ export const ModeloCard = ({ modelo, onAgendar }: { modelo: any; onAgendar?: (m:
       ? [{ url: modelo.foto_url }]
       : [];
   // Quita fotos duplicadas (misma URL guardada más de una vez), conservando la primera
-  // ocurrencia — así la foto principal no se pierde si también está repetida.
   const fotos: { url: string }[] = Array.from(
     new Map(fotosOrdenadas.filter(f => f?.url).map(f => [f.url, f])).values()
   );
@@ -41,6 +43,7 @@ export const ModeloCard = ({ modelo, onAgendar }: { modelo: any; onAgendar?: (m:
   ];
 
   const preciosVisibles = preciosReales.length > 0 ? preciosReales : preciosFallback;
+  const nombreModelo = modelo.nombre_artistico || modelo.nombre || 'Modelo';
 
   // Teclado para lightbox
   useEffect(() => {
@@ -57,7 +60,19 @@ export const ModeloCard = ({ modelo, onAgendar }: { modelo: any; onAgendar?: (m:
   }, [lightbox]);
 
   const abrirLightbox = (indice: number) =>
-    setLightbox({ fotos, indice, nombreModelo: modelo.nombre_artistico || modelo.nombre || '' });
+    setLightbox({ fotos, indice, nombreModelo });
+
+  const agendarPorWhatsApp = (servicio?: { nombre: string; precio: number }) => {
+    let mensaje = '';
+    if (servicio) {
+      const precioFmt = '$' + servicio.precio.toLocaleString('es-CO');
+      mensaje = `Hola Black Diamond, deseo agendar una cita con *${nombreModelo}* para el servicio de *${servicio.nombre}* (${precioFmt}). ¿Tienen disponibilidad?`;
+    } else {
+      mensaje = `Hola Black Diamond, deseo agendar una cita con *${nombreModelo}*. ¿Tienen disponibilidad?`;
+    }
+    const url = `https://wa.me/${WHATSAPP_NUMERO}?text=${encodeURIComponent(mensaje)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
 
   return (
     <>
@@ -67,9 +82,10 @@ export const ModeloCard = ({ modelo, onAgendar }: { modelo: any; onAgendar?: (m:
           onClick={() => setLightbox(null)}
           style={{
             position: 'fixed', inset: 0,
-            background: 'rgba(0,0,0,0.95)',
+            background: 'rgba(0,0,0,0.96)',
             zIndex: 9999,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
+            backdropFilter: 'blur(8px)',
           }}
         >
           {/* Botón izquierda */}
@@ -77,16 +93,18 @@ export const ModeloCard = ({ modelo, onAgendar }: { modelo: any; onAgendar?: (m:
             onClick={e => { e.stopPropagation(); setLightbox(p => p ? { ...p, indice: p.indice === 0 ? p.fotos.length - 1 : p.indice - 1 } : null); }}
             style={{
               position: 'fixed', left: 16, top: '50%', transform: 'translateY(-50%)',
-              background: 'rgba(255,255,255,0.1)', border: '0.5px solid rgba(255,255,255,0.2)',
-              borderRadius: '50%', width: 48, height: 48, color: 'white', fontSize: 24,
+              background: 'rgba(201,169,97,0.15)', border: '1px solid rgba(201,169,97,0.3)',
+              borderRadius: '50%', width: 48, height: 48, color: '#c9a961', fontSize: 24,
               cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000,
+              transition: 'all 0.2s',
             }}
           >‹</button>
 
           <img
             src={lightbox.fotos[lightbox.indice]?.url}
             onClick={e => e.stopPropagation()}
-            style={{ maxWidth: '90vw', maxHeight: '90vh', objectFit: 'contain', borderRadius: 8, boxShadow: '0 0 60px rgba(0,0,0,0.8)' }}
+            alt={lightbox.nombreModelo}
+            style={{ maxWidth: '90vw', maxHeight: '90vh', objectFit: 'contain', borderRadius: 12, boxShadow: '0 0 60px rgba(0,0,0,0.9)' }}
           />
 
           {/* Botón derecha */}
@@ -94,9 +112,10 @@ export const ModeloCard = ({ modelo, onAgendar }: { modelo: any; onAgendar?: (m:
             onClick={e => { e.stopPropagation(); setLightbox(p => p ? { ...p, indice: p.indice === p.fotos.length - 1 ? 0 : p.indice + 1 } : null); }}
             style={{
               position: 'fixed', right: 16, top: '50%', transform: 'translateY(-50%)',
-              background: 'rgba(255,255,255,0.1)', border: '0.5px solid rgba(255,255,255,0.2)',
-              borderRadius: '50%', width: 48, height: 48, color: 'white', fontSize: 24,
+              background: 'rgba(201,169,97,0.15)', border: '1px solid rgba(201,169,97,0.3)',
+              borderRadius: '50%', width: 48, height: 48, color: '#c9a961', fontSize: 24,
               cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000,
+              transition: 'all 0.2s',
             }}
           >›</button>
 
@@ -104,7 +123,7 @@ export const ModeloCard = ({ modelo, onAgendar }: { modelo: any; onAgendar?: (m:
           <button
             onClick={() => setLightbox(null)}
             style={{
-              position: 'fixed', top: 16, right: 16,
+              position: 'fixed', top: 20, right: 20,
               background: 'rgba(255,255,255,0.1)', border: 'none',
               borderRadius: '50%', width: 40, height: 40,
               color: 'white', fontSize: 20, cursor: 'pointer',
@@ -112,8 +131,8 @@ export const ModeloCard = ({ modelo, onAgendar }: { modelo: any; onAgendar?: (m:
             }}
           >×</button>
 
-          {/* Contador */}
-          <div style={{ position: 'fixed', bottom: 50, left: '50%', transform: 'translateX(-50%)', color: 'rgba(255,255,255,0.5)', fontSize: 12, zIndex: 10000 }}>
+          {/* Contador y Nombre */}
+          <div style={{ position: 'fixed', bottom: 50, left: '50%', transform: 'translateX(-50%)', color: 'rgba(255,255,255,0.7)', fontSize: 13, zIndex: 10000, fontFamily: "'Montserrat', sans-serif" }}>
             {lightbox.indice + 1} / {lightbox.fotos.length}
             {lightbox.nombreModelo && ' · ' + lightbox.nombreModelo}
           </div>
@@ -126,7 +145,7 @@ export const ModeloCard = ({ modelo, onAgendar }: { modelo: any; onAgendar?: (m:
                 onClick={e => { e.stopPropagation(); setLightbox(p => p ? { ...p, indice: i } : null); }}
                 style={{
                   width: i === lightbox.indice ? 24 : 8, height: 8, borderRadius: 4,
-                  background: i === lightbox.indice ? '#FFD700' : 'rgba(255,255,255,0.3)',
+                  background: i === lightbox.indice ? '#c9a961' : 'rgba(255,255,255,0.25)',
                   border: 'none', cursor: 'pointer', transition: 'all 0.2s', padding: 0,
                 }}
               />
@@ -135,117 +154,172 @@ export const ModeloCard = ({ modelo, onAgendar }: { modelo: any; onAgendar?: (m:
         </div>
       )}
 
-      {/* ── CARD ── */}
+      {/* ── CARD DE MODELO ── */}
       <div
+        className="rounded-2xl overflow-hidden flex flex-col transition-all duration-300 group"
         style={{
-          background: 'rgba(0,0,0,0.4)',
-          border: '0.5px solid rgba(255,215,0,0.2)',
-          borderRadius: 12, overflow: 'hidden',
-          transition: 'border-color 0.2s, transform 0.2s',
+          background: 'linear-gradient(180deg, #16181c 0%, #111317 100%)',
+          border: '1px solid rgba(201, 169, 97, 0.18)',
+          boxShadow: '0 8px 30px rgba(0,0,0,0.4)',
         }}
-        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,215,0,0.5)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-3px)'; }}
-        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,215,0,0.2)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'; }}
+        onMouseEnter={e => {
+          e.currentTarget.style.borderColor = 'rgba(201, 169, 97, 0.45)';
+          e.currentTarget.style.transform = 'translateY(-4px)';
+          e.currentTarget.style.boxShadow = '0 16px 40px rgba(0,0,0,0.6), 0 0 25px rgba(201, 169, 97, 0.1)';
+        }}
+        onMouseLeave={e => {
+          e.currentTarget.style.borderColor = 'rgba(201, 169, 97, 0.18)';
+          e.currentTarget.style.transform = 'translateY(0)';
+          e.currentTarget.style.boxShadow = '0 8px 30px rgba(0,0,0,0.4)';
+        }}
       >
-        {/* FOTO GRANDE */}
-        <div style={{ position: 'relative', height: 360 }}>
+        {/* FOTO PRINCIPAL */}
+        <div className="relative h-[360px] overflow-hidden cursor-pointer" onClick={() => abrirLightbox(fotoActual)}>
           {fotos.length > 0 ? (
             <img
               key={fotos[fotoActual]?.url}
               src={fotos[fotoActual]?.url}
-              alt={modelo.nombre_artistico || 'Modelo'}
+              alt={nombreModelo}
               loading="lazy"
-              onClick={() => abrirLightbox(fotoActual)}
-              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', cursor: 'zoom-in' }}
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
               onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
             />
           ) : (
-            <div style={{ width: '100%', height: '100%', background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: 56, color: '#FFD700', opacity: 0.15 }}>◆</span>
+            <div className="w-full h-full bg-[#16181c] flex items-center justify-center">
+              <span className="text-5xl text-[#c9a961]/20">◆</span>
             </div>
           )}
 
-          {/* Gradiente + nombre + badge */}
-          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(transparent, rgba(0,0,0,0.9))', padding: '32px 14px 14px', pointerEvents: 'none' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-              <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#4CAF50', boxShadow: '0 0 6px #4CAF50' }} />
-              <span style={{ fontSize: 11, color: '#4CAF50', fontWeight: 500 }}>Disponible</span>
+          {/* Badges superiores */}
+          <div className="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none z-10">
+            {/* Disponibilidad */}
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md border border-emerald-500/30">
+              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-[11px] font-medium text-emerald-400">Disponible</span>
             </div>
-            <h3 style={{ fontSize: 22, fontWeight: 700, color: 'white', margin: 0 }}>
-              {modelo.nombre_artistico || modelo.nombre}
+
+            {/* Verificada */}
+            <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md border border-[#c9a961]/30">
+              <ShieldCheck className="w-3.5 h-3.5 text-[#c9a961]" />
+              <span className="text-[10px] font-medium text-[#c9a961] tracking-wide uppercase">100% Real</span>
+            </div>
+          </div>
+
+          {/* Gradiente inferior + Nombre */}
+          <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black via-black/70 to-transparent p-4 pt-12 pointer-events-none">
+            <h3 className="text-2xl font-bold text-white mb-1 tracking-wide" style={{ fontFamily: "'Cormorant Garamond', serif" }}>
+              {nombreModelo}
             </h3>
+            {/* Detalles rápidos de ubicación / sede */}
+            <div className="flex items-center gap-3 text-xs text-[#aaa]">
+              <span className="flex items-center gap-1">
+                <Building2 className="w-3 h-3 text-[#c9385a]" />
+                {modelo.sede || 'Sede Exclusiva'}
+              </span>
+              {modelo.domicilio !== false && (
+                <span className="flex items-center gap-1">
+                  <Car className="w-3 h-3 text-[#c9a961]" />
+                  A Domicilio
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* MINIATURAS */}
+        {/* MINIATURAS FOTOGRÁFICAS */}
         {fotos.length > 1 && (
-          <div style={{ display: 'flex', gap: 4, padding: '8px', background: 'rgba(0,0,0,0.6)' }}>
+          <div className="flex gap-2 p-3 bg-black/40 border-t border-b border-white/5 overflow-x-auto">
             {fotos.slice(0, 5).map((foto, i) => (
               <div
                 key={i}
                 onClick={() => { setFotoActual(i); abrirLightbox(i); }}
+                className="w-12 h-12 rounded-lg overflow-hidden cursor-pointer flex-shrink-0 transition-all duration-200"
                 style={{
-                  width: 48, height: 48, borderRadius: 6, overflow: 'hidden',
-                  cursor: 'pointer', flexShrink: 0,
-                  border: fotoActual === i ? '2px solid #FFD700' : '2px solid transparent',
-                  opacity: fotoActual === i ? 1 : 0.6, transition: 'all 0.15s',
+                  border: fotoActual === i ? '2px solid #c9a961' : '1px solid rgba(255,255,255,0.1)',
+                  opacity: fotoActual === i ? 1 : 0.65,
                 }}
               >
-                <img src={foto.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <img src={foto.url} alt="" className="w-full h-full object-cover" />
               </div>
             ))}
             {fotos.length > 5 && (
-              <div style={{
-                width: 48, height: 48, borderRadius: 6,
-                background: 'rgba(255,215,0,0.1)', border: '2px solid rgba(255,215,0,0.3)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                flexShrink: 0, color: '#FFD700', fontSize: 11, fontWeight: 600,
-              }}>
+              <div
+                onClick={() => abrirLightbox(5)}
+                className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 cursor-pointer text-xs font-bold"
+                style={{
+                  background: 'rgba(201, 169, 97, 0.1)',
+                  border: '1px solid rgba(201, 169, 97, 0.3)',
+                  color: '#c9a961',
+                }}
+              >
                 +{fotos.length - 5}
               </div>
             )}
           </div>
         )}
 
-        {/* PRECIOS */}
-        <div style={{ borderTop: '0.5px solid rgba(255,215,0,0.1)', background: 'rgba(0,0,0,0.3)' }}>
-          <div style={{ padding: '10px 14px 6px', fontSize: 10, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.1em' }}>
-            PRECIOS DESDE
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, padding: '0 14px 12px' }}>
-            {preciosVisibles.map((s: any) => (
-              <div
-                key={s.nombre}
-                onClick={() => onAgendar && onAgendar({ ...modelo, servicioPreseleccionado: s })}
-                style={{
-                  background: 'rgba(255,215,0,0.05)', border: '0.5px solid rgba(255,215,0,0.15)',
-                  borderRadius: 6, padding: '7px 6px', textAlign: 'center', cursor: 'pointer',
-                  transition: 'border-color 0.15s',
-                }}
-                onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(255,215,0,0.5)')}
-                onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(255,215,0,0.15)')}
-              >
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 3 }}>{s.nombre}</div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#FFD700' }}>${Math.round(s.precio / 1000)}k</div>
-              </div>
-            ))}
-          </div>
-        </div>
+        {/* MOSAICO DE PRECIOS */}
+        <div className="p-4 bg-black/20 flex-1 flex flex-col justify-between">
+          <div>
+            <div className="text-[10px] uppercase font-semibold text-[#888] tracking-wider mb-2 flex items-center justify-between">
+              <span>Tarifas Disponibles</span>
+              <span className="text-[#c9a961]/80 text-[9px] lowercase font-normal">toca una para agendar</span>
+            </div>
 
-        {/* BOTÓN */}
-        <div style={{ padding: '0 14px 14px' }}>
-          <button
-            onClick={() => onAgendar && onAgendar(modelo)}
-            style={{
-              width: '100%', padding: '12px',
-              background: 'linear-gradient(135deg, #B8860B, #FFD700)',
-              border: 'none', borderRadius: 8,
-              color: 'black', fontWeight: 700, fontSize: 14, cursor: 'pointer',
-            }}
-          >
-            Reservar ahora
-          </button>
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              {preciosVisibles.map((s: any) => (
+                <button
+                  key={s.nombre}
+                  onClick={() => agendarPorWhatsApp(s)}
+                  className="rounded-lg p-2 text-center transition-all duration-200 hover:scale-[1.03] group/pill"
+                  style={{
+                    background: 'rgba(201, 169, 97, 0.06)',
+                    border: '1px solid rgba(201, 169, 97, 0.18)',
+                  }}
+                  title={`Agendar ${s.nombre} por WhatsApp`}
+                >
+                  <div className="text-[10px] text-[#888] truncate mb-0.5 group-hover/pill:text-white transition-colors">{s.nombre}</div>
+                  <div className="text-xs sm:text-sm font-bold text-[#c9a961] group-hover/pill:text-white transition-colors">
+                    ${Math.round(s.precio / 1000)}k
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* BOTONES DE ACCIÓN */}
+          <div className="flex flex-col gap-2 pt-2 border-t border-white/5">
+            {/* Botón principal: WhatsApp Express */}
+            <button
+              onClick={() => agendarPorWhatsApp()}
+              className="w-full py-3 px-4 rounded-xl font-bold text-white text-xs tracking-wider uppercase transition-all duration-300 hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2 shadow-lg"
+              style={{
+                background: 'linear-gradient(135deg, #25D366 0%, #1ea952 100%)',
+                boxShadow: '0 4px 16px rgba(37, 211, 102, 0.25)',
+                fontFamily: "'Montserrat', sans-serif",
+              }}
+            >
+              <MessageCircle className="w-4 h-4 fill-white" />
+              Reservar por WhatsApp
+            </button>
+
+            {/* Botón secundario: Ver perfil completo */}
+            <button
+              onClick={() => onAgendar && onAgendar(modelo)}
+              className="w-full py-2.5 px-4 rounded-xl font-medium text-xs tracking-wide transition-all duration-200 hover:bg-white/5 flex items-center justify-center gap-2"
+              style={{
+                border: '1px solid rgba(201, 169, 97, 0.3)',
+                color: '#c9a961',
+                fontFamily: "'Montserrat', sans-serif",
+              }}
+            >
+              <Eye className="w-3.5 h-3.5" />
+              Ver perfil completo
+            </button>
+          </div>
         </div>
       </div>
     </>
   );
 };
+

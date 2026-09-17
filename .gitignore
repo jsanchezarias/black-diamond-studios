@@ -19,3 +19,6 @@ build/
 *.sqlite
 *.db
 .env*.local
+*test*.sql
+CREAR_USUARIOS_TEST.sql
+tsc_errors*.txt

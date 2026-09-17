@@ -4,7 +4,7 @@ import { supabase } from '../../utils/supabase/info';
 import {
   X, Star, MapPin, Clock, ChevronLeft, ChevronRight,
   Calendar, Home, Building, DollarSign, Ruler, Languages,
-  User, Timer, CheckCircle, Heart
+  User, Timer, CheckCircle, Heart, MessageCircle
 } from 'lucide-react';
 
 interface PerfilModeloPublicoProps {
@@ -209,6 +209,20 @@ export function PerfilModeloPublico({ modeloId, onClose, currentUser, onLoginReq
     } catch (err) {
       if (process.env.NODE_ENV === 'development') console.error('Error enviando notificaciones:', err);
     }
+  };
+
+  const agendarReservaWhatsApp = () => {
+    if (!servicioSeleccionado) return;
+    const precio = ubicacion === 'sede' ? servicioSeleccionado.precio_sede : servicioSeleccionado.precio_domicilio;
+    const precioFmt = '$' + Number(precio).toLocaleString('es-CO');
+    const sedeLabel = ubicacion === 'domicilio' ? `A domicilio (${direccion || 'dirección a coordinar'})` : 'En sede';
+    const fechaTexto = fecha ? `el día ${fecha}` : '';
+    const horaTexto = hora ? `a las ${hora}` : '';
+
+    const msg = `Hola Black Diamond, deseo agendar con *${perfil.nombre_display}*:\n• Servicio: *${servicioSeleccionado.nombre}* (${precioFmt})\n• Modalidad: ${sedeLabel}\n${fechaTexto ? '• Fecha: ' + fechaTexto + '\n' : ''}${horaTexto ? '• Hora: ' + horaTexto + '\n' : ''}${notas ? '• Notas: ' + notas + '\n' : ''}¿Tienen disponibilidad?`;
+
+    const url = `https://wa.me/573017626768?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   const hacerReserva = async () => {
@@ -738,9 +752,23 @@ export function PerfilModeloPublico({ modeloId, onClose, currentUser, onLoginReq
                 )}
               </button>
 
+              {/* Botón WhatsApp Express */}
+              <button
+                onClick={agendarReservaWhatsApp}
+                className="w-full py-3.5 rounded-xl font-bold text-sm text-white flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-95 shadow-lg"
+                style={{
+                  background: 'linear-gradient(135deg, #25D366 0%, #1ea952 100%)',
+                  boxShadow: '0 4px 16px rgba(37, 211, 102, 0.25)',
+                  fontFamily: "'Montserrat', sans-serif",
+                }}
+              >
+                <MessageCircle className="w-4 h-4 fill-white" />
+                Agendar por WhatsApp (Sin registro)
+              </button>
+
               {!currentUser && (
                 <p className="text-center text-white/40 text-xs">
-                  Al confirmar, se te pedirá iniciar sesión
+                  O usa WhatsApp para reservar de forma directa y anónima
                 </p>
               )}
             </div>
