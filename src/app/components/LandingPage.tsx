@@ -16,6 +16,7 @@ import { GoldenCursor } from './GoldenCursor'; // ✅ Cursor personalizado dorad
 import { ScrollUI } from './ScrollUI'; // ✅ Barra de progreso y back-to-top
 import { HeroStats } from './HeroStats'; // ✅ Estadísticas de impacto visual
 import { FloatingWhatsApp } from './FloatingWhatsApp';
+import { BlackDiamondIcon } from './BlackDiamondIcon';
 import { Gem, Clock, MapPin, Shield, Award, Star, X, Phone, Mail, Sparkles, Heart, Send, Search, MessageCircle } from 'lucide-react';
 import { useLanguage } from './LanguageContext';
 
@@ -219,6 +220,119 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
   const [solicitudData, setSolicitudData] = useState<{model: any, service?: any, location?: 'sede' | 'domicilio', price?: string} | null>(null);
   const [perfilVisibleId, setPerfilVisibleId] = useState<string | null>(null);
   const [modeloPendienteId, setModeloPendienteId] = useState<string | null>(null);
+
+  // ============================================
+  // 🧭 MANEJO DEL HISTORIAL DEL NAVEGADOR (BOTÓN ATRÁS EN ANDROID / MÓVILES)
+  // ============================================
+  const handleAbrirPerfil = (id: string) => {
+    if (!id) return;
+    if (window.location.hash !== `#modelo-${id}`) {
+      window.history.pushState({ modal: 'perfil', modeloId: id }, '', `#modelo-${id}`);
+    }
+    setPerfilVisibleId(id);
+  };
+
+  const handleCerrarPerfil = () => {
+    setPerfilVisibleId(null);
+    if (window.location.hash.startsWith('#modelo-') || window.location.hash.startsWith('#reserva-')) {
+      window.history.back();
+    }
+  };
+
+  const handleAbrirClienteLogin = (tab: 'login' | 'registro' = 'login') => {
+    setTabLoginInicial(tab);
+    if (window.location.hash !== '#login-cliente') {
+      window.history.pushState({ modal: 'login-cliente' }, '', '#login-cliente');
+    }
+    setShowClienteLogin(true);
+  };
+
+  const handleCerrarClienteLogin = () => {
+    setShowClienteLogin(false);
+    if (window.location.hash === '#login-cliente') {
+      window.history.back();
+    }
+  };
+
+  const handleAbrirRegistro = () => {
+    if (window.location.hash !== '#registro-cliente') {
+      window.history.pushState({ modal: 'registro-cliente' }, '', '#registro-cliente');
+    }
+    setMostrarRegistro(true);
+  };
+
+  const handleCerrarRegistro = () => {
+    setMostrarRegistro(false);
+    if (window.location.hash === '#registro-cliente') {
+      window.history.back();
+    }
+  };
+
+  const handleAbrirSolicitud = (data: any) => {
+    if (window.location.hash !== '#solicitud') {
+      window.history.pushState({ modal: 'solicitud' }, '', '#solicitud');
+    }
+    setSolicitudData(data);
+  };
+
+  const handleCerrarSolicitud = () => {
+    setSolicitudData(null);
+    if (window.location.hash === '#solicitud') {
+      window.history.back();
+    }
+  };
+
+  // 1. Escuchar eventos popstate (botón regresar de Android / swipe atrás / botón del navegador)
+  useEffect(() => {
+    const handlePopState = () => {
+      const hash = window.location.hash;
+
+      if (hash.startsWith('#modelo-')) {
+        const id = hash.replace('#modelo-', '');
+        setPerfilVisibleId(id);
+        setShowClienteLogin(false);
+        setMostrarRegistro(false);
+        setSolicitudData(null);
+      } else if (hash.startsWith('#reserva-')) {
+        // En submodal de reserva dentro de PerfilModeloPublico; el perfil sigue visible
+      } else if (hash === '#login-cliente') {
+        setShowClienteLogin(true);
+        setPerfilVisibleId(null);
+        setMostrarRegistro(false);
+        setSolicitudData(null);
+      } else if (hash === '#registro-cliente') {
+        setMostrarRegistro(true);
+        setShowClienteLogin(false);
+        setPerfilVisibleId(null);
+        setSolicitudData(null);
+      } else if (hash === '#solicitud') {
+        // Mantiene solicitud activa
+      } else {
+        // Estado base (catálogo / landing principal): cerrar todos los overlays y modales
+        setPerfilVisibleId(null);
+        setShowClienteLogin(false);
+        setMostrarRegistro(false);
+        setSolicitudData(null);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // 2. Si el usuario ingresa directamente mediante enlace con #modelo-[id] o recarga, proteger la vuelta al catálogo
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash.startsWith('#modelo-')) {
+      const id = hash.replace('#modelo-', '');
+      if (id) {
+        const baseUrl = window.location.pathname + window.location.search;
+        window.history.replaceState({ modal: null }, '', baseUrl);
+        window.history.pushState({ modal: 'perfil', modeloId: id }, '', hash);
+        setPerfilVisibleId(id);
+      }
+    }
+  }, []);
 
   const [streamActivo, setStreamActivo] = useState(false);
 
@@ -554,11 +668,22 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
         <div className="flex items-center justify-between px-4 sm:px-6 lg:px-8 py-3.5 sm:py-4 max-w-7xl mx-auto">
 
           {/* LOGO */}
-          <span className="flex-shrink-0 flex items-center gap-2" style={{ fontFamily: "'Cormorant Garamond', serif", letterSpacing: '0.06em' }}>
-            <span style={{ color: '#c9385a', fontSize: 18, lineHeight: 1 }}>◆</span>
-            <span style={{ color: '#fff', fontWeight: 300, fontSize: '1.1rem' }}>BLACK</span>
-            <span style={{ color: '#c9385a', fontWeight: 700, fontSize: '1.1rem' }}>DIAMOND</span>
-          </span>
+          <a
+            href="#inicio"
+            onClick={(e) => {
+              e.preventDefault();
+              scrollToSection('inicio');
+            }}
+            className="flex-shrink-0 flex items-center transition-all duration-300 hover:opacity-95 hover:scale-[1.02]"
+            title="Black Diamond Studios"
+          >
+            <img
+              src="/brand/logo.png"
+              alt="Black Diamond Studios"
+              className="h-8 sm:h-9 md:h-10 w-auto object-contain drop-shadow-[0_0_12px_rgba(255,255,255,0.18)]"
+              loading="eager"
+            />
+          </a>
 
           {/* DESKTOP */}
           <div className="hidden md:flex items-center gap-7 lg:gap-9">
@@ -595,59 +720,28 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
                 letterSpacing: '0.1em',
               }}
             >
-              <span className="relative z-10">◆ Iniciar sesión</span>
+              <span className="relative z-10 flex items-center gap-2">
+                <BlackDiamondIcon size={15} glow={false} />
+                <span>Iniciar sesión</span>
+              </span>
               <span className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             </button>
 
             {/* BOTÓN SECRETO ACCESO AL SISTEMA (DESKTOP) */}
             <button
               onClick={() => onAccessSystem('sistema')}
-              aria-label="Acceso privado"
-              title=""
-              className="w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-300 relative group overflow-hidden border ml-1 hover:border-[#c9385a]/50"
+              aria-label="Acceso al sistema"
+              title="Acceso al Sistema Black Diamond"
+              className="w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-300 relative group overflow-hidden border ml-1 border-white/15 hover:border-white/50 hover:shadow-[0_0_18px_rgba(255,255,255,0.22)] active:scale-95"
               style={{
                 background: 'linear-gradient(145deg, #14161a 0%, #08090b 100%)',
-                borderColor: 'rgba(255, 255, 255, 0.1)',
-                boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 2px 8px rgba(0,0,0,0.7)',
+                boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 3px 12px rgba(0,0,0,0.8)',
               }}
             >
-              <div className="absolute inset-0 bg-[#c9385a]/15 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              <svg
-                viewBox="0 0 24 24"
-                className="w-5 h-5 transition-transform duration-300 group-hover:scale-110 active:scale-95"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                {/* Silueta Diamante Negro */}
-                <path
-                  d="M12 2L21 8.5L12 22L3 8.5L12 2Z"
-                  fill="#060709"
-                  stroke="rgba(255, 255, 255, 0.35)"
-                  strokeWidth="1.2"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M7 8.5L12 2L17 8.5H7Z"
-                  fill="#11141a"
-                  stroke="rgba(255, 255, 255, 0.15)"
-                  strokeWidth="0.8"
-                />
-                <path
-                  d="M7 8.5L12 22L17 8.5H7Z"
-                  fill="#040507"
-                  stroke="rgba(255, 255, 255, 0.15)"
-                  strokeWidth="0.8"
-                />
-                {/* Silueta de cerradura en el centro */}
-                <path
-                  d="M12 9.2a2 2 0 0 0-1.4 3.42V15.2a1.4 1.4 0 0 0 2.8 0v-2.58A2 2 0 0 0 12 9.2z"
-                  fill="#ffffff"
-                  className="group-hover:fill-[#c9385a] transition-colors duration-300"
-                  style={{
-                    filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.9))',
-                  }}
-                />
-              </svg>
+              <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <div className="relative z-10 transition-transform duration-300 group-hover:scale-115">
+                <BlackDiamondIcon size={24} glow={true} />
+              </div>
             </button>
           </div>
 
@@ -656,40 +750,17 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
             {/* BOTÓN SECRETO ACCESO AL SISTEMA (MÓVIL) */}
             <button
               onClick={() => onAccessSystem('sistema')}
-              aria-label="Acceso privado"
-              title=""
-              className="w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-300 relative group overflow-hidden border active:scale-95"
+              aria-label="Acceso al sistema"
+              title="Acceso al Sistema"
+              className="w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-300 relative group overflow-hidden border border-white/15 active:scale-95 hover:border-white/40"
               style={{
                 background: 'linear-gradient(145deg, #14161a 0%, #08090b 100%)',
-                borderColor: 'rgba(255, 255, 255, 0.1)',
-                boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 2px 8px rgba(0,0,0,0.7)',
+                boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 2px 8px rgba(0,0,0,0.7)',
               }}
             >
-              <svg
-                viewBox="0 0 24 24"
-                className="w-5 h-5"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="M12 2L21 8.5L12 22L3 8.5L12 2Z"
-                  fill="#060709"
-                  stroke="rgba(255, 255, 255, 0.35)"
-                  strokeWidth="1.2"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M7 8.5L12 22L17 8.5H7Z"
-                  fill="#040507"
-                  stroke="rgba(255, 255, 255, 0.15)"
-                  strokeWidth="0.8"
-                />
-                <path
-                  d="M12 9.2a2 2 0 0 0-1.4 3.42V15.2a1.4 1.4 0 0 0 2.8 0v-2.58A2 2 0 0 0 12 9.2z"
-                  fill="#ffffff"
-                  className="group-hover:fill-[#c9385a] transition-colors duration-300"
-                />
-              </svg>
+              <div className="relative z-10">
+                <BlackDiamondIcon size={24} glow={true} />
+              </div>
             </button>
 
             <a
@@ -778,7 +849,10 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
                   fontFamily: "'Montserrat', sans-serif",
                 }}
               >
-                ◆ Iniciar sesión
+                <span className="flex items-center justify-center gap-2">
+                  <BlackDiamondIcon size={15} glow={false} />
+                  <span>Iniciar sesión</span>
+                </span>
               </button>
 
               <button
@@ -786,10 +860,11 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
                   setMenuAbierto(false)
                   onAccessSystem('sistema')
                 }}
-                className="text-[9px] text-white/20 hover:text-white/40 transition-colors uppercase tracking-[0.3em] text-center py-2"
+                className="flex items-center justify-center gap-2 text-[10px] text-white/40 hover:text-white transition-colors uppercase tracking-[0.25em] text-center py-2.5"
                 style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: "'Montserrat', sans-serif" }}
               >
-                Acceso al sistema
+                <BlackDiamondIcon size={15} glow={true} />
+                <span>Acceso al sistema</span>
               </button>
             </div>
           </div>
@@ -958,7 +1033,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
                   modelo={modelo}
                   onAgendar={(m: any) => {
                     const id = (m?.id || modelo.id) as string;
-                    setPerfilVisibleId(id);
+                    handleAbrirPerfil(id);
                   }}
                 />
               ))}
@@ -975,8 +1050,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
             <div className="w-full lg:w-[70%] h-[45dvh] lg:h-full relative border-b lg:border-b-0 lg:border-r border-[#c9a961]/10">
               <StreamConPaywall
                 onRegistrarse={(tipo) => {
-                  setTabLoginInicial(tipo);
-                  setShowClienteLogin(true);
+                  handleAbrirClienteLogin(tipo);
                 }}
               />
             </div>
@@ -986,7 +1060,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
                 recentTips={recentTips}
                 onLoginClick={() => {
                   localStorage.setItem('loginRedirect', 'chat');
-                  setShowClienteLogin(true);
+                  handleAbrirClienteLogin('login');
                 }}
               />
             </div>
@@ -1009,7 +1083,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
         <div className="container mx-auto px-4 relative" style={{ zIndex: 1 }}>
           <div className="text-center mb-12">
             <Badge className="mb-4 bg-[#A11D3A]/20 text-[#c9385a] border-[#A11D3A]/30 bd-animate-fade-up bd-delay-0">
-              <Gem className="w-4 h-4 mr-2 inline" />
+              <BlackDiamondIcon size={15} className="mr-2 inline" glow={true} />
               {t.services.badge}
             </Badge>
             <h2 className="text-4xl md:text-6xl mb-4 bd-animate-fade-up bd-delay-1" style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 300, lineHeight: 1.1 }}>
@@ -1053,8 +1127,8 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
             {/* Servicio 3 */}
             <div className="group bd-animate-scale-in bd-delay-2 rounded-2xl p-6 flex flex-col gap-4 border border-[#c9a961]/12 bg-[#16181c] hover:border-[#c9a961]/40 hover:-translate-y-1 transition-all duration-400" style={{ boxShadow: 'none' }}
               onMouseEnter={e => (e.currentTarget.style.boxShadow='0 12px 40px rgba(201,169,97,0.12)')} onMouseLeave={e => (e.currentTarget.style.boxShadow='none')}>
-              <div className="w-12 h-12 flex items-center justify-center flex-shrink-0" style={{ transform: 'rotate(45deg)', background: 'rgba(201,169,97,0.08)', border: '1px solid rgba(201,169,97,0.25)', borderRadius: 6 }}>
-                <Gem className="w-5 h-5 text-[#c9385a]" style={{ transform: 'rotate(-45deg)' }} />
+              <div className="w-12 h-12 flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6 }}>
+                <BlackDiamondIcon size={26} glow={true} />
               </div>
               <h3 className="text-xl font-semibold text-white" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.35rem' }}>{t.services.vipSuites.title}</h3>
               <p className="text-[#888] text-sm leading-relaxed flex-1" style={{ fontFamily: "'Montserrat', sans-serif" }}>{t.services.vipSuites.description}</p>
@@ -1129,7 +1203,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
           <div className="max-w-4xl mx-auto">
             <div className="text-center mb-12">
               <Badge className="mb-4 bg-[#A11D3A]/20 text-[#c9385a] border-[#A11D3A]/30 bd-animate-fade-up bd-delay-0">
-                <Gem className="w-4 h-4 mr-2 inline" />
+                <BlackDiamondIcon size={15} className="mr-2 inline" glow={true} />
                 {t.about.badge}
               </Badge>
               <h2 className="text-4xl md:text-6xl mb-6 bd-animate-fade-up bd-delay-1" style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 300, lineHeight: 1.1 }}>
@@ -1263,8 +1337,8 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
 
             {/* CTA Final */}
             <div className="rounded-2xl border border-[#c9a961]/25 bg-[#0d0f12] p-8 md:p-12 text-center bd-animate-scale-in bd-delay-4" style={{ boxShadow: '0 0 60px rgba(201,169,97,0.05)' }}>
-              <div className="w-14 h-14 flex items-center justify-center mx-auto mb-6" style={{ transform: 'rotate(45deg)', background: 'rgba(201,169,97,0.1)', border: '1px solid rgba(201,169,97,0.3)', borderRadius: 10 }}>
-                <Gem className="w-7 h-7 text-[#c9385a] bd-animate-float" style={{ transform: 'rotate(-45deg)' }} />
+              <div className="w-14 h-14 flex items-center justify-center mx-auto mb-6" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 10 }}>
+                <BlackDiamondIcon size={34} glow={true} />
               </div>
               <h3 className="text-3xl md:text-4xl mb-4 text-white" style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 400 }}>
                 {t.contact.ctaTitle}
@@ -1278,9 +1352,10 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
                   <Phone className="w-4 h-4 inline mr-2" />
                   {t.contact.reserveNow}
                 </button>
-                <button onClick={() => onAccessSystem('sistema')} className="px-8 py-3.5 rounded-xl font-bold text-xs uppercase tracking-widest border border-[#c9a961]/30 text-[#c9a961]/70 hover:border-[#c9a961]/60 hover:text-[#c9a961] transition-all duration-300"
-                  style={{ fontFamily: "'Montserrat', sans-serif", background: 'transparent' }}>
-                  {t.contact.systemAccess}
+                <button onClick={() => onAccessSystem('sistema')} className="px-8 py-3.5 rounded-xl font-bold text-xs uppercase tracking-widest border border-white/20 text-white/80 hover:border-white/50 hover:text-white hover:shadow-[0_0_20px_rgba(255,255,255,0.15)] transition-all duration-300 flex items-center justify-center gap-2"
+                  style={{ fontFamily: "'Montserrat', sans-serif", background: 'rgba(255,255,255,0.03)' }}>
+                  <BlackDiamondIcon size={16} glow={true} />
+                  <span>{t.contact.systemAccess}</span>
                 </button>
               </div>
             </div>
@@ -1295,12 +1370,14 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
           <div className="flex flex-col md:grid md:grid-cols-4 gap-10 mb-10 text-center md:text-left">
             {/* Logo & Description */}
             <div className="md:col-span-2">
-              <span className="flex items-center gap-2 mb-4 justify-center md:justify-start" style={{ fontFamily: "'Cormorant Garamond', serif", letterSpacing: '0.06em' }}>
-                <span style={{ color: '#c9385a', fontSize: 18 }}>◆</span>
-                <span style={{ color: '#fff', fontWeight: 300, fontSize: '1.05rem' }}>BLACK</span>
-                <span style={{ color: '#c9385a', fontWeight: 700, fontSize: '1.05rem' }}>DIAMOND</span>
-              </span>
-              <p className="text-sm text-[#555] max-w-md mx-auto md:mx-0" style={{ fontFamily: "'Montserrat', sans-serif", lineHeight: 1.8 }}>
+              <div className="mb-4 flex justify-center md:justify-start">
+                <img
+                  src="/brand/logo.png"
+                  alt="Black Diamond Studios"
+                  className="h-10 sm:h-12 w-auto object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.18)]"
+                />
+              </div>
+              <p className="text-sm text-[#777] max-w-md mx-auto md:mx-0" style={{ fontFamily: "'Montserrat', sans-serif", lineHeight: 1.8 }}>
                 {t.footer.description}
               </p>
             </div>
@@ -1370,17 +1447,17 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
       {showClienteLogin && (
         <ClienteLoginModal
           isOpen={showClienteLogin}
-          onClose={() => setShowClienteLogin(false)}
+          onClose={handleCerrarClienteLogin}
           tabInicial={tabLoginInicial}
           onLoginSuccess={(cliente) => {
             setClienteActual(cliente);
-            setShowClienteLogin(false);
+            handleCerrarClienteLogin();
             toast.success(`¡Bienvenido de nuevo, ${cliente.nombre}!`);
 
             // Si había un modelo pendiente, abrirlo al volver al perfil (usuario no-cliente)
             // Para clientes, ClienteDashboard lo leerá de localStorage
             if (modeloPendienteId && !onLoginSuccess) {
-              setPerfilVisibleId(modeloPendienteId);
+              handleAbrirPerfil(modeloPendienteId);
               setModeloPendienteId(null);
             }
 
@@ -1402,7 +1479,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
       {/* Modal de Solicitud de Servicio */}
       <SolicitudServicioModal 
         isOpen={!!solicitudData}
-        onClose={() => setSolicitudData(null)}
+        onClose={handleCerrarSolicitud}
         data={solicitudData}
         currentUser={currentUserProp}
       />
@@ -1411,7 +1488,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
       {perfilVisibleId && (
         <PerfilModeloPublico
           modeloId={perfilVisibleId}
-          onClose={() => setPerfilVisibleId(null)}
+          onClose={handleCerrarPerfil}
           currentUser={currentUserProp}
           onLoginRequired={() => {
             if (perfilVisibleId) {
@@ -1419,7 +1496,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
               setModeloPendienteId(perfilVisibleId);
             }
             setPerfilVisibleId(null);
-            setShowClienteLogin(true);
+            handleAbrirClienteLogin('login');
           }}
         />
       )}
@@ -1430,7 +1507,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
           <div className="bg-[#0f1014] border border-white/10 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-lg font-semibold text-amber-400">Crear cuenta</h2>
-              <button onClick={() => setMostrarRegistro(false)} className="text-white/40 hover:text-white/70 transition-colors">
+              <button onClick={handleCerrarRegistro} className="text-white/40 hover:text-white/70 transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -1461,7 +1538,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
                   {registrando ? 'Creando cuenta...' : 'Crear cuenta'}
                 </button>
                 <button
-                  onClick={() => setMostrarRegistro(false)}
+                  onClick={handleCerrarRegistro}
                   className="px-4 py-2.5 bg-white/10 text-sm rounded-lg hover:bg-white/20 transition-colors"
                 >
                   Cancelar
@@ -1471,7 +1548,7 @@ export function LandingPage({ onAccessSystem, currentUser: currentUserProp, onLo
             <p className="text-xs text-white/30 text-center mt-3">
               ¿Ya tienes cuenta?{' '}
               <button
-                onClick={() => { setMostrarRegistro(false); setShowClienteLogin(true); }}
+                onClick={() => { handleCerrarRegistro(); handleAbrirClienteLogin('login'); }}
                 className="text-amber-400 hover:text-amber-300 transition-colors"
               >
                 Inicia sesión

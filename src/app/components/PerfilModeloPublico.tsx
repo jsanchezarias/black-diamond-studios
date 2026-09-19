@@ -5,7 +5,7 @@ import { getWhatsAppReservaCompletaUrl, getWhatsAppModeloUrl } from '../../utils
 import {
   X, Star, MapPin, Clock, ChevronLeft, ChevronRight,
   Calendar, Home, Building, DollarSign, Ruler, Languages,
-  User, Timer, CheckCircle, Heart, MessageCircle
+  User, Timer, CheckCircle, Heart, MessageCircle, ArrowLeft
 } from 'lucide-react';
 
 interface PerfilModeloPublicoProps {
@@ -52,6 +52,49 @@ export function PerfilModeloPublico({ modeloId, onClose, currentUser, onLoginReq
   const [direccion, setDireccion] = useState('');
   const [notas, setNotas] = useState('');
   const [enviando, setEnviando] = useState(false);
+
+  // 🔒 Bloquear scroll de la página de fondo mientras el perfil está abierto
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, []);
+
+  // 🧭 Manejo de historial para sub-modal de reserva (Nivel 2 de navegación móvil)
+  const handleAbrirReserva = (servicio: any) => {
+    if (!window.location.hash.startsWith('#reserva-')) {
+      window.history.pushState(
+        { modal: 'reserva', modeloId, servicioId: servicio.id },
+        '',
+        `#reserva-${modeloId}`
+      );
+    }
+    setServicioSeleccionado(servicio);
+    setUbicacion(tabServicio);
+  };
+
+  const handleCerrarReserva = () => {
+    setServicioSeleccionado(null);
+    if (window.location.hash.startsWith('#reserva-')) {
+      window.history.back();
+    }
+  };
+
+  // Escuchar popstate: Si el usuario presiona "Atrás" en Android mientras está en el modal de reserva,
+  // se cierra solo la reserva y se mantiene en el perfil de la chica.
+  useEffect(() => {
+    const handlePopState = () => {
+      const hash = window.location.hash;
+      if (!hash.startsWith('#reserva-')) {
+        setServicioSeleccionado(null);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   useEffect(() => {
     cargarPerfil();
@@ -234,6 +277,7 @@ export function PerfilModeloPublico({ modeloId, onClose, currentUser, onLoginReq
 
   const hacerReserva = async () => {
     if (!currentUser) {
+      handleCerrarReserva();
       onLoginRequired?.();
       return;
     }
@@ -333,7 +377,7 @@ export function PerfilModeloPublico({ modeloId, onClose, currentUser, onLoginReq
       await notificarNuevaReserva(agendamiento, nombreCliente, clienteData?.telefono || '');
 
       toast.success('✅ Reserva enviada. Te notificaremos cuando sea aprobada.');
-      setServicioSeleccionado(null);
+      handleCerrarReserva();
       setFecha('');
       setHora('');
       setNotas('');
@@ -400,10 +444,25 @@ export function PerfilModeloPublico({ modeloId, onClose, currentUser, onLoginReq
           <div className="absolute inset-0 bg-gradient-to-t from-[#080810] via-black/30 to-transparent" />
         </div>
 
-        {/* Botón cerrar */}
+        {/* Botón flotante para regresar al catálogo (Siempre visible y accesible al hacer scroll en móviles) */}
         <button
           onClick={onClose}
-          className="absolute top-4 left-4 z-10 bg-black/60 backdrop-blur-md rounded-full p-2.5 text-white hover:bg-black/80 transition-colors border border-white/10"
+          className="fixed top-4 left-4 z-50 flex items-center gap-2 bg-black/75 backdrop-blur-md px-3.5 py-2 rounded-full text-white/90 hover:text-white hover:bg-black/90 transition-all border border-white/15 shadow-2xl active:scale-95 group"
+          title="Regresar al catálogo"
+          aria-label="Regresar al catálogo"
+        >
+          <ArrowLeft className="w-4 h-4 text-[#c9a961] transition-transform group-hover:-translate-x-0.5" />
+          <span className="text-xs font-semibold tracking-wider uppercase" style={{ fontFamily: "'Montserrat', sans-serif" }}>
+            Volver
+          </span>
+        </button>
+
+        {/* Botón X superior derecho */}
+        <button
+          onClick={onClose}
+          className="fixed top-4 right-4 z-50 bg-black/75 backdrop-blur-md p-2 rounded-full text-white/70 hover:text-white hover:bg-black/90 transition-all border border-white/15 shadow-2xl active:scale-95"
+          title="Cerrar perfil"
+          aria-label="Cerrar perfil"
         >
           <X className="w-5 h-5" />
         </button>
@@ -553,8 +612,7 @@ export function PerfilModeloPublico({ modeloId, onClose, currentUser, onLoginReq
                   <button
                     key={s.id}
                     onClick={() => {
-                      setServicioSeleccionado(s);
-                      setUbicacion(tabServicio);
+                      handleAbrirReserva(s);
                     }}
                     className="group relative bg-white/[0.04] hover:bg-amber-500/10 border border-white/10 hover:border-amber-500/40 rounded-2xl p-4 text-left transition-all duration-200 active:scale-95"
                   >
@@ -589,7 +647,7 @@ export function PerfilModeloPublico({ modeloId, onClose, currentUser, onLoginReq
                   {perfil.nombre_display}
                 </h3>
               </div>
-              <button onClick={() => setServicioSeleccionado(null)} className="text-white/50 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors">
+              <button onClick={handleCerrarReserva} className="text-white/50 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>

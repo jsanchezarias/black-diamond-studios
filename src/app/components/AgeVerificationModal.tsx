@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ShieldAlert, ShieldCheck } from 'lucide-react';
+import { BlackDiamondIcon } from './BlackDiamondIcon';
 
 export function AgeVerificationModal() {
   const [isOpen, setIsOpen] = useState(false);
@@ -48,9 +49,9 @@ export function AgeVerificationModal() {
 
         {/* Icono + Logo */}
         <div className="flex items-center justify-center gap-2 mb-4">
-          <span style={{ color: '#c9385a', fontSize: 24, lineHeight: 1 }}>◆</span>
+          <BlackDiamondIcon size={24} glow={true} />
           <span style={{ color: '#fff', fontWeight: 300, fontSize: '1.25rem', letterSpacing: '0.08em', fontFamily: "'Cormorant Garamond', serif" }}>
-            BLACK <strong style={{ color: '#c9385a', fontWeight: 700 }}>DIAMOND</strong>
+            BLACK <strong style={{ color: '#ffffff', fontWeight: 700 }}>DIAMOND</strong>
           </span>
         </div>
 
@@ -90,8 +91,9 @@ export function AgeVerificationModal() {
           </button>
         </div>
 
-        <p className="text-[10px] text-[#555] tracking-wide" style={{ fontFamily: "'Montserrat', sans-serif" }}>
-          ◆ Privacidad y discreción 100% garantizada
+        <p className="text-[10px] text-[#555] tracking-wide flex items-center justify-center gap-1.5" style={{ fontFamily: "'Montserrat', sans-serif" }}>
+          <BlackDiamondIcon size={12} glow={false} />
+          <span>Privacidad y discreción 100% garantizada</span>
         </p>
       </div>
     </div>

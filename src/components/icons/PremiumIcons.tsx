@@ -509,8 +509,16 @@ export const IconPremium = ({ size = 20, className = '', strokeWidth = 1.5 }: Ic
   <Sparkles size={size} strokeWidth={strokeWidth} className={className} />
 );
 
-export const IconDiamond = ({ size = 20, className = '', strokeWidth = 1.5 }: IconProps) => (
-  <Gem size={size} strokeWidth={strokeWidth} className={className} />
+export const IconDiamond = ({ size = 20, className = '' }: IconProps) => (
+  <span className={`inline-flex items-center justify-center ${className}`}>
+    <img
+      src="/brand/diamond.png"
+      alt="Diamond"
+      style={{ width: size, height: size }}
+      className="object-contain drop-shadow-[0_0_6px_rgba(255,255,255,0.4)]"
+      loading="eager"
+    />
+  </span>
 );
 
 export const IconLogin = ({ size = 20, className = '', strokeWidth = 1.5 }: IconProps) => (

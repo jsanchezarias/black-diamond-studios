@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { MessageCircle, Eye, ShieldCheck, Building2, Car } from 'lucide-react';
+import { BlackDiamondIcon } from './BlackDiamondIcon';
 
 interface LightboxState {
   fotos: { url: string }[];
@@ -53,14 +54,37 @@ export const ModeloCard = ({ modelo, onAgendar }: { modelo: any; onAgendar?: (m:
         setLightbox(p => p ? { ...p, indice: p.indice === p.fotos.length - 1 ? 0 : p.indice + 1 } : null);
       if (e.key === 'ArrowLeft')
         setLightbox(p => p ? { ...p, indice: p.indice === 0 ? p.fotos.length - 1 : p.indice - 1 } : null);
-      if (e.key === 'Escape') setLightbox(null);
+      if (e.key === 'Escape') cerrarLightbox();
     };
     window.addEventListener('keydown', handle);
     return () => window.removeEventListener('keydown', handle);
   }, [lightbox]);
 
-  const abrirLightbox = (indice: number) =>
+  const abrirLightbox = (indice: number) => {
+    if (window.location.hash !== '#foto') {
+      window.history.pushState({ modal: 'lightbox' }, '', '#foto');
+    }
     setLightbox({ fotos, indice, nombreModelo });
+  };
+
+  const cerrarLightbox = () => {
+    setLightbox(null);
+    if (window.location.hash === '#foto') {
+      window.history.back();
+    }
+  };
+
+  // Escuchar popstate para cerrar lightbox con el botón de regresar en Android / móviles
+  useEffect(() => {
+    if (!lightbox) return;
+    const handlePop = () => {
+      if (window.location.hash !== '#foto') {
+        setLightbox(null);
+      }
+    };
+    window.addEventListener('popstate', handlePop);
+    return () => window.removeEventListener('popstate', handlePop);
+  }, [lightbox]);
 
   const agendarPorWhatsApp = (servicio?: { nombre: string; precio: number }) => {
     const url = getWhatsAppModeloUrl(nombreModelo, servicio);
@@ -72,7 +96,7 @@ export const ModeloCard = ({ modelo, onAgendar }: { modelo: any; onAgendar?: (m:
       {/* ── LIGHTBOX ── */}
       {lightbox && (
         <div
-          onClick={() => setLightbox(null)}
+          onClick={cerrarLightbox}
           style={{
             position: 'fixed', inset: 0,
             background: 'rgba(0,0,0,0.96)',
@@ -179,7 +203,7 @@ export const ModeloCard = ({ modelo, onAgendar }: { modelo: any; onAgendar?: (m:
             />
           ) : (
             <div className="w-full h-full bg-[#16181c] flex items-center justify-center">
-              <span className="text-5xl text-[#c9a961]/20">◆</span>
+              <BlackDiamondIcon size={52} className="opacity-30" glow={false} />
             </div>
           )}
 

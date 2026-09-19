@@ -1,134 +1,51 @@
+import React from 'react';
+import { BlackDiamondIcon } from './BlackDiamondIcon';
+
 interface LogoIsotipoProps {
   className?: string;
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+  showText?: boolean;
 }
 
 /**
- * Isotipo minimalista de Black Diamond Studios
- * Versión compacta con diamante geométrico + iniciales "BDS"
- * Diseñado para dashboards internos y headers
+ * Isotipo Oficial de Black Diamond Studios
+ * Versión compacta para dashboards, barras de navegación y áreas operativas.
+ * Incluye el diamante auténtico y las siglas o texto estilizado.
  */
-export function LogoIsotipo({ className = '', size = 'md' }: LogoIsotipoProps) {
-  const sizeClasses = {
-    xs: 'h-8 w-auto',
-    sm: 'h-10 w-auto',
-    md: 'h-12 w-auto',
-    lg: 'h-16 w-auto',
-    xl: 'h-20 w-auto'
+export function LogoIsotipo({ className = '', size = 'md', showText = true }: LogoIsotipoProps) {
+  const sizeMap = {
+    xs: { icon: 20, text: 'text-xs', sub: 'text-[7px]' },
+    sm: { icon: 26, text: 'text-sm', sub: 'text-[8px]' },
+    md: { icon: 32, text: 'text-base', sub: 'text-[9px]' },
+    lg: { icon: 40, text: 'text-lg', sub: 'text-[10px]' },
+    xl: { icon: 48, text: 'text-xl', sub: 'text-[11px]' }
   };
 
-  const sizeClass = sizeClasses[size];
+  const conf = sizeMap[size];
 
   return (
-    <div className={`relative ${className} diamond-glow`}>
-      <svg 
-        viewBox="0 0 120 45" 
-        className={`${sizeClass} object-contain drop-shadow-[0_0_8px_rgba(201,169,97,0.3)]`}
-        fill="none" 
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        {/* Diamante geométrico minimalista */}
-        <g>
-          {/* Parte superior del diamante */}
-          <path 
-            d="M25 5 L35 15 L25 15 L15 15 Z" 
-            fill="url(#diamondTopGrad)"
-            stroke="url(#diamondStroke)"
-            strokeWidth="0.5"
-          />
-          
-          {/* Parte inferior del diamante */}
-          <path 
-            d="M15 15 L25 35 L35 15 Z" 
-            fill="url(#diamondBottomGrad)"
-            stroke="url(#diamondStroke)"
-            strokeWidth="0.5"
-          />
-          
-          {/* Líneas de refracción internas */}
-          <line x1="20" y1="15" x2="25" y2="25" stroke="url(#refractionGrad)" strokeWidth="0.5" opacity="0.4" />
-          <line x1="30" y1="15" x2="25" y2="25" stroke="url(#refractionGrad)" strokeWidth="0.5" opacity="0.4" />
-        </g>
+    <div className={`inline-flex items-center gap-2.5 select-none group ${className}`}>
+      {/* Diamante Oficial con resplandor */}
+      <div className="relative transition-transform duration-300 group-hover:scale-105">
+        <BlackDiamondIcon size={conf.icon} glow={true} />
+      </div>
 
-        {/* Iniciales BDS */}
-        <text 
-          x="52" 
-          y="28" 
-          fontFamily="Playfair Display, serif" 
-          fontSize="22" 
-          fontWeight="700" 
-          fill="url(#textGradient)" 
-          letterSpacing="2"
-        >
-          BDS
-        </text>
-        
-        {/* Línea decorativa debajo */}
-        <line 
-          x1="52" 
-          y1="32" 
-          x2="110" 
-          y2="32" 
-          stroke="url(#lineGradient)" 
-          strokeWidth="1"
-          opacity="0.6"
-        />
-        
-        {/* Texto secundario "STUDIOS" */}
-        <text 
-          x="52" 
-          y="40" 
-          fontFamily="Montserrat, sans-serif" 
-          fontSize="7" 
-          fontWeight="400" 
-          fill="#c9a961" 
-          letterSpacing="3"
-          opacity="0.85"
-        >
-          STUDIOS
-        </text>
-
-        {/* Gradientes y efectos */}
-        <defs>
-          {/* Gradiente parte superior del diamante */}
-          <linearGradient id="diamondTopGrad" x1="25" y1="5" x2="25" y2="15" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#f5d977" />
-            <stop offset="100%" stopColor="#e5c767" />
-          </linearGradient>
-          
-          {/* Gradiente parte inferior del diamante */}
-          <linearGradient id="diamondBottomGrad" x1="25" y1="15" x2="25" y2="35" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#d4af37" />
-            <stop offset="50%" stopColor="#c9a961" />
-            <stop offset="100%" stopColor="#8b7220" />
-          </linearGradient>
-          
-          {/* Gradiente para el borde del diamante */}
-          <linearGradient id="diamondStroke" x1="25" y1="5" x2="25" y2="35" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#f5d977" opacity="0.8" />
-            <stop offset="100%" stopColor="#c9a961" opacity="0.6" />
-          </linearGradient>
-          
-          {/* Gradiente para líneas de refracción */}
-          <linearGradient id="refractionGrad" x1="0%" y1="0%" x2="0%" y2="100%" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#ffffff" />
-            <stop offset="100%" stopColor="#f5d977" />
-          </linearGradient>
-          
-          {/* Gradiente para el texto BDS */}
-          <linearGradient id="textGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#e5c767" />
-            <stop offset="50%" stopColor="#d4af37" />
-            <stop offset="100%" stopColor="#c9a961" />
-          </linearGradient>
-          
-          {/* Gradiente para la línea decorativa */}
-          <linearGradient id="lineGradient" x1="52" y1="0" x2="110" y2="0">
-            <stop offset="0%" stopColor="#c9a961" />
-            <stop offset="100%" stopColor="#c9a961" opacity="0.2" />
-          </linearGradient>
-        </defs>
-      </svg>
+      {showText && (
+        <div className="flex flex-col leading-tight">
+          <span
+            className={`font-light text-white tracking-[0.14em] uppercase ${conf.text}`}
+            style={{ fontFamily: "'Cormorant Garamond', serif" }}
+          >
+            BLACK <span className="font-bold text-white">DIAMOND</span>
+          </span>
+          <span
+            className={`text-white/60 tracking-[0.25em] uppercase font-medium ${conf.sub}`}
+            style={{ fontFamily: "'Montserrat', sans-serif" }}
+          >
+            STUDIOS
+          </span>
+        </div>
+      )}
     </div>
   );
 }

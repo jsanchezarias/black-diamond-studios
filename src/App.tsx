@@ -222,6 +222,32 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(() => getSavedUser());
   const [verifyingSession, setVerifyingSession] = useState(true);
 
+  // 🧭 Manejo de historial para login del sistema en móviles / botón atrás
+  const handleAccessSystem = (tipo: 'cliente' | 'sistema') => {
+    setTipoLogin(tipo);
+    if (window.location.hash !== '#login') {
+      window.history.pushState({ view: 'login', tipo }, '', '#login');
+    }
+    setShowLogin(true);
+  };
+
+  const handleBackToLanding = () => {
+    setShowLogin(false);
+    if (window.location.hash === '#login') {
+      window.history.back();
+    }
+  };
+
+  useEffect(() => {
+    const handlePopState = () => {
+      if (window.location.hash !== '#login' && showLogin) {
+        setShowLogin(false);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [showLogin]);
+
   // ✅ ROLES VÁLIDOS DEL SISTEMA
   const rolesValidos = ['programador', 'owner', 'administrador', 'modelo', 'cliente', 'contador', 'recepcionista', 'supervisor', 'moderador'];
 
@@ -704,12 +730,12 @@ export default function App() {
             <LoginForm
               tipo={tipoLogin}
               onLogin={handleLogin}
-              onBackToLanding={() => setShowLogin(false)}
+              onBackToLanding={handleBackToLanding}
             />
           ) : (
             <Suspense fallback={<GlobalLoadingScreen />}>
               <LandingPage
-                onAccessSystem={(tipo: 'cliente' | 'sistema') => { setTipoLogin(tipo); setShowLogin(true); }}
+                onAccessSystem={handleAccessSystem}
                 onLoginSuccess={handleLogin}
                 currentUser={currentUser ? { ...currentUser, id: currentUser.id ?? currentUser.userId } : null}
               />

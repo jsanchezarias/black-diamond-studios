@@ -22,3 +22,4 @@ build/
 *test*.sql
 CREAR_USUARIOS_TEST.sql
 tsc_errors*.txt
+scratch/

@@ -179,9 +179,14 @@ function rowToServicio(row: any): Servicio {
     creadoPor: row.creado_por ?? 'sistema',
     creadoPorRol: row.creado_por_rol,
     agendamientoId: row.agendamiento_id ?? '',
-    costoServicio: row.monto_pactado ?? row.monto ?? 0,
+    costoServicio: row.monto_pactado ?? row.monto ?? row.precio ?? 0,
     costoAdicionales: row.total_adicionales ?? 0,
     costoConsumo: row.total_consumos ?? 0,
+    duracionMinutos: row.duracion_minutos ?? row.duracion_estimada_minutos ?? row.duracion ?? 60,
+    horaInicio: row.hora_inicio ? new Date(row.hora_inicio) : undefined,
+    horaFin: row.hora_fin_estimada ? new Date(row.hora_fin_estimada) : undefined,
+    habitacion: row.habitacion ? String(row.habitacion) : undefined,
+    tiempoServicio: row.tiempo_servicio ?? row.duracion_texto,
   };
 }
 
@@ -221,6 +226,10 @@ function servicioToRow(s: Partial<Servicio>): Record<string, any> {
   if (s.multaPagada !== undefined) row.multa_pagada = s.multaPagada;
   if (s.agendamientoId !== undefined) row.agendamiento_id = s.agendamientoId;
   if (s.creadoPor !== undefined) row.creado_por = s.creadoPor;
+  if (s.duracionMinutos !== undefined) row.duracion_minutos = s.duracionMinutos;
+  if (s.horaInicio !== undefined) row.hora_inicio = s.horaInicio instanceof Date ? s.horaInicio.toISOString() : s.horaInicio;
+  if (s.horaFin !== undefined) row.hora_fin_estimada = s.horaFin instanceof Date ? s.horaFin.toISOString() : s.horaFin;
+  if (s.habitacion !== undefined) row.habitacion = s.habitacion;
   return row;
 }
 
@@ -353,38 +362,127 @@ export function ServiciosProvider({ children }: { children: ReactNode }) {
     datos?: Partial<Servicio>
   ) => {
     try {
-      // Obtener datos del agendamiento
-      const { data: ag, error: agError } = await supabase
-        .from('agendamientos')
-        .select('*')
-        .eq('id', agendamientoId)
-        .single();
+      const ahora = new Date();
 
-      if (agError || !ag) {
-        return { success: false, error: 'Agendamiento no encontrado' };
+      if (agendamientoId) {
+        // Obtener datos del agendamiento
+        const { data: ag, error: agError } = await supabase
+          .from('agendamientos')
+          .select('*')
+          .eq('id', agendamientoId)
+          .single();
+
+        if (agError || !ag) {
+          return { success: false, error: 'Agendamiento no encontrado' };
+        }
+
+        // Si se está iniciando (estado 'activo'), actualizar agendamiento en Supabase a en_curso
+        if (datos?.estado === 'activo' || estado === 'completado') {
+          const duracionMins = datos?.duracionMinutos ?? ag.duracion_minutos ?? ag.duracion ?? 60;
+          const horaFinEstimada = new Date(ahora.getTime() + duracionMins * 60000).toISOString();
+          await supabase
+            .from('agendamientos')
+            .update({
+              estado: 'en_curso',
+              hora_inicio: ahora.toISOString(),
+              hora_fin_estimada: horaFinEstimada,
+              ...(datos?.habitacion ? { habitacion: datos.habitacion } : {}),
+              ...(datos?.montoPactado !== undefined ? { monto_pago: datos.montoPactado } : {}),
+            })
+            .eq('id', agendamientoId);
+        }
+
+        const servicio: Omit<Servicio, 'id' | 'fechaCreacion' | 'creadoPor'> = {
+          fecha: ag.fecha,
+          hora: ag.hora,
+          duracionEstimadaMinutos: ag.duracion_minutos ?? ag.duracion ?? 60,
+          clienteId: ag.cliente_id ?? '',
+          clienteNombre: ag.cliente_nombre ?? '',
+          clienteTelefono: ag.cliente_telefono ?? '',
+          modeloEmail: ag.modelo_email ?? '',
+          modeloNombre: ag.modelo_nombre ?? '',
+          tipoServicio: ag.tipo_servicio ?? 'sede',
+          tarifaNombre: ag.tarifa_nombre ?? ag.servicio ?? 'Servicio',
+          montoPactado: ag.monto_pago ?? ag.precio ?? 0,
+          estadoPago: ag.estado_pago ?? 'pendiente',
+          estado,
+          agendamientoId,
+          motivoCancelacion: estado !== 'completado' ? ag.motivo_cancelacion : undefined,
+          canceladoPor: estado !== 'completado' ? ag.cancelado_por : undefined,
+          horaInicio: ahora,
+          duracionMinutos: ag.duracion_minutos ?? ag.duracion ?? 60,
+          ...datos,
+        };
+
+        return await crearServicio(servicio);
       }
 
-      const servicio: Omit<Servicio, 'id' | 'fechaCreacion' | 'creadoPor'> = {
-        fecha: ag.fecha,
-        hora: ag.hora,
-        duracionEstimadaMinutos: ag.duracion_minutos ?? ag.duracion ?? 60,
-        clienteId: ag.cliente_id ?? '',
-        clienteNombre: ag.cliente_nombre ?? '',
-        clienteTelefono: ag.cliente_telefono ?? '',
-        modeloEmail: ag.modelo_email ?? '',
-        modeloNombre: ag.modelo_nombre ?? '',
-        tipoServicio: ag.tipo_servicio ?? 'sede',
-        tarifaNombre: ag.tarifa_nombre ?? ag.servicio ?? 'Servicio',
-        montoPactado: ag.monto_pago ?? ag.precio ?? 0,
-        estadoPago: ag.estado_pago ?? 'pendiente',
-        estado,
-        agendamientoId,
-        motivoCancelacion: estado !== 'completado' ? ag.motivo_cancelacion : undefined,
-        canceladoPor: estado !== 'completado' ? ag.cancelado_por : undefined,
+      // Si no hay agendamientoId (Walk-In / Servicio Directo)
+      const duracion = datos?.duracionMinutos ?? 60;
+      const horaFin = new Date(ahora.getTime() + duracion * 60000).toISOString();
+      const precioServicio = datos?.costoServicio ?? datos?.montoPactado ?? 0;
+
+      const { data: nuevoAg } = await supabase
+        .from('agendamientos')
+        .insert({
+          modelo_id: datos?.modeloId || null,
+          tipo_servicio: datos?.tipoServicio ?? 'sede',
+          nombre_servicio: datos?.tarifaNombre ?? 'Walk-in',
+          duracion_minutos: duracion,
+          precio: precioServicio,
+          monto_pago: precioServicio,
+          estado: 'en_curso',
+          fecha: ahora.toISOString().split('T')[0],
+          hora: ahora.toTimeString().slice(0, 5),
+          hora_inicio: ahora.toISOString(),
+          hora_fin_estimada: horaFin,
+          habitacion: datos?.habitacion || null,
+          cliente_nombre: datos?.clienteNombre || 'Cliente Directo',
+          cliente_telefono: datos?.clienteTelefono || null,
+          cliente_email: datos?.clienteEmail || null,
+          modelo_email: datos?.modeloEmail || '',
+          notas: `Servicio directo iniciado por ${datos?.modeloNombre || 'Modelo'}`,
+        })
+        .select()
+        .single();
+
+      const servicioWalkin: Omit<Servicio, 'id' | 'fechaCreacion' | 'creadoPor'> = {
+        fecha: ahora.toISOString().split('T')[0],
+        hora: ahora.toTimeString().slice(0, 5),
+        duracionEstimadaMinutos: duracion,
+        duracionMinutos: duracion,
+        clienteId: datos?.clienteId ?? '',
+        clienteNombre: datos?.clienteNombre ?? 'Cliente Directo',
+        clienteTelefono: datos?.clienteTelefono ?? '',
+        clienteEmail: datos?.clienteEmail,
+        modeloEmail: datos?.modeloEmail ?? '',
+        modeloNombre: datos?.modeloNombre ?? '',
+        tipoServicio: datos?.tipoServicio ?? 'sede',
+        tarifaNombre: datos?.tarifaNombre ?? 'Walk-in',
+        montoPactado: precioServicio,
+        estadoPago: datos?.estadoPago ?? 'pendiente',
+        estado: datos?.estado ?? 'activo',
+        agendamientoId: nuevoAg?.id ? String(nuevoAg.id) : '',
+        horaInicio: ahora,
+        horaFin: new Date(ahora.getTime() + duracion * 60000),
+        habitacion: datos?.habitacion,
+        costoServicio: precioServicio,
+        costoAdicionales: datos?.costoAdicionales ?? 0,
+        costoConsumo: datos?.costoConsumo ?? 0,
+        consumosDetallados: datos?.consumosDetallados,
+        metodoPago: datos?.metodoPago,
+        comprobantePago: datos?.comprobantePago,
         ...datos,
       };
 
-      return await crearServicio(servicio);
+      if (nuevoAg?.id) {
+        const sMapped = rowToServicio(nuevoAg);
+        const fullServicio = { ...sMapped, ...servicioWalkin, id: String(nuevoAg.id) };
+        setServicios(prev => [fullServicio, ...prev.filter(x => x.id !== fullServicio.id)]);
+        return { success: true, data: fullServicio };
+      }
+
+      return await crearServicio(servicioWalkin);
     } catch (error) {
       if (process.env.NODE_ENV === 'development') console.error('❌ Error en crearServicioDesdeAgendamiento:', error);
       return { success: false, error };

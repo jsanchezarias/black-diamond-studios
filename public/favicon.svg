@@ -1,15 +1,27 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <defs>
-    <linearGradient id="bdGem" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#e7c873"/>
-      <stop offset="45%" stop-color="#c9a961"/>
-      <stop offset="55%" stop-color="#A11D3A"/>
-      <stop offset="100%" stop-color="#6B1226"/>
-    </linearGradient>
+    <radialGradient id="favHalo" cx="50%" cy="30%" r="50%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.35" />
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+    </radialGradient>
   </defs>
-  <rect width="64" height="64" rx="14" fill="#0a0b0d"/>
-  <g transform="translate(32,32) rotate(45)">
-    <rect x="-16" y="-16" width="32" height="32" rx="4" fill="url(#bdGem)"/>
-    <rect x="-16" y="-16" width="32" height="10" rx="3" fill="#ffffff" opacity="0.18"/>
+  <rect width="64" height="64" rx="14" fill="#060709" />
+  <circle cx="32" cy="22" r="22" fill="url(#favHalo)" />
+  <g transform="translate(6, 4) scale(0.52)">
+    <!-- Outer contour -->
+    <polygon points="24,18 76,18 92,38 50,92 8,38" fill="#08090d" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" />
+    <!-- Table -->
+    <polygon points="35,18 65,18 50,38" fill="#101217" stroke="#ffffff" stroke-width="2.5" stroke-linejoin="round" />
+    <!-- Crown facets -->
+    <line x1="24" y1="18" x2="8" y2="38" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" />
+    <line x1="35" y1="18" x2="8" y2="38" stroke="#ffffff" stroke-width="2" stroke-linecap="round" />
+    <line x1="65" y1="18" x2="92" y2="38" stroke="#ffffff" stroke-width="2" stroke-linecap="round" />
+    <line x1="76" y1="18" x2="92" y2="38" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" />
+    <!-- Girdle -->
+    <line x1="8" y1="38" x2="92" y2="38" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" />
+    <!-- Pavilion -->
+    <line x1="50" y1="38" x2="50" y2="92" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" />
+    <line x1="28" y1="38" x2="50" y2="92" stroke="#ffffff" stroke-width="2" stroke-linecap="round" />
+    <line x1="72" y1="38" x2="50" y2="92" stroke="#ffffff" stroke-width="2" stroke-linecap="round" />
   </g>
 </svg>
