@@ -340,7 +340,8 @@ export function GaleriaFotosModelo({ modeloId: modeloIdProp, modeloEmail, soloLe
               <img
                 src={foto.url}
                 alt="Foto de galería"
-                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                className="w-full h-full object-cover object-top origin-top transition-transform duration-300 group-hover:scale-105"
+                style={{ objectPosition: 'top center' }}
                 loading="lazy"
               />
 

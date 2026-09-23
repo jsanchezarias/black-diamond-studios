@@ -13,6 +13,18 @@ import { getWhatsAppModeloUrl } from '../../utils/whatsapp';
 export const ModeloCard = ({ modelo, onAgendar }: { modelo: any; onAgendar?: (m: any) => void }) => {
   const [fotoActual, setFotoActual] = useState(0);
   const [lightbox, setLightbox] = useState<LightboxState | null>(null);
+  // Detección automática inteligente de orientación (landscape vs portrait) por URL
+  const [orientaciones, setOrientaciones] = useState<Record<string, 'landscape' | 'portrait'>>({});
+
+  const registrarDimensiones = (url: string, naturalWidth: number, naturalHeight: number) => {
+    if (!url || !naturalWidth || !naturalHeight) return;
+    const ratio = naturalWidth / naturalHeight;
+    const orientacion = ratio > 1.08 ? 'landscape' : 'portrait';
+    setOrientaciones(prev => {
+      if (prev[url] === orientacion) return prev;
+      return { ...prev, [url]: orientacion };
+    });
+  };
 
   // Normaliza el array de fotos: acepta modelo_fotos (Supabase join) o fotos (legado)
   const rawFotos: any[] = modelo.modelo_fotos || modelo.fotos || [];
@@ -26,6 +38,16 @@ export const ModeloCard = ({ modelo, onAgendar }: { modelo: any; onAgendar?: (m:
   const fotos: { url: string }[] = Array.from(
     new Map(fotosOrdenadas.filter(f => f?.url).map(f => [f.url, f])).values()
   );
+
+  // Pre-carga y cálculo instantáneo de dimensiones para todas las fotos del modelo
+  useEffect(() => {
+    fotos.forEach(f => {
+      if (!f?.url) return;
+      const img = new Image();
+      img.onload = () => registrarDimensiones(f.url, img.naturalWidth, img.naturalHeight);
+      img.src = f.url;
+    });
+  }, [fotos]);
 
   // Precios desde servicios_modelo (real) o fallback fijo
   const serviciosActivos = (modelo.servicios_modelo || []).filter((s: any) => s.activo);
@@ -191,16 +213,55 @@ export const ModeloCard = ({ modelo, onAgendar }: { modelo: any; onAgendar?: (m:
         }}
       >
         {/* FOTO PRINCIPAL */}
-        <div className="relative h-[360px] overflow-hidden cursor-pointer" onClick={() => abrirLightbox(fotoActual)}>
+        <div className="relative h-[390px] sm:h-[420px] overflow-hidden cursor-pointer bg-[#0e1013]" onClick={() => abrirLightbox(fotoActual)}>
           {fotos.length > 0 ? (
-            <img
-              key={fotos[fotoActual]?.url}
-              src={fotos[fotoActual]?.url}
-              alt={nombreModelo}
-              loading="lazy"
-              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-            />
+            (() => {
+              const urlActual = fotos[fotoActual]?.url;
+              const esHorizontal = urlActual ? orientaciones[urlActual] === 'landscape' : false;
+
+              if (esHorizontal) {
+                return (
+                  /* MODO INTELIGENTE PARA FOTOS HORIZONTALES / PANORÁMICAS */
+                  <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
+                    {/* Fondo ambiente desenfocado con la misma foto */}
+                    <img
+                      src={urlActual}
+                      alt=""
+                      aria-hidden="true"
+                      className="absolute inset-0 w-full h-full object-cover blur-2xl scale-125 opacity-35 brightness-75 select-none pointer-events-none"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/85 pointer-events-none" />
+
+                    {/* Foto horizontal completa en primer plano, sin recortar cabeza, rostro ni extremidades */}
+                    <div className="relative z-10 w-full h-full flex items-center justify-center p-3 pb-16">
+                      <img
+                        key={urlActual}
+                        src={urlActual}
+                        alt={nombreModelo}
+                        loading="lazy"
+                        className="max-w-full max-h-full object-contain rounded-lg drop-shadow-[0_12px_28px_rgba(0,0,0,0.85)] transition-transform duration-500 group-hover:scale-105"
+                        onLoad={(e) => registrarDimensiones(urlActual, e.currentTarget.naturalWidth, e.currentTarget.naturalHeight)}
+                        onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      />
+                    </div>
+                  </div>
+                );
+              }
+
+              /* MODO VERTICAL / PORTRAIT (ENCUADRE ANCLADO A LA CABEZA) */
+              return (
+                <img
+                  key={urlActual}
+                  src={urlActual}
+                  alt={nombreModelo}
+                  loading="lazy"
+                  className="w-full h-full object-cover object-top origin-top transition-transform duration-500 group-hover:scale-105"
+                  style={{ objectPosition: 'top center' }}
+                  onLoad={(e) => registrarDimensiones(urlActual, e.currentTarget.naturalWidth, e.currentTarget.naturalHeight)}
+                  onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+              );
+            })()
           ) : (
             <div className="w-full h-full bg-[#16181c] flex items-center justify-center">
               <BlackDiamondIcon size={52} className="opacity-30" glow={false} />
@@ -208,7 +269,7 @@ export const ModeloCard = ({ modelo, onAgendar }: { modelo: any; onAgendar?: (m:
           )}
 
           {/* Badges superiores */}
-          <div className="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none z-10">
+          <div className="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none z-20">
             {/* Disponibilidad */}
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md border border-emerald-500/30">
               <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -223,7 +284,7 @@ export const ModeloCard = ({ modelo, onAgendar }: { modelo: any; onAgendar?: (m:
           </div>
 
           {/* Gradiente inferior + Nombre */}
-          <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black via-black/70 to-transparent p-4 pt-12 pointer-events-none">
+          <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black via-black/80 to-transparent p-4 pt-14 pointer-events-none z-20">
             <h3 className="text-2xl font-bold text-white mb-1 tracking-wide" style={{ fontFamily: "'Cormorant Garamond', serif" }}>
               {nombreModelo}
             </h3>
@@ -246,19 +307,35 @@ export const ModeloCard = ({ modelo, onAgendar }: { modelo: any; onAgendar?: (m:
         {/* MINIATURAS FOTOGRÁFICAS */}
         {fotos.length > 1 && (
           <div className="flex gap-2 p-3 bg-black/40 border-t border-b border-white/5 overflow-x-auto">
-            {fotos.slice(0, 5).map((foto, i) => (
-              <div
-                key={i}
-                onClick={() => { setFotoActual(i); abrirLightbox(i); }}
-                className="w-12 h-12 rounded-lg overflow-hidden cursor-pointer flex-shrink-0 transition-all duration-200"
-                style={{
-                  border: fotoActual === i ? '2px solid #c9a961' : '1px solid rgba(255,255,255,0.1)',
-                  opacity: fotoActual === i ? 1 : 0.65,
-                }}
-              >
-                <img src={foto.url} alt="" className="w-full h-full object-cover" />
-              </div>
-            ))}
+            {fotos.slice(0, 5).map((foto, i) => {
+              const esThumbHorizontal = orientaciones[foto.url] === 'landscape';
+              return (
+                <div
+                  key={i}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setFotoActual(i);
+                  }}
+                  className="w-12 h-12 rounded-lg overflow-hidden cursor-pointer flex-shrink-0 transition-all duration-200 relative group/thumb"
+                  style={{
+                    border: fotoActual === i ? '2px solid #c9a961' : '1px solid rgba(255,255,255,0.1)',
+                    opacity: fotoActual === i ? 1 : 0.65,
+                  }}
+                  title={esThumbHorizontal ? 'Foto panorámica' : 'Foto vertical'}
+                >
+                  <img
+                    src={foto.url}
+                    alt=""
+                    className={`w-full h-full object-cover ${esThumbHorizontal ? 'object-center' : 'object-top'}`}
+                    style={{ objectPosition: esThumbHorizontal ? 'center center' : 'top center' }}
+                    onLoad={(e) => registrarDimensiones(foto.url, e.currentTarget.naturalWidth, e.currentTarget.naturalHeight)}
+                  />
+                  {esThumbHorizontal && (
+                    <div className="absolute bottom-1 right-1 w-1.5 h-1.5 rounded-full bg-[#c9a961] shadow" />
+                  )}
+                </div>
+              );
+            })}
             {fotos.length > 5 && (
               <div
                 onClick={() => abrirLightbox(5)}

@@ -220,7 +220,8 @@ export function DetalleModeloPanel({ modelo, onClose, onEdit }: DetalleModeloPan
                 <img 
                   src={modelo.fotoPerfil} 
                   alt={modelo.nombre}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover object-top"
+                  style={{ objectPosition: 'top center' }}
                   loading="lazy"
                 />
               </div>

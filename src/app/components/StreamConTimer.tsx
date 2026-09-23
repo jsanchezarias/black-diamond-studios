@@ -303,7 +303,12 @@ export function StreamConTimer({ mostrarModelos, onRegistrarse }: StreamConTimer
                     >
                       <div className="relative bg-[#1a1a1a]" style={{ aspectRatio: '3/4' }}>
                         {foto ? (
-                          <img src={foto} alt={modelo.nombre_artistico || 'Modelo'} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                          <img
+                            src={foto}
+                            alt={modelo.nombre_artistico || 'Modelo'}
+                            className="w-full h-full object-cover object-top origin-top transition-transform duration-500 group-hover:scale-105"
+                            style={{ objectPosition: 'top center' }}
+                          />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center font-bold" style={{ color: '#c9a961', fontSize: '2.5rem' }}>
                             {(modelo.nombre_artistico || '◆')[0]}

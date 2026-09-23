@@ -49,9 +49,29 @@ export function PerfilModeloPublico({ modeloId, onClose, currentUser, onLoginReq
   const [fecha, setFecha] = useState('');
   const [hora, setHora] = useState('');
   const [ubicacion, setUbicacion] = useState<'sede' | 'domicilio'>('sede');
-  const [direccion, setDireccion] = useState('');
-  const [notas, setNotas] = useState('');
   const [enviando, setEnviando] = useState(false);
+
+  // Detección automática inteligente de orientación de fotos (horizontal / panorámica vs vertical)
+  const [orientaciones, setOrientaciones] = useState<Record<string, 'landscape' | 'portrait'>>({});
+
+  const registrarDimensiones = (url: string, naturalWidth: number, naturalHeight: number) => {
+    if (!url || !naturalWidth || !naturalHeight) return;
+    const ratio = naturalWidth / naturalHeight;
+    const orientacion = ratio > 1.08 ? 'landscape' : 'portrait';
+    setOrientaciones(prev => {
+      if (prev[url] === orientacion) return prev;
+      return { ...prev, [url]: orientacion };
+    });
+  };
+
+  useEffect(() => {
+    fotos.forEach(url => {
+      if (!url) return;
+      const img = new Image();
+      img.onload = () => registrarDimensiones(url, img.naturalWidth, img.naturalHeight);
+      img.src = url;
+    });
+  }, [fotos]);
 
   // 🔒 Bloquear scroll de la página de fondo mientras el perfil está abierto
   useEffect(() => {
@@ -425,23 +445,53 @@ export function PerfilModeloPublico({ modeloId, onClose, currentUser, onLoginReq
       <div className="relative h-[65vh] min-h-[420px] overflow-hidden">
         {/* Carousel de fotos */}
         <div className="absolute inset-0">
-          {fotos.map((foto, idx) => (
-            <div
-              key={idx}
-              className={`absolute inset-0 transition-opacity duration-700 ${idx === fotoActual ? 'opacity-100' : 'opacity-0'}`}
-            >
-              <img
-                src={foto}
-                alt={`${perfil.nombre_display} - foto ${idx + 1}`}
-                className="w-full h-full object-cover object-top"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(perfil.nombre_display || 'M')}&background=1a1a1a&color=d4af37&size=600`;
-                }}
-              />
-            </div>
-          ))}
+          {fotos.map((foto, idx) => {
+            const esHorizontal = orientaciones[foto] === 'landscape';
+            return (
+              <div
+                key={idx}
+                className={`absolute inset-0 transition-opacity duration-700 ${idx === fotoActual ? 'opacity-100' : 'opacity-0'}`}
+              >
+                {esHorizontal ? (
+                  /* Modo inteligente para fotos panorámicas / horizontales */
+                  <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
+                    <img
+                      src={foto}
+                      alt=""
+                      aria-hidden="true"
+                      className="absolute inset-0 w-full h-full object-cover blur-2xl scale-125 opacity-40 brightness-75 select-none pointer-events-none"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/80 pointer-events-none" />
+                    <div className="relative z-10 w-full h-full flex items-center justify-center p-4 pb-16">
+                      <img
+                        src={foto}
+                        alt={`${perfil.nombre_display} - foto ${idx + 1}`}
+                        className="max-w-full max-h-full object-contain rounded-xl drop-shadow-[0_16px_36px_rgba(0,0,0,0.9)]"
+                        onLoad={(e) => registrarDimensiones(foto, e.currentTarget.naturalWidth, e.currentTarget.naturalHeight)}
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(perfil.nombre_display || 'M')}&background=1a1a1a&color=d4af37&size=600`;
+                        }}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  /* Modo vertical / portrait */
+                  <img
+                    src={foto}
+                    alt={`${perfil.nombre_display} - foto ${idx + 1}`}
+                    className="w-full h-full object-cover object-top"
+                    style={{ objectPosition: 'top center' }}
+                    onLoad={(e) => registrarDimensiones(foto, e.currentTarget.naturalWidth, e.currentTarget.naturalHeight)}
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(perfil.nombre_display || 'M')}&background=1a1a1a&color=d4af37&size=600`;
+                    }}
+                  />
+                )}
+              </div>
+            );
+          })}
           {/* Gradiente */}
-          <div className="absolute inset-0 bg-gradient-to-t from-[#080810] via-black/30 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#080810] via-black/30 to-transparent pointer-events-none" />
         </div>
 
         {/* Botón flotante para regresar al catálogo (Siempre visible y accesible al hacer scroll en móviles) */}
