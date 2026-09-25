@@ -92,10 +92,25 @@ export function LoginForm({ tipo, onLogin, onBackToLanding }: LoginFormProps) {
 
   const esEmail = (valor: string) => valor.includes('@');
 
-  const loginCliente = async (emailParaLogin: string, pass: string) => {
-    const { data: { user, session }, error } = await supabase.auth.signInWithPassword({
-      email: emailParaLogin, password: pass
+  const ejecutarLogin = async (emailParaLogin: string, pass: string, alternativo?: string) => {
+    let authEmailUsado = emailParaLogin;
+    let authRes = await supabase.auth.signInWithPassword({
+      email: authEmailUsado, password: pass
     });
+
+    // Si falló y tenemos un email alternativo (ej. sintético de teléfono vs real), intentar con el alternativo
+    if (authRes.error && alternativo && alternativo !== authEmailUsado) {
+      const altRes = await supabase.auth.signInWithPassword({
+        email: alternativo, password: pass
+      });
+      if (!altRes.error && altRes.data.user) {
+        authRes = altRes;
+        authEmailUsado = alternativo;
+      }
+    }
+
+    const { data, error } = authRes;
+
     if (error) { 
       const msg = translateSupabaseError(error);
       setError(msg);
@@ -103,74 +118,85 @@ export function LoginForm({ tipo, onLogin, onBackToLanding }: LoginFormProps) {
       return;
     }
 
-    // Buscar en usuarios primero
-    const { data: usuario } = await supabase
+    const user = data.user;
+    const session = data.session;
+
+    if (!user || !session) {
+      const msg = 'No se pudo iniciar sesión. Verifica tus credenciales.';
+      setError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    // 1. Buscar rol en tabla usuarios
+    const { data: usuario, error: _userError } = await supabase
       .from('usuarios')
-      .select('role')
-      .eq('id', user!.id)
+      .select('role, estado')
+      .eq('id', user.id)
       .maybeSingle();
 
-    let role = usuario?.role;
+    if (_userError && process.env.NODE_ENV === 'development') {
+      console.warn('⚠️ Nota consultando usuarios:', _userError);
+    }
 
-    // Si no está en usuarios buscar en clientes
+    let role = usuario?.role?.trim().toLowerCase();
+
+    // 2. Si no tiene rol en tabla usuarios, buscar en user_metadata del auth (útil recién creado)
+    if (!role && user.user_metadata?.role) {
+      role = String(user.user_metadata.role).trim().toLowerCase();
+    }
+
+    // 3. Si no está en usuarios ni en metadata, buscar en clientes
     if (!role) {
       const { data: cliente } = await supabase
         .from('clientes')
-        .select('id')
-        .eq('user_id', user!.id)
+        .select('id, bloqueado')
+        .or(`user_id.eq.${user.id},email.eq.${authEmailUsado}`)
         .maybeSingle();
-      if (cliente) role = 'cliente';
+      if (cliente) {
+        if (cliente.bloqueado) {
+          const msg = 'Esta cuenta se encuentra bloqueada.';
+          setError(msg);
+          toast.error(msg);
+          await supabase.auth.signOut();
+          return;
+        }
+        role = 'cliente';
+      }
     }
 
-    // Validar que es cliente
-    if (role !== 'cliente') {
-      const msg = 'Usa el Acceso al Sistema administrativo para ingresar.';
+    // 4. Validar estado de bloqueo (solo si está explícitamente bloqueado, archivado o suspendido)
+    if (usuario?.estado === 'bloqueado' || usuario?.estado === 'archivado' || usuario?.estado === 'suspendido') {
+      const msg = 'Esta cuenta se encuentra bloqueada o suspendida por administración.';
       setError(msg);
       toast.error(msg);
       await supabase.auth.signOut();
       return;
     }
 
-    onLogin(session!.access_token, user!.id, emailParaLogin, 'cliente');
-  };
-
-  const loginSistema = async (emailParaLogin: string, pass: string) => {
-    const { data: { user, session }, error } = await supabase.auth.signInWithPassword({
-      email: emailParaLogin, password: pass
-    });
-    if (error) { 
-      const msg = translateSupabaseError(error);
-      setError(msg);
-      toast.error(msg);
-      return;
-    }
-
-    const { data: usuario, error: _userError } = await supabase
-      .from('usuarios')
-      .select('role')
-      .eq('id', user!.id)
-      .maybeSingle();
-
-    if (_userError) {
-      console.error('❌ Error consultando perfil en usuarios:', _userError);
-    }
-
-    const role = usuario?.role;
     const rolesPermitidos = [
-      'administrador', 'owner',
-      'programador', 'modelo',
-      'contador', 'recepcionista', 'supervisor', 'moderador'
+      'administrador', 'owner', 'programador', 'modelo',
+      'contador', 'recepcionista', 'supervisor', 'moderador', 'cliente'
     ];
 
     if (!role || !rolesPermitidos.includes(role)) {
-      const msg = 'Acceso no autorizado. Si eres cliente usa Iniciar sesión.';
-      setError(msg);
-      toast.error(msg);
-      await supabase.auth.signOut();
-      return;
+      const { data: clientePorEmail } = await supabase
+        .from('clientes')
+        .select('id')
+        .eq('email', authEmailUsado)
+        .maybeSingle();
+      if (clientePorEmail) {
+        role = 'cliente';
+      } else {
+        const msg = 'Acceso no configurado. Contacta a un administrador.';
+        setError(msg);
+        toast.error(msg);
+        await supabase.auth.signOut();
+        return;
+      }
     }
 
-    onLogin(session!.access_token, user!.id, emailParaLogin, role);
+    onLogin(session.access_token, user.id, authEmailUsado, role);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -179,28 +205,54 @@ export function LoginForm({ tipo, onLogin, onBackToLanding }: LoginFormProps) {
     setError('');
 
     let emailParaLogin = identificador.trim().toLowerCase();
+    let emailAlternativo: string | undefined = undefined;
 
     try {
       if (!esEmail(emailParaLogin)) {
         const soloDigitos = emailParaLogin.replace(/[^0-9]/g, '');
         const tel10 = soloDigitos.slice(-10);
 
-        const { data: emailData } = await supabase
-          .rpc('get_email_by_telefono', { p_telefono: tel10 });
-
-        if (!emailData) {
-          setError('No encontramos una cuenta asociada a ese número de teléfono.');
+        if (!tel10) {
+          setError('Ingresa un número de teléfono o correo electrónico válido.');
           setLoading(false);
           return;
         }
-        emailParaLogin = emailData;
+
+        const syntheticEmail = `${tel10}@clientes.blackdiamond.app`;
+        let emailEncontrado: string | null = null;
+
+        // 1. Probar RPC get_email_by_telefono
+        try {
+          const { data: emailData } = await supabase
+            .rpc('get_email_by_telefono', { p_telefono: tel10 });
+          if (emailData) emailEncontrado = emailData;
+        } catch {}
+
+        // 2. Si no, buscar directamente en clientes
+        if (!emailEncontrado) {
+          try {
+            const { data: clienteData } = await supabase
+              .from('clientes')
+              .select('email')
+              .or(`telefono.eq.${tel10},telefono.eq.57${tel10},telefono.eq.+57${tel10}`)
+              .not('email', 'is', null)
+              .maybeSingle();
+
+            if (clienteData?.email) {
+              emailEncontrado = clienteData.email;
+            }
+          } catch {}
+        }
+
+        if (emailEncontrado) {
+          emailParaLogin = emailEncontrado;
+          emailAlternativo = syntheticEmail;
+        } else {
+          emailParaLogin = syntheticEmail;
+        }
       }
 
-      if (tipo === 'cliente') {
-        await loginCliente(emailParaLogin, password);
-      } else {
-        await loginSistema(emailParaLogin, password);
-      }
+      await ejecutarLogin(emailParaLogin, password, emailAlternativo);
     } catch (err: any) {
       if (process.env.NODE_ENV === 'development') console.error('Error en login:', err);
       const msg = translateSupabaseError(err);

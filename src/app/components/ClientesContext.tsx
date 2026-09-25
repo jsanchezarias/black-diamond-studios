@@ -220,8 +220,135 @@ export function ClientesProvider({ children }: { children: ReactNode }) {
   const agregarCliente = async (
     clienteData: Omit<Cliente, 'id' | 'fechaRegistro' | 'totalServicios' | 'totalGastado' | 'historialServicios' | 'observaciones'> & { password?: string }
   ): Promise<Cliente> => {
+    const cleanTelefono = clienteData.telefono?.trim();
+    const cleanNombre = clienteData.nombre?.trim();
+    const cleanEmail = clienteData.email?.trim().toLowerCase();
+    const telDigits = cleanTelefono.replace(/[^0-9]/g, '').slice(-10);
+    const authEmail = cleanEmail || (telDigits ? `${telDigits}@clientes.blackdiamond.app` : undefined);
+
+    // Si tiene contraseña, crear mediante el endpoint del servidor para registrar credenciales en Supabase Auth
+    if (clienteData.password) {
+      try {
+        let fnData: any = null;
+        let fnErrorMsg: string | null = null;
+
+        // 1. Invocar vía Supabase Functions
+        try {
+          const { data, error: fnError } = await supabase.functions.invoke(
+            'bd-api/make-server-9dadc017/clientes',
+            {
+              method: 'POST',
+              body: {
+                telefono: cleanTelefono,
+                nombre: cleanNombre,
+                nombreUsuario: clienteData.nombreUsuario || cleanNombre.toLowerCase().replace(/\s+/g, ''),
+                password: clienteData.password,
+                email: authEmail,
+                fechaNacimiento: clienteData.fechaNacimiento,
+                ciudad: clienteData.ciudad,
+                preferencias: clienteData.preferencias,
+                notas: clienteData.notas,
+                rating: clienteData.rating,
+              },
+            }
+          );
+
+          if (!fnError && data && !data.error) {
+            fnData = data;
+          } else {
+            fnErrorMsg = data?.error || fnError?.message || null;
+          }
+        } catch (errInv: any) {
+          fnErrorMsg = errInv?.message;
+        }
+
+        // 2. Fallback a fetch directo si functions.invoke falló
+        if (!fnData && (!fnErrorMsg || !fnErrorMsg.includes('ya existe'))) {
+          try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const token = session?.access_token || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt6ZGpyYXZ3Y2p1bW1lZ3h4cmtkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3NzY4ODIsImV4cCI6MjA4MzM1Mjg4Mn0.xC2QDsAzhYRRg8yakyRTChzHL_bleIT-u9mtKlNeBpc';
+            const anonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt6ZGpyYXZ3Y2p1bW1lZ3h4cmtkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3NzY4ODIsImV4cCI6MjA4MzM1Mjg4Mn0.xC2QDsAzhYRRg8yakyRTChzHL_bleIT-u9mtKlNeBpc';
+
+            const resDirect = await fetch(
+              'https://kzdjravwcjummegxxrkd.supabase.co/functions/v1/bd-api/make-server-9dadc017/clientes',
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`,
+                  'apikey': anonKey,
+                  'x-invoke-path': '/make-server-9dadc017/clientes',
+                },
+                body: JSON.stringify({
+                  telefono: cleanTelefono,
+                  nombre: cleanNombre,
+                  nombreUsuario: clienteData.nombreUsuario || cleanNombre.toLowerCase().replace(/\s+/g, ''),
+                  password: clienteData.password,
+                  email: authEmail,
+                  fechaNacimiento: clienteData.fechaNacimiento,
+                  ciudad: clienteData.ciudad,
+                  preferencias: clienteData.preferencias,
+                  notas: clienteData.notas,
+                  rating: clienteData.rating,
+                }),
+              }
+            );
+
+            const resJson = await resDirect.json().catch(() => null);
+            if (resDirect.ok && resJson && !resJson.error) {
+              fnData = resJson;
+              fnErrorMsg = null;
+            } else if (resJson?.error) {
+              fnErrorMsg = resJson.error;
+            }
+          } catch (errFetch: any) {
+            if (!fnErrorMsg) fnErrorMsg = errFetch?.message;
+          }
+        }
+
+        if (fnErrorMsg && fnErrorMsg.includes('ya existe')) {
+          throw new Error(fnErrorMsg);
+        }
+
+        if (fnData) {
+          const nuevoCliente: Cliente = {
+            id: fnData.id,
+            telefono: fnData.telefono,
+            nombre: fnData.nombre,
+            nombreUsuario: fnData.nombreUsuario ?? fnData.nombre_usuario ?? '',
+            email: fnData.email,
+            userId: fnData.userId,
+            fechaNacimiento: fnData.fechaNacimiento ? new Date(fnData.fechaNacimiento) : undefined,
+            ciudad: fnData.ciudad,
+            preferencias: fnData.preferencias,
+            notas: fnData.notas,
+            observaciones: [],
+            rating: fnData.rating,
+            historialServicios: [],
+            fechaRegistro: new Date(fnData.fechaRegistro || Date.now()),
+            totalServicios: 0,
+            totalGastado: 0,
+            bloqueado: false,
+          };
+          setClientes(prev => [nuevoCliente, ...prev]);
+          return nuevoCliente;
+        }
+      } catch (errFn: any) {
+        if (errFn?.message?.includes('ya existe')) {
+          throw errFn;
+        }
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('⚠️ Fallback a inserción directa de cliente:', errFn);
+        }
+      }
+    }
+
+    // Fallback estándar a inserción en tabla clientes
     const dbRow = {
       ...clienteToDbRow(clienteData),
+      telefono: cleanTelefono,
+      nombre: cleanNombre,
+      email: cleanEmail || authEmail,
       historial_servicios: [],
       observaciones: [],
       total_servicios: 0,
@@ -229,7 +356,6 @@ export function ClientesProvider({ children }: { children: ReactNode }) {
       fecha_registro: new Date().toISOString(),
       bloqueado: false,
     };
-    // No guardar password en la tabla directamente
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     delete (dbRow as any).password;
 

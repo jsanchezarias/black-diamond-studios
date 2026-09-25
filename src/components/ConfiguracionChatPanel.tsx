@@ -22,17 +22,34 @@ export function ConfiguracionChatPanel() {
 
   const cargarDatosProgramador = async () => {
     try {
-      const { data, error } = await supabase
+      // 1. Buscar en la tabla usuarios por rol o email
+      const { data: usuario, error } = await supabase
+        .from('usuarios')
+        .select('*')
+        .or('email.eq.programador@app.com,role.eq.programador')
+        .limit(1)
+        .maybeSingle();
+
+      if (usuario && !error) {
+        setProgramadorExists(true);
+        setProgramadorId(usuario.id);
+        setUsername(usuario.nombre);
+        setEmail(usuario.email);
+        return;
+      }
+
+      // 2. Si no está en usuarios, buscar en clientes
+      const { data: cliente } = await supabase
         .from('clientes')
         .select('*')
         .eq('email', 'programador@app.com')
-        .single();
+        .maybeSingle();
 
-      if (data && !error) {
+      if (cliente) {
         setProgramadorExists(true);
-        setProgramadorId(data.id);
-        setUsername(data.nombre);
-        setEmail(data.email);
+        setProgramadorId(cliente.id);
+        setUsername(cliente.nombre);
+        setEmail(cliente.email);
       } else {
         setProgramadorExists(false);
       }
@@ -55,35 +72,107 @@ export function ConfiguracionChatPanel() {
     setLoading(true);
 
     try {
-      // Crear programador SIN password_hash
-      const { data, error } = await supabase
-        .from('clientes')
-        .insert({
-          nombre: username,
-          email: 'programador@app.com',
-          telefono: '3000000000', // Teléfono del programador
-          total_servicios: 0,
-          total_gastado: 0
-        })
-        .select('*')
-        .single();
+      const emailFinal = email || 'programador@app.com';
 
-      if (error) {
-        if (process.env.NODE_ENV === 'development') console.error('❌ Error creando programador:', error);
-        toast.error('Error al crear usuario programador');
-        return;
+      // 1. Crear usuario en Auth y tabla usuarios mediante Edge Function
+      let fnData: any = null;
+      let errorMsg: string | null = null;
+
+      try {
+        const { data, error: fnError } = await supabase.functions.invoke(
+          'bd-api/make-server-9dadc017/administrador/crear-usuario',
+          {
+            method: 'POST',
+            body: {
+              email: emailFinal,
+              password,
+              nombre: username,
+              role: 'programador',
+            },
+          }
+        );
+
+        if (!fnError && data && !data.error) {
+          fnData = data;
+        } else {
+          errorMsg = data?.error || fnError?.message || null;
+        }
+      } catch (errInv: any) {
+        errorMsg = errInv?.message;
       }
 
+      // Fallback a fetch directo
+      if (!fnData && (!errorMsg || !errorMsg.includes('ya está registrado'))) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          const token = session?.access_token || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt6ZGpyYXZ3Y2p1bW1lZ3h4cmtkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3NzY4ODIsImV4cCI6MjA4MzM1Mjg4Mn0.xC2QDsAzhYRRg8yakyRTChzHL_bleIT-u9mtKlNeBpc';
+          const anonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt6ZGpyYXZ3Y2p1bW1lZ3h4cmtkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3NzY4ODIsImV4cCI6MjA4MzM1Mjg4Mn0.xC2QDsAzhYRRg8yakyRTChzHL_bleIT-u9mtKlNeBpc';
+
+          const resDirect = await fetch(
+            'https://kzdjravwcjummegxxrkd.supabase.co/functions/v1/bd-api/make-server-9dadc017/administrador/crear-usuario',
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+                'apikey': anonKey,
+                'x-invoke-path': '/make-server-9dadc017/administrador/crear-usuario',
+              },
+              body: JSON.stringify({
+                email: emailFinal,
+                password,
+                nombre: username,
+                role: 'programador',
+              }),
+            }
+          );
+
+          const resJson = await resDirect.json().catch(() => null);
+          if (resDirect.ok && resJson && !resJson.error) {
+            fnData = resJson;
+            errorMsg = null;
+          } else if (resJson?.error) {
+            errorMsg = resJson.error;
+          }
+        } catch (errFetch: any) {
+          if (!errorMsg) errorMsg = errFetch?.message;
+        }
+      }
+
+      if (!fnData) {
+        throw new Error(errorMsg || 'Error al registrar credenciales del programador');
+      }
+
+      const userId = fnData?.userId || fnData?.user?.id;
+      if (userId) {
+        await supabase
+          .from('usuarios')
+          .update({ estado: 'activo' })
+          .eq('id', userId);
+      }
+
+      // También registrar en clientes si el chat moderator lo requiere
+      await supabase
+        .from('clientes')
+        .upsert({
+          nombre: username,
+          email: emailFinal,
+          telefono: '3000000000',
+          user_id: userId,
+          total_servicios: 0,
+          total_gastado: 0,
+        }, { onConflict: 'email' });
+
       setProgramadorExists(true);
-      setProgramadorId(data.id);
+      setProgramadorId(userId || fnData.id);
       setPassword('');
-      toast.success('Usuario programador creado exitosamente');
+      toast.success('✅ Usuario programador creado exitosamente con credenciales de acceso activas');
 
       // Crear mensaje de sistema si no existe
       await crearMensajeSistema();
-    } catch (error) {
+    } catch (error: any) {
       if (process.env.NODE_ENV === 'development') console.error('Error creando programador:', error);
-      toast.error('Error al crear usuario');
+      toast.error(error.message || 'Error al crear usuario programador');
     } finally {
       setLoading(false);
     }
@@ -100,27 +189,44 @@ export function ConfiguracionChatPanel() {
     setLoading(true);
 
     try {
-      const updates: any = {
-        nombre: username
-      };
+      const emailFinal = email || 'programador@app.com';
 
-      // ⚠️ La tabla clientes no tiene password_hash, solo actualizar nombre
-      const { error } = await supabase
-        .from('clientes')
-        .update(updates)
-        .eq('id', programadorId);
+      // 1. Si se ingresó una nueva contraseña, actualizar credenciales de Auth
+      if (password && password.length >= 6) {
+        const { data, error: credError } = await supabase.functions.invoke(
+          'bd-api/make-server-9dadc017/administrador/actualizar-credenciales',
+          {
+            method: 'POST',
+            body: {
+              userId: programadorId,
+              email: emailFinal,
+              password,
+            },
+          }
+        );
 
-      if (error) {
-        if (process.env.NODE_ENV === 'development') console.error('❌ Error actualizando programador:', error);
-        toast.error('Error al actualizar usuario');
-        return;
+        if (credError || data?.error) {
+          throw new Error(data?.error || credError?.message || 'Error al actualizar contraseña de acceso');
+        }
       }
 
+      // 2. Actualizar nombre en tabla usuarios
+      await supabase
+        .from('usuarios')
+        .update({ nombre: username, updated_at: new Date().toISOString() })
+        .eq('id', programadorId);
+
+      // 3. Actualizar en tabla clientes
+      await supabase
+        .from('clientes')
+        .update({ nombre: username })
+        .eq('email', emailFinal);
+
       setPassword('');
-      toast.success('Usuario programador actualizado exitosamente');
-    } catch (error) {
+      toast.success('✅ Usuario programador y credenciales actualizados exitosamente');
+    } catch (error: any) {
       if (process.env.NODE_ENV === 'development') console.error('Error actualizando programador:', error);
-      toast.error('Error al actualizar usuario');
+      toast.error(error.message || 'Error al actualizar usuario');
     } finally {
       setLoading(false);
     }

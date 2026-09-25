@@ -79,6 +79,8 @@ interface AsistenciaContextType {
   obtenerJornadaActual: (modeloEmail: string) => Jornada | undefined;
   finalizarJornada: (jornadaId: string, notas?: string) => Promise<void>;
   actualizarConfiguracion: (config: Partial<ConfiguracionJornada>) => Promise<void>;
+  confirmarActividadTurno: (jornadaId: string) => Promise<void>;
+  marcarInactivaPorFaltaDeRespuesta: (jornadaId: string, ultimaActividad?: Date) => Promise<void>;
 }
 
 const AsistenciaContext = createContext<AsistenciaContextType | undefined>(undefined);
@@ -310,7 +312,27 @@ export function AsistenciaProvider({ children }: { children: ReactNode }) {
       .single();
     if (insErr) throw insErr;
 
-    // 4. Notificar a la modelo
+    // 4. Activar estado de la modelo en la tabla usuarios al iniciar turno aprobado
+    if (solicitud.modeloId) {
+      try {
+        await supabase
+          .from('usuarios')
+          .update({
+            estado: 'activo',
+            disponible: true,
+            updated_at: ahora,
+          })
+          .eq('id', solicitud.modeloId);
+      } catch (errUsu) {
+        console.warn('No se pudo actualizar estado en tabla usuarios:', errUsu);
+      }
+    }
+
+    if (typeof window !== 'undefined' && jornadaData?.id) {
+      localStorage.setItem(`turno_ultima_confirmacion_${jornadaData.id}`, Date.now().toString());
+    }
+
+    // 5. Notificar a la modelo
     await supabase.from('notificaciones').insert({
       para_usuario_id: solicitud.modeloId,
       titulo: '✅ Entrada aprobada',
@@ -462,6 +484,22 @@ export function AsistenciaProvider({ children }: { children: ReactNode }) {
     
     if (jorErr) throw jorErr;
 
+    // Actualizar estado de la modelo a inactivo al finalizar su jornada
+    if (jornada.modeloId) {
+      try {
+        await supabase
+          .from('usuarios')
+          .update({
+            estado: 'inactivo',
+            disponible: false,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', jornada.modeloId);
+      } catch (errUsu) {
+        console.warn('No se pudo actualizar estado inactivo en usuarios:', errUsu);
+      }
+    }
+
     // Sincronizar con asistencias (legacy)
     await supabase
       .from('asistencias')
@@ -473,6 +511,100 @@ export function AsistenciaProvider({ children }: { children: ReactNode }) {
       })
       .eq('solicitud_entrada_id', jornada.id) // o buscar por email+fecha
       .or(`solicitud_entrada_id.eq.${jornada.id},modelo_email.eq.${jornada.modeloEmail},estado.eq.En Turno`);
+
+    await cargarDatos();
+  };
+
+  const confirmarActividadTurno = async (jornadaId: string) => {
+    const jornada = jornadas.find(j => j.id === jornadaId);
+    if (!jornada) return;
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`turno_ultima_confirmacion_${jornadaId}`, Date.now().toString());
+    }
+
+    try {
+      await supabase.from('notificaciones').insert({
+        para_rol: 'administrador',
+        titulo: '🟢 Actividad confirmada',
+        mensaje: `${jornada.modeloNombre} confirmó que continúa activa en su turno.`,
+        tipo: 'confirmacion_actividad',
+        referencia_id: jornadaId,
+        leida: true,
+      });
+    } catch {}
+  };
+
+  const marcarInactivaPorFaltaDeRespuesta = async (jornadaId: string, ultimaActividad?: Date) => {
+    const jornada = jornadas.find(j => j.id === jornadaId);
+    if (!jornada) return;
+
+    // La hora fin se congela en la última confirmación activa o ahora
+    const horaFin = ultimaActividad || new Date();
+    const diffMs = Math.max(0, horaFin.getTime() - jornada.horaInicio.getTime());
+    const horasTrabajadas = Math.round((diffMs / 3600000) * 100) / 100;
+    const jornadaCompleta = horasTrabajadas >= jornada.horasRequeridas;
+
+    // 1. Actualizar jornada a 'cerrada_auto'
+    await supabase
+      .from('jornadas')
+      .update({
+        hora_fin_jornada: horaFin.toISOString(),
+        horas_trabajadas: horasTrabajadas,
+        jornada_completa: jornadaCompleta,
+        estado: 'cerrada_auto',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', jornadaId);
+
+    // 2. Actualizar asistencias legacy
+    await supabase
+      .from('asistencias')
+      .update({
+        hora_salida: horaFin.toISOString(),
+        horas_trabajadas: horasTrabajadas,
+        estado: 'Finalizado',
+        observaciones: 'Cierre automático por inactividad (sin confirmación de estado periódico)'
+      })
+      .or(`solicitud_entrada_id.eq.${jornada.id},modelo_email.eq.${jornada.modeloEmail},estado.eq.En Turno`);
+
+    // 3. Pasar estado de la modelo a INACTIVO en usuarios
+    if (jornada.modeloId) {
+      try {
+        await supabase
+          .from('usuarios')
+          .update({
+            estado: 'inactivo',
+            disponible: false,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', jornada.modeloId);
+      } catch (e) {
+        console.warn('Error al pasar modelo a inactivo en usuarios:', e);
+      }
+    }
+
+    // 4. Notificaciones
+    try {
+      await supabase.from('notificaciones').insert([
+        {
+          para_usuario_id: jornada.modeloId,
+          titulo: '⏸️ Turno pausado por inactividad',
+          mensaje: `Tu turno ha sido cerrado y tu estado pasó a Inactivo por no confirmar actividad (${horasTrabajadas}h contabilizadas).`,
+          tipo: 'turno_cerrado_inactividad',
+          datos: { jornada_id: jornadaId, horas_trabajadas: horasTrabajadas },
+          leida: false,
+        },
+        {
+          para_rol: 'administrador',
+          titulo: '⚠️ Modelo inactiva — Turno cerrado',
+          mensaje: `${jornada.modeloNombre} pasó a estado Inactivo por falta de confirmación periódica (${horasTrabajadas}h contabilizadas).`,
+          tipo: 'modelo_inactiva_auto',
+          referencia_id: jornadaId,
+          leida: false,
+        }
+      ]);
+    } catch {}
 
     await cargarDatos();
   };
@@ -536,13 +668,18 @@ export function AsistenciaProvider({ children }: { children: ReactNode }) {
       .sort((a, b) => a.fecha.getTime() - b.fecha.getTime());
 
   const obtenerSolicitudPorModelo = (modeloEmail: string): SolicitudEntrada | undefined => {
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
+    if (!modeloEmail) return undefined;
+    const cleanEmail = modeloEmail.toLowerCase().trim();
+    const hoyStr = new Date().toISOString().split('T')[0];
+
     return solicitudesEntrada
       .filter(s => {
-        const f = new Date(s.fecha);
-        f.setHours(0, 0, 0, 0);
-        return s.modeloEmail === modeloEmail && f.getTime() === hoy.getTime();
+        const emailMatch = s.modeloEmail?.toLowerCase().trim() === cleanEmail;
+        if (!emailMatch) return false;
+
+        const fStr = s.fecha instanceof Date ? s.fecha.toISOString().split('T')[0] : String(s.fecha).split('T')[0];
+        // Priorizar solicitudes de hoy, o solicitudes que sigan pendientes/aprobadas
+        return fStr === hoyStr || s.estado === 'pendiente' || s.estado === 'aprobada';
       })
       .sort((a, b) => b.fecha.getTime() - a.fecha.getTime())[0];
   };
@@ -567,6 +704,8 @@ export function AsistenciaProvider({ children }: { children: ReactNode }) {
       obtenerJornadaActual,
       finalizarJornada,
       actualizarConfiguracion,
+      confirmarActividadTurno,
+      marcarInactivaPorFaltaDeRespuesta,
     }}>
       {children}
     </AsistenciaContext.Provider>

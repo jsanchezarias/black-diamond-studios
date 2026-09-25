@@ -2,10 +2,10 @@ import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { AlertCircle, Camera, CheckCircle, Info, Loader2, RefreshCw, Upload, X } from 'lucide-react';
+import { AlertCircle, Camera, CheckCircle, Info, Loader2, RefreshCw, Upload, X, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAsistencia } from '../app/components/AsistenciaContext';
-import { supabase } from '../utils/supabase/info'; // ✅ Corregido: ruta correcta
+import { supabase } from '../utils/supabase/info';
 import { Alert, AlertDescription } from './ui/alert';
 
 interface RegistroEntradaModalProps {
@@ -16,17 +16,21 @@ interface RegistroEntradaModalProps {
 }
 
 export function RegistroEntradaModal({ isOpen, onClose, modeloEmail, modeloNombre }: RegistroEntradaModalProps) {
-  const { crearSolicitudEntrada, obtenerSolicitudPorModelo } = useAsistencia();
+  const { crearSolicitudEntrada, obtenerSolicitudPorModelo, jornadas } = useAsistencia();
   const [paso, setPaso] = useState<'seleccion' | 'camara' | 'preview' | 'procesando' | 'exito' | 'error'>('seleccion');
   const [imagenCapturada, setImagenCapturada] = useState<string | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tipoError, setTipoError] = useState<'permiso' | 'navegador' | 'otro' | null>(null);
+  const [reintentarNuevaSelfie, setReintentarNuevaSelfie] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const solicitudHoy = obtenerSolicitudPorModelo(modeloEmail);
+  const jornadaActiva = (jornadas || []).find(
+    (j) => j.modeloEmail?.toLowerCase() === modeloEmail?.toLowerCase() && j.estado === 'en_curso'
+  );
 
   // Resetear al abrir
   useEffect(() => {
@@ -35,66 +39,81 @@ export function RegistroEntradaModal({ isOpen, onClose, modeloEmail, modeloNombr
       setImagenCapturada(null);
       setError(null);
       setTipoError(null);
+      setReintentarNuevaSelfie(false);
     } else {
       detenerCamara();
     }
   }, [isOpen]);
 
-  // Iniciar cámara cuando se selecciona esa opción
+  // Manejar el stream de la cámara y asegurar reproducción en dispositivos móviles
   useEffect(() => {
     if (paso === 'camara') {
       iniciarCamara();
+    } else {
+      detenerCamara();
     }
     return () => {
-      if (paso !== 'camara') {
-        detenerCamara();
-      }
+      detenerCamara();
     };
   }, [paso]);
 
+  // Asignar el stream al video cuando ambos estén disponibles
+  useEffect(() => {
+    if (paso === 'camara' && stream && videoRef.current) {
+      videoRef.current.srcObject = stream;
+      videoRef.current
+        .play()
+        .catch((e) => console.info('Autoplay de cámara gestionado:', e?.name || e));
+    }
+  }, [paso, stream]);
+
   const iniciarCamara = async () => {
     try {
-      // Verificar si el navegador soporta getUserMedia
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        setError('Tu navegador no soporta el acceso a la cámara. Por favor, usa un navegador moderno como Chrome, Firefox o Safari.');
+        setError('Tu navegador no soporta el acceso a la cámara. Por favor, sube una foto desde tu galería o usa Chrome/Safari.');
         setTipoError('navegador');
         return;
+      }
+
+      // Detener stream previo si existía
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
       }
 
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: 'user', // Cámara frontal
           width: { ideal: 1280 },
-          height: { ideal: 720 }
+          height: { ideal: 720 },
         },
-        audio: false
+        audio: false,
       });
-      
+
       setStream(mediaStream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-      }
       setError(null);
       setTipoError(null);
+
+      // Timeout de seguridad para vincular ref de video en DOM recién renderizado
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = mediaStream;
+          videoRef.current.play().catch(() => {});
+        }
+      }, 100);
     } catch (err: any) {
-      // Log informativo en lugar de error (es normal que algunos usuarios no den permiso)
-      if (process.env.NODE_ENV === 'development') console.info('Acceso a cámara no disponible:', err.name);
-      
-      // Manejar diferentes tipos de errores
+      if (process.env.NODE_ENV === 'development') console.info('Acceso a cámara no disponible:', err?.name);
+
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        setError('Permiso de cámara denegado. Por favor, permite el acceso a la cámara en la configuración de tu navegador.');
+        setError('Permiso de cámara denegado. Permite el acceso a la cámara o sube una foto desde tu galería.');
         setTipoError('permiso');
       } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-        setError('No se detectó ninguna cámara en tu dispositivo.');
+        setError('No se detectó ninguna cámara en tu dispositivo. Puedes subir una foto desde tu galería.');
         setTipoError('otro');
       } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
-        setError('La cámara está siendo usada por otra aplicación. Por favor, cierra otras apps que puedan estar usando la cámara.');
-        setTipoError('otro');
-      } else if (err.name === 'OverconstrainedError' || err.name === 'ConstraintNotSatisfiedError') {
-        setError('La cámara no cumple con los requisitos necesarios. Intenta usar otra cámara o dispositivo.');
+        setError('La cámara está siendo usada por otra aplicación. Ciérrala o sube una foto desde tu galería.');
         setTipoError('otro');
       } else {
-        setError('No se pudo acceder a la cámara. Asegúrate de que tu navegador tenga permisos y que estés usando HTTPS.');
+        setError('No se pudo acceder a la cámara. Asegúrate de otorgar permisos o utiliza la opción de subir foto.');
         setTipoError('otro');
       }
     }
@@ -102,8 +121,11 @@ export function RegistroEntradaModal({ isOpen, onClose, modeloEmail, modeloNombr
 
   const detenerCamara = () => {
     if (stream) {
-      stream.getTracks().forEach(track => track.stop());
+      stream.getTracks().forEach((track) => track.stop());
       setStream(null);
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
     }
   };
 
@@ -112,19 +134,27 @@ export function RegistroEntradaModal({ isOpen, onClose, modeloEmail, modeloNombr
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    const context = canvas.getContext('2d');
 
+    // Validar que la cámara ya esté entregando dimensiones válidas
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+      toast.error('La cámara se está inicializando, espera un segundo...');
+      return;
+    }
+
+    const context = canvas.getContext('2d');
     if (!context) return;
 
-    // Configurar el canvas con las dimensiones del video
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
 
-    // Dibujar la imagen del video en el canvas
+    // Reflejar horizontalmente para que coincida con la previsualización en espejo
+    context.save();
+    context.translate(canvas.width, 0);
+    context.scale(-1, 1);
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    context.restore();
 
-    // Convertir a base64
-    const imagenBase64 = canvas.toDataURL('image/jpeg', 0.8);
+    const imagenBase64 = canvas.toDataURL('image/jpeg', 0.85);
     setImagenCapturada(imagenBase64);
     detenerCamara();
     setPaso('preview');
@@ -134,15 +164,13 @@ export function RegistroEntradaModal({ isOpen, onClose, modeloEmail, modeloNombr
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Validar que sea una imagen
     if (!file.type.startsWith('image/')) {
-      setError('Por favor, selecciona un archivo de imagen válido.');
+      setError('Por favor, selecciona un archivo de imagen válido (JPG, PNG, WebP).');
       return;
     }
 
-    // Validar tamaño (máximo 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      setError('La imagen es demasiado grande. Por favor, selecciona una imagen de menos de 5MB.');
+      setError('La imagen es demasiado grande. Por favor selecciona una imagen de menos de 5MB.');
       return;
     }
 
@@ -152,9 +180,10 @@ export function RegistroEntradaModal({ isOpen, onClose, modeloEmail, modeloNombr
       setImagenCapturada(result);
       setPaso('preview');
       setError(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     };
     reader.onerror = () => {
-      setError('Error al leer el archivo. Por favor, intenta de nuevo.');
+      setError('Error al leer el archivo. Por favor intenta nuevamente.');
     };
     reader.readAsDataURL(file);
   };
@@ -172,14 +201,14 @@ export function RegistroEntradaModal({ isOpen, onClose, modeloEmail, modeloNombr
     setPaso('procesando');
 
     try {
-      let selfieUrl = imagenCapturada; // Fallback: usar base64
+      let selfieUrl = imagenCapturada; // Fallback garantizado: base64
 
-      // Intentar subir a Supabase Storage — si falla, se usa base64 como fallback
+      // Intentar subir a Supabase Storage
       try {
-        const blob = await fetch(imagenCapturada).then(r => r.blob());
+        const blob = await fetch(imagenCapturada).then((r) => r.blob());
         const arrayBuffer = await blob.arrayBuffer();
 
-        const safeEmail = modeloEmail.replace(/[^a-zA-Z0-9]/g, '_');
+        const safeEmail = (modeloEmail || 'modelo').replace(/[^a-zA-Z0-9]/g, '_');
         const fileName = `checkins/${safeEmail}_${Date.now()}.jpg`;
 
         const { data, error: uploadError } = await supabase.storage
@@ -190,35 +219,36 @@ export function RegistroEntradaModal({ isOpen, onClose, modeloEmail, modeloNombr
           });
 
         if (uploadError) {
-          // No re-throw: continuar con base64 como fallback
-          if (process.env.NODE_ENV === 'development') console.warn('Storage upload falló, usando base64:', uploadError.message);
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('Storage upload falló, usando base64 como respaldo:', uploadError.message);
+          }
         } else if (data) {
-          const { data: urlData } = supabase.storage
-            .from('fotos-modelos')
-            .getPublicUrl(fileName);
+          const { data: urlData } = supabase.storage.from('fotos-modelos').getPublicUrl(fileName);
           if (urlData?.publicUrl) {
             selfieUrl = urlData.publicUrl;
           }
         }
       } catch (storageError: any) {
-        // No re-throw: continuar con base64 como fallback
-        if (process.env.NODE_ENV === 'development') console.warn('Storage error, usando base64:', storageError.message);
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('Storage error, usando fallback base64:', storageError?.message);
+        }
       }
 
-      // Crear la solicitud de entrada en Supabase
+      // Crear la solicitud de entrada
       await crearSolicitudEntrada(modeloEmail, modeloNombre, selfieUrl);
-      
+
       setPaso('exito');
-      
-      // Cerrar modal después de 3 segundos
+      toast.success('📸 Solicitud de entrada enviada al administrador');
+
       setTimeout(() => {
         onClose();
         resetearModal();
-      }, 3000);
-
+      }, 2500);
     } catch (err: any) {
-      toast.error('Error al guardar', { description: err instanceof Error ? err.message : String(err) });
-      setError('Hubo un error al enviar la solicitud. Por favor, intenta de nuevo.');
+      toast.error('Error al guardar solicitud', {
+        description: err instanceof Error ? err.message : String(err),
+      });
+      setError('Hubo un error al enviar la solicitud: ' + (err?.message || 'Error de conexión'));
       setPaso('error');
     }
   };
@@ -228,6 +258,7 @@ export function RegistroEntradaModal({ isOpen, onClose, modeloEmail, modeloNombr
     setImagenCapturada(null);
     setError(null);
     setTipoError(null);
+    setReintentarNuevaSelfie(false);
     detenerCamara();
   };
 
@@ -236,17 +267,17 @@ export function RegistroEntradaModal({ isOpen, onClose, modeloEmail, modeloNombr
     onClose();
   };
 
-  // Si ya tiene una solicitud hoy, mostrar el estado
-  if (solicitudHoy && isOpen) {
+  // Si ya tiene una solicitud hoy y no eligió reintentar tras rechazo
+  if (solicitudHoy && !reintentarNuevaSelfie && isOpen) {
     return (
       <Dialog open={isOpen} onOpenChange={handleClose}>
-        <DialogContent className="max-w-md bg-card backdrop-blur-sm border-primary/30">
+        <DialogContent className="max-w-md bg-[#16181c] border border-primary/30 text-white">
           <DialogHeader>
             <DialogTitle className="text-2xl flex items-center gap-2">
               {solicitudHoy.estado === 'pendiente' && (
                 <>
-                  <AlertCircle className="w-6 h-6 text-yellow-500" />
-                  Solicitud Pendiente
+                  <AlertCircle className="w-6 h-6 text-yellow-500 animate-pulse" />
+                  Solicitud en Revisión
                 </>
               )}
               {solicitudHoy.estado === 'aprobada' && (
@@ -258,75 +289,93 @@ export function RegistroEntradaModal({ isOpen, onClose, modeloEmail, modeloNombr
               {solicitudHoy.estado === 'rechazada' && (
                 <>
                   <X className="w-6 h-6 text-red-500" />
-                  Entrada Rechazada
+                  Solicitud Rechazada
                 </>
               )}
             </DialogTitle>
-            <DialogDescription>
-              {solicitudHoy.estado === 'pendiente' && 'Tu solicitud está siendo revisada'}
-              {solicitudHoy.estado === 'aprobada' && 'Tu entrada ha sido aprobada'}
-              {solicitudHoy.estado === 'rechazada' && 'Tu solicitud de entrada fue rechazada'}
+            <DialogDescription className="text-gray-300">
+              {solicitudHoy.estado === 'pendiente' &&
+                'Tu selfie fue enviada y está siendo verificada por el administrador.'}
+              {solicitudHoy.estado === 'aprobada' &&
+                'Tu registro de entrada ha sido aprobado y tu turno está activo.'}
+              {solicitudHoy.estado === 'rechazada' &&
+                'Tu foto no fue aprobada por el administrador. Puedes tomar una nueva selfie ahora.'}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             {/* Selfie enviada */}
-            <div className="relative w-full aspect-video rounded-lg overflow-hidden border-2 border-border">
-              <img 
-                src={solicitudHoy.selfieUrl} 
-                alt="Selfie de registro" 
-                className="w-full h-full object-cover"
-              />
-            </div>
+            {solicitudHoy.selfieUrl && (
+              <div className="relative w-full aspect-video rounded-xl overflow-hidden border-2 border-white/10">
+                <img
+                  src={solicitudHoy.selfieUrl}
+                  alt="Selfie de registro"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            )}
 
             {/* Estado */}
-            <div className="p-4 bg-secondary rounded-lg border border-border">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-muted-foreground">Estado:</span>
-                <Badge 
+            <div className="p-4 bg-black/40 rounded-xl border border-white/10 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-400">Estado de turno:</span>
+                <Badge
                   className={
-                    solicitudHoy.estado === 'pendiente' 
+                    solicitudHoy.estado === 'pendiente'
                       ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
                       : solicitudHoy.estado === 'aprobada'
                       ? 'bg-green-500/20 text-green-400 border-green-500/30'
                       : 'bg-red-500/20 text-red-400 border-red-500/30'
                   }
                 >
-                  {solicitudHoy.estado === 'pendiente' && 'Esperando aprobación'}
-                  {solicitudHoy.estado === 'aprobada' && 'Aprobada'}
-                  {solicitudHoy.estado === 'rechazada' && 'Rechazada'}
+                  {solicitudHoy.estado === 'pendiente' && '⏳ Esperando Aprobación'}
+                  {solicitudHoy.estado === 'aprobada' && '🟢 Turno Iniciado'}
+                  {solicitudHoy.estado === 'rechazada' && '🔴 Rechazada'}
                 </Badge>
               </div>
 
-              <div className="text-xs text-muted-foreground">
-                Enviada: {solicitudHoy.fecha.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
+              <div className="text-xs text-gray-400">
+                Hora de envío: {solicitudHoy.fecha.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
               </div>
 
               {solicitudHoy.comentariosAdmin && (
-                <div className="mt-3 p-3 bg-background rounded border border-border">
-                  <p className="text-xs font-semibold mb-1">Comentarios del Admin:</p>
-                  <p className="text-sm">{solicitudHoy.comentariosAdmin}</p>
+                <div className="mt-3 p-3 bg-red-500/10 rounded-lg border border-red-500/20">
+                  <p className="text-xs font-semibold text-red-400 mb-1">Motivo del Administrador:</p>
+                  <p className="text-sm text-gray-200">{solicitudHoy.comentariosAdmin}</p>
                 </div>
               )}
             </div>
 
             {solicitudHoy.estado === 'pendiente' && (
-              <p className="text-sm text-center text-muted-foreground">
-                Tu solicitud está siendo revisada por el administrador. Recibirás notificación pronto.
+              <p className="text-xs text-center text-yellow-400/80 bg-yellow-500/10 p-2.5 rounded-lg border border-yellow-500/20">
+                El administrador recibirá una alerta para revisar tu foto y dar inicio a tu contador de tiempo.
               </p>
             )}
 
             {solicitudHoy.estado === 'aprobada' && (
-              <div className="p-4 bg-green-950/30 border-2 border-green-500/30 rounded-lg text-center">
-                <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-2" />
-                <p className="font-semibold text-green-400">¡Ya estás registrada!</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Hora de entrada: {solicitudHoy.fechaRespuesta?.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
+              <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-xl text-center">
+                <p className="text-sm font-semibold text-green-400">¡Tu contador de tiempo está activo!</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  Hora de inicio: {solicitudHoy.fechaRespuesta?.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) || 'Confirmada'}
                 </p>
               </div>
             )}
 
-            <Button onClick={handleClose} className="w-full">
+            {/* BOTÓN PARA REINTENTAR SI FUE RECHAZADA (CORRECCIÓN CRÍTICA DE FLUJO) */}
+            {solicitudHoy.estado === 'rechazada' && (
+              <Button
+                onClick={() => {
+                  setReintentarNuevaSelfie(true);
+                  setPaso('seleccion');
+                }}
+                className="w-full h-12 bg-gradient-to-r from-[#b8860b] via-[#d4af37] to-[#ffd700] text-black font-extrabold hover:brightness-110 shadow-lg"
+              >
+                <Camera className="w-5 h-5 mr-2" />
+                Tomar o Subir Nueva Selfie
+              </Button>
+            )}
+
+            <Button onClick={handleClose} variant="outline" className="w-full border-white/20">
               Cerrar
             </Button>
           </div>
@@ -337,14 +386,14 @@ export function RegistroEntradaModal({ isOpen, onClose, modeloEmail, modeloNombr
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-card backdrop-blur-sm border-primary/30">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-[#16181c] border-2 border-[#c9a961]/40 text-white shadow-[0_0_40px_rgba(201,169,97,0.15)]">
         <DialogHeader>
-          <DialogTitle className="text-2xl flex items-center gap-2">
-            <Camera className="w-6 h-6 text-primary" />
-            Registrar Entrada
+          <DialogTitle className="text-2xl flex items-center gap-2 text-[#c9a961] font-['Playfair_Display',serif]">
+            <Camera className="w-6 h-6 text-[#c9a961]" />
+            Verificación de Inicio de Turno
           </DialogTitle>
-          <DialogDescription>
-            Toma una selfie o sube una foto para solicitar tu registro de entrada al turno
+          <DialogDescription className="text-gray-300">
+            Toma una selfie o sube tu foto de hoy. Al ser aprobada por el administrador, iniciará tu turno laboral y el contador de tiempo.
           </DialogDescription>
         </DialogHeader>
 
@@ -352,37 +401,37 @@ export function RegistroEntradaModal({ isOpen, onClose, modeloEmail, modeloNombr
           {/* Paso 0: Selección de método */}
           {paso === 'seleccion' && (
             <div className="space-y-4">
-              <Alert>
-                <Info className="h-4 w-4" />
-                <AlertDescription>
-                  Elige cómo quieres enviar tu foto de registro. Si usas un celular, te recomendamos tomar una selfie directamente.
+              <Alert className="bg-[#c9a961]/10 border border-[#c9a961]/30 text-gray-200">
+                <Info className="h-4 w-4 text-[#c9a961]" />
+                <AlertDescription className="text-xs">
+                  Por seguridad y verificación de presencia en sede o disponibilidad, requerimos una selfie diaria clara de tu rostro.
                 </AlertDescription>
               </Alert>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Button
                   onClick={() => setPaso('camara')}
-                  className="h-32 flex flex-col gap-3"
+                  className="h-32 flex flex-col gap-3 bg-black/40 hover:bg-[#c9a961]/10 border-2 border-white/10 hover:border-[#c9a961]/60 transition-all text-white group"
                   variant="outline"
                   size="lg"
                 >
-                  <Camera className="w-12 h-12" />
+                  <Camera className="w-12 h-12 text-[#c9a961] group-hover:scale-110 transition-transform" />
                   <div className="text-center">
-                    <p className="font-semibold">Tomar Selfie</p>
-                    <p className="text-xs text-muted-foreground">Usar cámara</p>
+                    <p className="font-bold text-base text-[#c9a961]">Tomar Selfie Ahora</p>
+                    <p className="text-xs text-gray-400">Usar la cámara de tu dispositivo</p>
                   </div>
                 </Button>
 
                 <Button
                   onClick={() => fileInputRef.current?.click()}
-                  className="h-32 flex flex-col gap-3"
+                  className="h-32 flex flex-col gap-3 bg-black/40 hover:bg-[#c9a961]/10 border-2 border-white/10 hover:border-[#c9a961]/60 transition-all text-white group"
                   variant="outline"
                   size="lg"
                 >
-                  <Upload className="w-12 h-12" />
+                  <Upload className="w-12 h-12 text-[#c9a961] group-hover:scale-110 transition-transform" />
                   <div className="text-center">
-                    <p className="font-semibold">Subir Foto</p>
-                    <p className="text-xs text-muted-foreground">Desde galería</p>
+                    <p className="font-bold text-base text-[#c9a961]">Subir desde Galería</p>
+                    <p className="text-xs text-gray-400">Seleccionar imagen de tus archivos</p>
                   </div>
                 </Button>
               </div>
@@ -396,7 +445,7 @@ export function RegistroEntradaModal({ isOpen, onClose, modeloEmail, modeloNombr
                 className="hidden"
               />
 
-              <Button onClick={handleClose} variant="outline" className="w-full">
+              <Button onClick={handleClose} variant="ghost" className="w-full text-gray-400 hover:text-white">
                 Cancelar
               </Button>
             </div>
@@ -406,73 +455,65 @@ export function RegistroEntradaModal({ isOpen, onClose, modeloEmail, modeloNombr
           {paso === 'camara' && (
             <div className="space-y-4">
               {error ? (
-                <div className="bg-black/40 rounded-lg p-5 border border-red-500/30">
-                  <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
-                  <p className="text-white text-sm text-center mb-4">{error}</p>
-                  
-                  {tipoError === 'permiso' ? (
-                    <div className="space-y-4">
-                      <Button onClick={() => fileInputRef.current?.click()} className="w-full h-14 bg-[#c9a961] text-black hover:bg-[#b59550] font-bold text-lg shadow-[0_0_15px_rgba(201,169,97,0.3)]">
-                        <Upload className="w-6 h-6 mr-2" />
-                        Subir Foto de Galería
-                      </Button>
-                      
-                      <div className="text-xs text-gray-300 text-left bg-black/60 p-4 rounded border border-white/5 mt-4">
-                        <p className="font-semibold mb-2 text-[#c9a961]">Si prefieres reintentar con la cámara:</p>
-                        <ul className="list-disc list-inside space-y-2">
-                          <li>Haz clic en el ícono de candado en la barra de direcciones.</li>
-                          <li>Selecciona <strong>"Permitir"</strong>.</li>
-                          <li>Recarga la página.</li>
-                        </ul>
-                        <Button onClick={iniciarCamara} className="w-full h-10 mt-4 bg-white/10 hover:bg-white/20 text-white border-none">
-                          <RefreshCw className="w-4 h-4 mr-2" />
-                          Reintentar Cámara
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col sm:flex-row gap-3 justify-center mt-4">
-                      <Button onClick={() => setPaso('seleccion')} className="flex-1 h-12" variant="outline">
-                        Volver
-                      </Button>
-                      <Button onClick={() => fileInputRef.current?.click()} className="flex-1 h-12 bg-[#c9a961] text-black hover:bg-[#b59550] font-bold">
-                        <Upload className="w-5 h-5 mr-2" />
-                        Subir de Galería
-                      </Button>
-                    </div>
-                  )}
+                <div className="bg-black/60 rounded-xl p-5 border border-red-500/30 text-center space-y-4">
+                  <AlertCircle className="w-12 h-12 text-red-500 mx-auto" />
+                  <p className="text-white text-sm">{error}</p>
+
+                  <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+                    <Button
+                      onClick={() => setPaso('seleccion')}
+                      className="flex-1 h-12 border-white/20 text-white"
+                      variant="outline"
+                    >
+                      <ArrowLeft className="w-4 h-4 mr-2" /> Volver
+                    </Button>
+                    <Button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex-1 h-12 bg-gradient-to-r from-[#b8860b] via-[#d4af37] to-[#ffd700] text-black font-extrabold hover:brightness-110"
+                    >
+                      <Upload className="w-4 h-4 mr-2" /> Subir de Galería
+                    </Button>
+                  </div>
                 </div>
               ) : (
-                <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden border-2 border-primary/30">
+                <div className="relative w-full aspect-video sm:aspect-[4/3] bg-black rounded-xl overflow-hidden border-2 border-[#c9a961]/40 shadow-inner">
                   <video
                     ref={videoRef}
                     autoPlay
                     playsInline
                     muted
-                    className="w-full h-full object-cover mirror"
+                    className="w-full h-full object-cover"
                     style={{ transform: 'scaleX(-1)' }}
                   />
+                  {/* Guía ovalada para centrar rostro */}
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="w-64 h-80 border-4 border-primary/50 rounded-full shadow-[0_0_20px_rgba(201,169,97,0.3)]" />
+                    <div className="w-56 h-72 border-2 border-dashed border-[#c9a961]/70 rounded-full shadow-[0_0_25px_rgba(201,169,97,0.3)] animate-pulse" />
                   </div>
                 </div>
               )}
 
               <div className="flex gap-3 pt-2">
                 {!error && (
-                  <Button onClick={capturarSelfie} className="flex-1 h-12 bg-[#c9a961] text-black hover:bg-[#b59550] font-bold text-lg shadow-lg">
-                    <Camera className="w-5 h-5 mr-2" />
-                    Capturar
+                  <Button
+                    onClick={capturarSelfie}
+                    className="flex-1 h-13 bg-gradient-to-r from-[#b8860b] via-[#d4af37] to-[#ffd700] hover:brightness-110 text-black font-black text-base shadow-lg transition-all"
+                  >
+                    <Camera className="w-5 h-5 mr-2 text-black" />
+                    Capturar Foto
                   </Button>
                 )}
-                <Button onClick={() => setPaso('seleccion')} variant="outline" className={`h-12 ${error ? 'w-full' : 'px-8'}`}>
+                <Button
+                  onClick={() => setPaso('seleccion')}
+                  variant="outline"
+                  className={`h-13 border-white/20 text-white ${error ? 'w-full' : 'px-6'}`}
+                >
                   Volver al menú
                 </Button>
               </div>
 
               {!error && (
-                <p className="text-xs text-center text-muted-foreground">
-                  Centra tu rostro en el óvalo y asegúrate de tener buena iluminación
+                <p className="text-xs text-center text-gray-400">
+                  Ubica tu rostro dentro del óvalo con buena iluminación antes de capturar
                 </p>
               )}
             </div>
@@ -480,70 +521,76 @@ export function RegistroEntradaModal({ isOpen, onClose, modeloEmail, modeloNombr
 
           {/* Paso 2: Preview de la imagen */}
           {paso === 'preview' && imagenCapturada && (
-            <>
-              <div className="relative w-full aspect-video rounded-lg overflow-hidden border-2 border-primary/30">
-                <img 
-                  src={imagenCapturada} 
-                  alt="Preview selfie" 
+            <div className="space-y-4">
+              <div className="relative w-full aspect-video sm:aspect-[4/3] rounded-xl overflow-hidden border-2 border-[#c9a961]/50 shadow-xl bg-black">
+                <img
+                  src={imagenCapturada}
+                  alt="Preview selfie"
                   className="w-full h-full object-cover"
                 />
               </div>
 
-              <div className="flex gap-3">
-                <Button onClick={enviarSolicitud} className="flex-1" size="lg">
-                  <CheckCircle className="w-4 h-4 mr-2" />
-                  Enviar Solicitud
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Button
+                  onClick={enviarSolicitud}
+                  className="flex-1 h-13 bg-gradient-to-r from-[#b8860b] via-[#d4af37] to-[#ffd700] hover:brightness-110 text-black font-black text-base shadow-lg"
+                >
+                  <CheckCircle className="w-5 h-5 mr-2 text-black" />
+                  Enviar Solicitud al Admin
                 </Button>
-                <Button onClick={reintentar} variant="outline" size="lg">
+                <Button
+                  onClick={reintentar}
+                  variant="outline"
+                  className="h-13 border-white/20 text-white hover:bg-white/5"
+                >
                   <RefreshCw className="w-4 h-4 mr-2" />
                   Tomar de Nuevo
                 </Button>
               </div>
 
-              <p className="text-xs text-center text-muted-foreground">
-                Revisa que la imagen sea clara antes de enviarla
+              <p className="text-xs text-center text-gray-400">
+                Asegúrate de que tu rostro se vea nítido antes de enviar la verificación.
               </p>
-            </>
+            </div>
           )}
 
           {/* Paso 3: Procesando */}
           {paso === 'procesando' && (
-            <div className="flex flex-col items-center justify-center py-12">
-              <Loader2 className="w-16 h-16 text-primary animate-spin mb-4" />
-              <p className="text-lg font-semibold">Enviando solicitud...</p>
-              <p className="text-sm text-muted-foreground mt-2">
-                Por favor espera un momento
-              </p>
+            <div className="flex flex-col items-center justify-center py-12 space-y-4">
+              <Loader2 className="w-16 h-16 text-[#c9a961] animate-spin" />
+              <p className="text-lg font-bold text-[#c9a961]">Enviando selfie para verificación...</p>
+              <p className="text-sm text-gray-400">Notificando al administrador para iniciar tu turno</p>
             </div>
           )}
 
           {/* Paso 4: Éxito */}
           {paso === 'exito' && (
-            <div className="flex flex-col items-center justify-center py-12">
-              <div className="w-20 h-20 rounded-full bg-green-500/20 border-2 border-green-500 flex items-center justify-center mb-4">
-                <CheckCircle className="w-12 h-12 text-green-500" />
+            <div className="flex flex-col items-center justify-center py-10 space-y-3 text-center">
+              <div className="w-20 h-20 rounded-full bg-green-500/20 border-2 border-green-500 flex items-center justify-center shadow-[0_0_30px_rgba(34,197,94,0.3)]">
+                <CheckCircle className="w-12 h-12 text-green-400" />
               </div>
-              <p className="text-2xl font-bold text-green-500 mb-2">¡Solicitud Enviada!</p>
-              <p className="text-center text-muted-foreground">
-                Tu solicitud de entrada ha sido enviada al administrador.
-                <br />
-                Recibirás notificación cuando sea aprobada.
+              <p className="text-2xl font-extrabold text-green-400">¡Selfie Enviada con Éxito!</p>
+              <p className="text-sm text-gray-300 max-w-md">
+                Tu solicitud fue recibida por el administrador. En cuanto sea aprobada, comenzará a contabilizarse tu turno de 8 horas de forma automática.
               </p>
             </div>
           )}
 
           {/* Paso 5: Error */}
           {paso === 'error' && (
-            <div className="flex flex-col items-center justify-center py-12">
-              <div className="w-20 h-20 rounded-full bg-red-500/20 border-2 border-red-500 flex items-center justify-center mb-4">
+            <div className="flex flex-col items-center justify-center py-10 space-y-4 text-center">
+              <div className="w-20 h-20 rounded-full bg-red-500/20 border-2 border-red-500 flex items-center justify-center">
                 <AlertCircle className="w-12 h-12 text-red-500" />
               </div>
-              <p className="text-2xl font-bold text-red-500 mb-2">Error</p>
-              <p className="text-center text-muted-foreground mb-4">
-                {error || 'Hubo un problema al enviar tu solicitud'}
+              <p className="text-2xl font-bold text-red-400">Error al Enviar</p>
+              <p className="text-sm text-gray-300 max-w-md">
+                {error || 'Hubo un inconveniente al registrar la foto. Por favor intenta de nuevo.'}
               </p>
-              <Button onClick={reintentar}>
-                Intentar de Nuevo
+              <Button
+                onClick={reintentar}
+                className="bg-white/10 hover:bg-white/20 text-white border border-white/20"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" /> Reintentar
               </Button>
             </div>
           )}

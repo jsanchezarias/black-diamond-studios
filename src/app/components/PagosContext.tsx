@@ -56,6 +56,22 @@ export interface LiquidacionDetalle {
     valorTotal: number;
     porcentaje: number;
     liquidacion: number;
+    serviciosNormales?: {
+      cantidad: number;
+      valorTotal: number;
+      porcentaje: number;
+      liquidacion: number;
+      porcentajeCasa: number;
+      liquidacionCasa: number;
+    };
+    serviciosHorasExtra?: {
+      cantidad: number;
+      valorTotal: number;
+      porcentaje: number;
+      liquidacion: number;
+      porcentajeCasa: number;
+      liquidacionCasa: number;
+    };
   };
   adicionales: {
     cantidad: number;

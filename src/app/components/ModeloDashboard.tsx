@@ -75,8 +75,10 @@ const CalendarioPanel = lazy(() => import('../../components/CalendarioPanel').th
 const DetalleCitaModal = lazy(() => import('../../components/DetalleCitaModal').then(m => ({ default: m.DetalleCitaModal })));
 const NotificacionesPanel = lazy(() => import('./NotificacionesPanel').then(m => ({ default: m.NotificacionesPanel })));
 // const AnalyticsPanel = lazy(() => import('./AnalyticsPanel').then(m => ({ default: m.AnalyticsPanel })));
-const StreamingControl = lazy(() => import('./StreamingControl').then(m => ({ default: m.StreamingControl })));
 const CalificarClienteModal = lazy(() => import('../../components/CalificarClienteModal').then(m => ({ default: m.CalificarClienteModal })));
+const ConfirmacionActividadModal = lazy(() => import('../../components/ConfirmacionActividadModal').then(m => ({ default: m.ConfirmacionActividadModal })));
+import { determinarComisionServicio, FRECUENCIA_CONFIRMACION_MS, VENTANA_RESPUESTA_MS } from '../../utils/calculoComisiones';
+import { Sparkles } from 'lucide-react';
 
 interface ModeloDashboardProps {
   accessToken: string;
@@ -187,7 +189,8 @@ function JornadaBanner({ userEmail, onRegistrarEntrada }: { userEmail: string; o
   const faltanSecs = Math.max(0, totalReqSecs - diffSecs);
   const faltanHoras = Math.floor(faltanSecs / 3600);
   const faltanMins = Math.floor((faltanSecs % 3600) / 60);
-  const colorBarra = progreso < 40 ? '#ef4444' : progreso < 75 ? '#eab308' : progreso < 100 ? '#22c55e' : '#c9a961';
+  const esSobretiempo = horas >= 8;
+  const colorBarra = esSobretiempo ? '#c9a961' : progreso < 40 ? '#ef4444' : progreso < 75 ? '#eab308' : '#22c55e';
 
   const handleCheckout = async () => {
     const confirm = window.confirm(
@@ -220,11 +223,13 @@ function JornadaBanner({ userEmail, onRegistrarEntrada }: { userEmail: string; o
         <div className="flex items-center justify-between mb-2">
           <span className="text-[#888] text-xs flex items-center gap-1.5 font-medium">⏱️ TURNO</span>
           <span className={`text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1 border ${
-            progreso >= 100
+            esSobretiempo
+              ? 'bg-[#c9a961]/25 text-[#ffd700] border-[#c9a961]/50 font-bold'
+              : progreso >= 100
               ? 'bg-[#c9a961]/20 text-[#c9a961] border-[#c9a961]/30'
               : 'bg-green-500/20 text-green-400 border-green-500/30'
           }`}>
-            {progreso >= 100 ? '✅ Turno completo' : '🟢 En turno'}
+            {esSobretiempo ? '🔥 Sobretiempo (>8h)' : progreso >= 100 ? '✅ Turno completo' : '🟢 En turno'}
           </span>
         </div>
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
@@ -241,7 +246,7 @@ function JornadaBanner({ userEmail, onRegistrarEntrada }: { userEmail: string; o
             <div className="flex justify-between text-[11px] text-[#888]">
               <span>Entrada: {horaInicio.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}</span>
               <span style={{ color: colorBarra }}>{Math.floor(progreso)}%</span>
-              <span>{progreso >= 100 ? '✅ Completo' : `Faltan ${faltanHoras}h ${faltanMins}m`}</span>
+              <span>{esSobretiempo ? '🔥 Sobretiempo activo' : progreso >= 100 ? '✅ Completo' : `Faltan ${faltanHoras}h ${faltanMins}m`}</span>
             </div>
           </div>
           <Button
@@ -253,9 +258,18 @@ function JornadaBanner({ userEmail, onRegistrarEntrada }: { userEmail: string; o
             <span className="hidden sm:inline">Finalizar</span> Jornada
           </Button>
         </div>
-        {progreso >= 100 && (
+        {esSobretiempo ? (
+          <div className="mt-2 text-center text-xs text-[#ffd700] bg-[#c9a961]/15 border border-[#c9a961]/30 rounded-lg py-2 px-3 font-semibold flex items-center justify-center gap-1.5 shadow-[0_0_15px_rgba(201,169,97,0.15)]">
+            <Sparkles className="w-4 h-4 text-yellow-400" />
+            <span>🔥 ¡Horas Extras Activas (&gt;8h)! Tus servicios se liquidan al <strong>60% para ti</strong> (40% casa).</span>
+          </div>
+        ) : progreso >= 100 ? (
           <div className="mt-2 text-center text-[11px] text-[#c9a961] bg-[#c9a961]/10 rounded-lg py-1.5">
             ✅ ¡Completaste tus {jornadaActiva.horasRequeridas}h! Puedes salir sin multa
+          </div>
+        ) : (
+          <div className="mt-1 text-[11px] text-gray-400 text-center">
+            ⏱️ Turno estándar (≤8h): Servicios al 50% modelo / 50% casa · Verificación periódica activa cada 90 min
           </div>
         )}
       </CardContent>
@@ -511,9 +525,22 @@ export function ModeloDashboard({ accessToken: _accessToken, userId, userEmail, 
   const { multas, obtenerTotalMultasPendientesPorEmail } = useMultas();
   const { obtenerAdelantosPendientes } = usePagos();
   const { agendamientos, recargarAgendamientos } = useAgendamientos();
-  const { registrarSalida, obtenerRegistroActual, obtenerSolicitudPorModelo, crearSolicitudEntrada, jornadas } = useAsistencia();
+  const {
+    registrarSalida,
+    obtenerRegistroActual,
+    obtenerSolicitudPorModelo,
+    crearSolicitudEntrada,
+    jornadas,
+    finalizarJornada,
+    confirmarActividadTurno,
+    marcarInactivaPorFaltaDeRespuesta
+  } = useAsistencia();
   const { inventario, recargarProductos } = useInventory();
   const { carrito } = useCarrito();
+
+  // Estados para confirmación periódica de actividad (cada 90 minutos)
+  const [mostrarConfirmacionActividad, setMostrarConfirmacionActividad] = useState(false);
+  const [tiempoRestanteConfirmacionMs, setTiempoRestanteConfirmacionMs] = useState(VENTANA_RESPUESTA_MS);
 
   useEffect(() => {
     recargarAgendamientos();
@@ -845,7 +872,99 @@ export function ModeloDashboard({ accessToken: _accessToken, userId, userEmail, 
 
   const registroActivo = modeloActual ? obtenerRegistroActual(emailModelo) : undefined;
   const solicitudEntrada = modeloActual ? obtenerSolicitudPorModelo(emailModelo) : undefined;
-  const puedeIniciarServicio = !!registroActivo;
+  const jornadaActiva = (jornadas || []).find(
+    (j) => j.modeloEmail?.toLowerCase().trim() === emailModelo.toLowerCase().trim() && j.estado === 'en_curso'
+  );
+  const puedeIniciarServicio = !!registroActivo || !!jornadaActiva;
+
+  // ── Verificación periódica de turno activo (cada 90 minutos) ──────────────────
+  useEffect(() => {
+    if (!jornadaActiva) {
+      setMostrarConfirmacionActividad(false);
+      return;
+    }
+
+    const checkInterval = setInterval(() => {
+      // Si hay un servicio activo con cliente, posponer automáticamente la verificación
+      if (servicioActivo) {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(`turno_ultima_confirmacion_${jornadaActiva.id}`, Date.now().toString());
+        }
+        setMostrarConfirmacionActividad(false);
+        return;
+      }
+
+      // Obtener timestamp de última confirmación (o inicio de jornada si es primera vez)
+      let ultimaConfirmacionMs = new Date(jornadaActiva.horaInicio).getTime();
+      if (typeof window !== 'undefined') {
+        const stored = localStorage.getItem(`turno_ultima_confirmacion_${jornadaActiva.id}`);
+        if (stored) {
+          const parsed = parseInt(stored, 10);
+          if (!isNaN(parsed) && parsed > 0) ultimaConfirmacionMs = parsed;
+        }
+      }
+
+      const ahoraMs = Date.now();
+      const tiempoTranscurrido = ahoraMs - ultimaConfirmacionMs;
+
+      // Si han pasado los 90 minutos de intervalo
+      if (tiempoTranscurrido >= FRECUENCIA_CONFIRMACION_MS) {
+        const limiteRespuesta = FRECUENCIA_CONFIRMACION_MS + VENTANA_RESPUESTA_MS;
+        const restanteMs = limiteRespuesta - tiempoTranscurrido;
+
+        if (restanteMs > 0) {
+          setTiempoRestanteConfirmacionMs(restanteMs);
+          setMostrarConfirmacionActividad(true);
+        } else {
+          // Expiró la ventana de 15 minutos sin confirmación:
+          // Pasa a inactivo y deja de contabilizar el tiempo
+          setMostrarConfirmacionActividad(false);
+          const fechaCongelada = new Date(ultimaConfirmacionMs + FRECUENCIA_CONFIRMACION_MS);
+          marcarInactivaPorFaltaDeRespuesta(jornadaActiva.id, fechaCongelada);
+          toast.error('⚠️ Turno finalizado por inactividad. Tu estado pasó a Inactivo.');
+        }
+      } else {
+        setMostrarConfirmacionActividad(false);
+      }
+    }, 1000);
+
+    return () => clearInterval(checkInterval);
+  }, [jornadaActiva, servicioActivo, marcarInactivaPorFaltaDeRespuesta]);
+
+  const handleConfirmarActividad = async () => {
+    if (!jornadaActiva) return;
+    try {
+      await confirmarActividadTurno(jornadaActiva.id);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(`turno_ultima_confirmacion_${jornadaActiva.id}`, Date.now().toString());
+      }
+      setMostrarConfirmacionActividad(false);
+      toast.success('✅ Actividad confirmada. Tu turno continúa activo.');
+    } catch {
+      setMostrarConfirmacionActividad(false);
+    }
+  };
+
+  const handleFinalizarPorInactividadModal = async () => {
+    if (!jornadaActiva) return;
+    const confirm = window.confirm('¿Deseas finalizar tu jornada de turno de hoy?');
+    if (confirm) {
+      setMostrarConfirmacionActividad(false);
+      try {
+        await finalizarJornada(jornadaActiva.id, 'Finalizada por la modelo durante verificación de actividad');
+        toast.success('Jornada finalizada correctamente');
+      } catch (err: any) {
+        toast.error('Error al finalizar jornada: ' + err.message);
+      }
+    }
+  };
+
+  const handleExpiracionConfirmacion = () => {
+    if (!jornadaActiva) return;
+    setMostrarConfirmacionActividad(false);
+    marcarInactivaPorFaltaDeRespuesta(jornadaActiva.id);
+    toast.error('⚠️ Turno finalizado por inactividad. Tu estado pasó a Inactivo.');
+  };
 
   const multasPendientes = obtenerTotalMultasPendientesPorEmail(emailModelo);
   const multasModelo = multas.filter(m => m.modeloEmail === emailModelo);
@@ -1684,7 +1803,9 @@ export function ModeloDashboard({ accessToken: _accessToken, userId, userEmail, 
                             No hay servicios en este período
                           </td>
                         </tr>
-                      ) : serviciosPagina.map(s => (
+                      ) : serviciosPagina.map(s => {
+                        const comision = determinarComisionServicio(s, jornadas);
+                        return (
                         <tr key={s.id} className="border-b border-white/5 hover:bg-white/2 transition-colors">
                           <td className="px-4 py-3 text-white">{s.fecha}</td>
                           <td className="px-4 py-3 text-muted-foreground">{formatearHora(s.hora)}</td>
@@ -1693,14 +1814,31 @@ export function ModeloDashboard({ accessToken: _accessToken, userId, userEmail, 
                             {s.tipoServicio || '—'}
                           </td>
                           <td className="px-4 py-3 text-muted-foreground">{s.duracionEstimadaMinutos ? `${s.duracionEstimadaMinutos}min` : '—'}</td>
-                          <td className="px-4 py-3 text-right text-green-400 font-semibold">{formatCOP(s.montoPagado ?? s.montoPactado ?? 0)}</td>
-                           <td className="px-4 py-3 text-center">
+                          <td className="px-4 py-3 text-right">
+                            <div className="text-green-400 font-semibold">{formatCOP(s.montoPagado ?? s.montoPactado ?? 0)}</div>
+                            <div className="text-[11px] text-yellow-400 font-medium">
+                              Tuyo ({comision.porcentajeModelo}%): {formatCOP(comision.montoModelo)}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-center space-y-1">
                             <Badge className={`text-xs border ${s.estado === 'completado' ? 'bg-green-500/15 text-green-400 border-green-500/30' : 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30'}`}>
                               {s.estado}
                             </Badge>
+                            <div>
+                              {comision.esHoraExtra ? (
+                                <Badge className="text-[10px] bg-[#c9a961]/20 text-[#c9a961] border-[#c9a961]/40 font-bold">
+                                  🔥 60% Extra
+                                </Badge>
+                              ) : (
+                                <Badge className="text-[10px] bg-blue-500/15 text-blue-300 border-blue-500/30">
+                                  ⏱️ 50% Turno
+                                </Badge>
+                              )}
+                            </div>
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -2728,6 +2866,16 @@ export function ModeloDashboard({ accessToken: _accessToken, userId, userEmail, 
             onSuccess={() => {
               // El contexto de agendamientos suele ser realtime, pero podemos forzar refresh si fuera necesario
             }}
+          />
+        )}
+        {jornadaActiva && mostrarConfirmacionActividad && (
+          <ConfirmacionActividadModal
+            isOpen={mostrarConfirmacionActividad}
+            modeloNombre={nombreDisplay}
+            tiempoRestanteMs={tiempoRestanteConfirmacionMs}
+            onConfirmar={handleConfirmarActividad}
+            onFinalizar={handleFinalizarPorInactividadModal}
+            onExpirado={handleExpiracionConfirmacion}
           />
         )}
       </Suspense>

@@ -348,8 +348,16 @@ export default function App() {
 
         let verifiedUser: CurrentUser | null = null;
 
-        if (!userError && userData?.role) {
-          if (userData.estado === 'inactivo' || userData.estado === 'bloqueado') {
+        // 1. Obtener rol de la tabla usuarios o de user_metadata
+        let role = userData?.role?.trim().toLowerCase();
+        if (!role && session.user.user_metadata?.role) {
+          role = String(session.user.user_metadata.role).trim().toLowerCase();
+        }
+
+        if (role) {
+          // Solo bloquear si la cuenta está explícitamente bloqueada, archivada o suspendida
+          // 'inactivo' es un estado de turno para las modelos (no en turno), NO una expulsión del sistema
+          if (userData?.estado === 'bloqueado' || userData?.estado === 'archivado' || userData?.estado === 'suspendido') {
             await supabase.auth.signOut();
             clearLocalSession();
             if (mounted) setCurrentUser(null);
@@ -360,8 +368,8 @@ export default function App() {
             accessToken: session.access_token,
             userId: session.user.id,
             email: session.user.email || '',
-            nombre: userData.nombre || session.user.email,
-            role: userData.role?.trim().toLowerCase(),
+            nombre: userData?.nombre || session.user.user_metadata?.nombre || session.user.email,
+            role,
           };
         } else {
           // Si no está en usuarios, verificar si es cliente

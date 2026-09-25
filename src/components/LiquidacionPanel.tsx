@@ -28,6 +28,9 @@ import { useServicios } from '../app/components/ServiciosContext';
 import { useCarrito } from '../app/components/CarritoContext';
 import { useMultas } from '../app/components/MultasContext';
 import { usePagos, LiquidacionDetalle } from '../app/components/PagosContext';
+import { useAsistencia } from '../app/components/AsistenciaContext';
+import { liquidarServiciosConHorasExtra } from '../utils/calculoComisiones';
+import { Sparkles } from 'lucide-react';
 
 interface LiquidacionPanelProps {
   userEmail: string;
@@ -39,6 +42,7 @@ export function LiquidacionPanel({ userEmail }: LiquidacionPanelProps) {
   const { compras } = useCarrito();
   const { multas } = useMultas();
   const { registrarPago, obtenerPagosModelo, obtenerTotalAdelantosAprobados, loading: pagosLoading } = usePagos();
+  const { jornadas } = useAsistencia();
   const [deudasBoutique, setDeudasBoutique] = useState<any[]>([]);
   const [loadingDeudas, setLoadingDeudas] = useState(false);
   const isLoading = modelosLoading || serviciosLoading || pagosLoading || loadingDeudas;
@@ -80,17 +84,15 @@ export function LiquidacionPanel({ userEmail }: LiquidacionPanelProps) {
     // Filtrar servicios completados de esta modelo desde el último pago
     const serviciosModelo = servicios.filter(
       (s) =>
-        s.modeloEmail === modeloEmail &&
+        s.modeloEmail?.toLowerCase().trim() === modeloEmail.toLowerCase().trim() &&
         s.estado === 'completado' &&
         (!ultimoPago || new Date(s.fechaCreacion) > ultimoPago)
     );
 
-    // Calcular servicios (50% del valor pagado/pactado)
-    const valorServicios = serviciosModelo.reduce(
-      (total, s) => total + (s.montoPagado ?? s.montoPactado ?? 0),
-      0
-    );
-    const liquidacionServicios = valorServicios * 0.5;
+    // Calcular servicios con desglose: 50% dentro de 8h laborales, 60% modelo y 40% casa pasadas las 8h
+    const resumenServicios = liquidarServiciosConHorasExtra(serviciosModelo, jornadas);
+    const valorServicios = resumenServicios.valorTotal;
+    const liquidacionServicios = resumenServicios.totalModelo;
 
     // Sin campo costoAdicionales en el modelo actual — se omite
     const valorAdicionales = 0;
@@ -131,8 +133,10 @@ export function LiquidacionPanel({ userEmail }: LiquidacionPanelProps) {
       servicios: {
         cantidad: serviciosModelo.length,
         valorTotal: valorServicios,
-        porcentaje: 50,
+        porcentaje: resumenServicios.serviciosHorasExtra.cantidad > 0 ? 60 : 50,
         liquidacion: liquidacionServicios,
+        serviciosNormales: resumenServicios.serviciosNormales,
+        serviciosHorasExtra: resumenServicios.serviciosHorasExtra,
       },
       adicionales: {
         cantidad: 0,
@@ -168,7 +172,7 @@ export function LiquidacionPanel({ userEmail }: LiquidacionPanelProps) {
   // Calcular liquidaciones de todas las modelos
   const liquidaciones = useMemo(() => {
     return modelos.map((modelo) => calcularLiquidacion(modelo.email));
-  }, [modelos, servicios, compras, multas, deudasBoutique]);
+  }, [modelos, servicios, compras, multas, deudasBoutique, jornadas]);
 
   const liquidacionActual = modeloSeleccionado
     ? calcularLiquidacion(modeloSeleccionado)
@@ -448,14 +452,40 @@ export function LiquidacionPanel({ userEmail }: LiquidacionPanelProps) {
 
                 {/* Ingresos */}
                 <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">
-                      Servicios ({liquidacionActual.servicios.cantidad}) × 50%
-                    </span>
-                    <span className="text-green-400 font-semibold">
-                      +${liquidacionActual.servicios.liquidacion.toLocaleString('es-CO')}
-                    </span>
-                  </div>
+                  {/* Desglose de servicios normales si los hay */}
+                  {liquidacionActual.servicios.serviciosNormales && liquidacionActual.servicios.serviciosNormales.cantidad > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        Servicios jornada (≤8h: {liquidacionActual.servicios.serviciosNormales.cantidad}) × 50%
+                      </span>
+                      <span className="text-green-400 font-semibold">
+                        +${liquidacionActual.servicios.serviciosNormales.liquidacion.toLocaleString('es-CO')}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Desglose de servicios en horas extras si los hay */}
+                  {liquidacionActual.servicios.serviciosHorasExtra && liquidacionActual.servicios.serviciosHorasExtra.cantidad > 0 && (
+                    <div className="flex justify-between text-sm bg-[#c9a961]/10 p-2 rounded-lg border border-[#c9a961]/25">
+                      <span className="text-yellow-300 font-medium flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-yellow-400" />
+                        Servicios sobretiempo (&gt;8h: {liquidacionActual.servicios.serviciosHorasExtra.cantidad}) × 60%
+                      </span>
+                      <span className="text-yellow-400 font-bold">
+                        +${liquidacionActual.servicios.serviciosHorasExtra.liquidacion.toLocaleString('es-CO')}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Participación Casa */}
+                  {(liquidacionActual.servicios.serviciosNormales || liquidacionActual.servicios.serviciosHorasExtra) && (
+                    <div className="flex justify-between text-xs text-gray-400 py-1.5 px-2 rounded bg-black/30 border border-white/5">
+                      <span>Participación Casa (50% jornada / 40% sobretiempo):</span>
+                      <span className="text-primary font-bold">
+                        ${((liquidacionActual.servicios.serviciosNormales?.liquidacionCasa || 0) + (liquidacionActual.servicios.serviciosHorasExtra?.liquidacionCasa || 0)).toLocaleString('es-CO')}
+                      </span>
+                    </div>
+                  )}
 
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">

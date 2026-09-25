@@ -99,7 +99,21 @@ export function SolicitudEntradaModal({ solicitudId, onClose }: Props) {
         selfie_url: solicitud.selfie_url,
       });
 
-      // 4. Notificar a la modelo
+      // 4. Activar estado de la modelo en usuarios
+      try {
+        await supabase
+          .from('usuarios')
+          .update({
+            estado: 'activo',
+            disponible: true,
+            updated_at: ahora,
+          })
+          .eq('id', solicitud.modelo_id);
+      } catch (errUsu) {
+        console.warn('Error al activar modelo en usuarios:', errUsu);
+      }
+
+      // 5. Notificar a la modelo
       await supabase.from('notificaciones').insert({
         para_usuario_id: solicitud.modelo_id,
         titulo: '✅ Entrada aprobada',

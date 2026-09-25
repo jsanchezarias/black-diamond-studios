@@ -38,8 +38,10 @@ export function GestionUsuariosPanel({ userRole }: GestionUsuariosPanelProps) {
   const [nuevoNombre, setNuevoNombre] = useState('');
   const [error, setError] = useState('');
 
-  const roleACrear = userRole === 'owner' ? 'administrador' : 'programador';
-  const roleNombre = userRole === 'owner' ? 'Administrador' : 'Programador';
+  const [roleACrear, setRoleACrear] = useState<'administrador' | 'programador'>(
+    userRole === 'owner' ? 'administrador' : 'programador'
+  );
+  const roleNombre = roleACrear === 'administrador' ? 'Administrador' : 'Programador';
 
   useEffect(() => {
     cargarUsuarios();
@@ -61,9 +63,10 @@ export function GestionUsuariosPanel({ userRole }: GestionUsuariosPanelProps) {
       const authData: Record<string, string> = {};
       const publicData: Record<string, string> = {};
 
-      if (editForm.email && editForm.email !== editando.email) authData.email = editForm.email;
+      const cleanEditEmail = editForm.email?.trim().toLowerCase();
+      if (cleanEditEmail && cleanEditEmail !== editando.email) authData.email = cleanEditEmail;
       if (editForm.password && editForm.password.length >= 6) authData.password = editForm.password;
-      if (editForm.nombre && editForm.nombre !== editando.nombre) publicData.nombre = editForm.nombre;
+      if (editForm.nombre && editForm.nombre.trim() !== editando.nombre) publicData.nombre = editForm.nombre.trim();
 
       if (Object.keys(authData).length === 0 && Object.keys(publicData).length === 0) {
         setEditError('No hay cambios para guardar');
@@ -77,12 +80,44 @@ export function GestionUsuariosPanel({ userRole }: GestionUsuariosPanelProps) {
         return;
       }
 
-      const { data, error: fnError } = await supabase.functions.invoke('admin-update-user', {
-        body: { targetUserId: editando.id, authData, publicData },
-      });
+      let updated = false;
 
-      if (fnError) throw fnError;
-      if (data?.error) throw new Error(data.error);
+      // 1. Intentar actualizar vía admin-update-user
+      try {
+        const { data, error: fnError } = await supabase.functions.invoke('admin-update-user', {
+          body: { targetUserId: editando.id, authData, publicData },
+        });
+
+        if (!fnError && !data?.error) {
+          updated = true;
+        }
+      } catch (e) {
+        if (process.env.NODE_ENV === 'development') console.warn('admin-update-user fallo, probando fallback:', e);
+      }
+
+      // 2. Fallback a actualizar-credenciales del servidor si admin-update-user no funcionó
+      if (!updated) {
+        const { data: credData, error: credError } = await supabase.functions.invoke(
+          'bd-api/make-server-9dadc017/administrador/actualizar-credenciales',
+          {
+            method: 'POST',
+            body: {
+              userId: editando.id,
+              email: authData.email || undefined,
+              password: authData.password || undefined,
+            },
+          }
+        );
+
+        if (!credError && !credData?.error) {
+          updated = true;
+          if (publicData.nombre) {
+            await supabase.from('usuarios').update({ nombre: publicData.nombre }).eq('id', editando.id);
+          }
+        } else {
+          throw new Error(credData?.error || credError?.message || 'Error al actualizar usuario');
+        }
+      }
 
       await cargarUsuarios();
       setEditando(null);
@@ -98,13 +133,13 @@ export function GestionUsuariosPanel({ userRole }: GestionUsuariosPanelProps) {
     try {
       setLoading(true);
       
-      // Cargar usuarios según el rol del usuario actual
-      const rolABuscar = userRole === 'owner' ? 'administrador' : 'programador';
+      // Cargar usuarios administradores y programadores
+      const rolesABuscar = ['administrador', 'programador'];
       
       const { data, error } = await supabase
         .from('usuarios')
         .select('id, email, nombre, role, created_at')
-        .eq('role', rolABuscar)
+        .in('role', rolesABuscar)
         .order('created_at', { ascending: false })
         .limit(100);
 
@@ -128,8 +163,11 @@ export function GestionUsuariosPanel({ userRole }: GestionUsuariosPanelProps) {
     setCreando(true);
     setError('');
 
+    const cleanEmail = nuevoEmail.trim().toLowerCase();
+    const cleanNombre = nuevoNombre.trim();
+
     // Validaciones básicas
-    if (!nuevoEmail || !nuevoPassword || !nuevoNombre) {
+    if (!cleanEmail || !nuevoPassword || !cleanNombre) {
       setError('Todos los campos son requeridos');
       setCreando(false);
       return;
@@ -142,41 +180,87 @@ export function GestionUsuariosPanel({ userRole }: GestionUsuariosPanelProps) {
     }
 
     try {
-      // Crear usuario vía Edge Function (usa Admin API con email_confirm: true)
-      // Esto evita el problema de confirmación de email que bloquea el login
-      const { data, error: fnError } = await supabase.functions.invoke('bd-api', {
-        method: 'POST',
-        headers: { 'x-invoke-path': '/make-server-9dadc017/administrador/crear-usuario' },
-        body: {
-          email: nuevoEmail,
-          password: nuevoPassword,
-          nombre: nuevoNombre,
-          role: roleACrear,
-          _path: '/make-server-9dadc017/administrador/crear-usuario'
-        }
-      });
-
-      // La Edge Function devuelve error en el body con { error: '...' }
-      // fnError.message del SDK es genérico ("non-2xx status code"); el mensaje
-      // real viene en el body de la respuesta, accesible vía error.context.
+      // 1. Invocar vía Supabase Functions con path directo
+      let fnData: any = null;
       let mensajeError: string | null = null;
-      if (fnError) {
-        try {
-          const bodyText = await (fnError as any)?.context?.text?.();
-          const parsed = bodyText ? JSON.parse(bodyText) : null;
-          mensajeError = parsed?.error || fnError.message;
-        } catch {
-          mensajeError = fnError.message;
+
+      try {
+        const { data, error: fnError } = await supabase.functions.invoke(
+          'bd-api/make-server-9dadc017/administrador/crear-usuario',
+          {
+            method: 'POST',
+            body: {
+              email: cleanEmail,
+              password: nuevoPassword,
+              nombre: cleanNombre,
+              role: roleACrear,
+            }
+          }
+        );
+
+        if (!fnError && data && !data.error) {
+          fnData = data;
+        } else {
+          mensajeError = data?.error || fnError?.message || null;
         }
-      } else if (data?.error) {
-        mensajeError = data.error;
+      } catch (errInv: any) {
+        mensajeError = errInv?.message;
       }
 
-      if (mensajeError) {
-        if (process.env.NODE_ENV === 'development') console.error('Error creando usuario:', mensajeError);
-        setError(mensajeError);
+      // 2. Fallback a fetch directo si functions.invoke falló
+      if (!fnData) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          const token = session?.access_token || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt6ZGpyYXZ3Y2p1bW1lZ3h4cmtkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3NzY4ODIsImV4cCI6MjA4MzM1Mjg4Mn0.xC2QDsAzhYRRg8yakyRTChzHL_bleIT-u9mtKlNeBpc';
+          const anonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt6ZGpyYXZ3Y2p1bW1lZ3h4cmtkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3NzY4ODIsImV4cCI6MjA4MzM1Mjg4Mn0.xC2QDsAzhYRRg8yakyRTChzHL_bleIT-u9mtKlNeBpc';
+
+          const resDirect = await fetch(
+            'https://kzdjravwcjummegxxrkd.supabase.co/functions/v1/bd-api/make-server-9dadc017/administrador/crear-usuario',
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+                'apikey': anonKey,
+                'x-invoke-path': '/make-server-9dadc017/administrador/crear-usuario',
+              },
+              body: JSON.stringify({
+                email: cleanEmail,
+                password: nuevoPassword,
+                nombre: cleanNombre,
+                role: roleACrear,
+              })
+            }
+          );
+
+          const resJson = await resDirect.json().catch(() => null);
+          if (resDirect.ok && resJson && !resJson.error) {
+            fnData = resJson;
+            mensajeError = null;
+          } else {
+            mensajeError = resJson?.error || `Error HTTP ${resDirect.status}`;
+          }
+        } catch (errFetch: any) {
+          mensajeError = errFetch?.message || mensajeError;
+        }
+      }
+
+      if (!fnData) {
+        if (mensajeError?.includes('already registered') || mensajeError?.includes('ya está registrado')) {
+          mensajeError = `El correo ${cleanEmail} ya se encuentra registrado en el sistema. Puedes editar su contraseña desde la lista.`;
+        }
+        setError(mensajeError || 'Error al crear usuario en el servidor');
         setCreando(false);
         return;
+      }
+
+      // Asegurar que el estado en la tabla usuarios esté activo
+      const userId = fnData?.userId || fnData?.user?.id;
+      if (userId) {
+        await supabase
+          .from('usuarios')
+          .update({ estado: 'activo', updated_at: new Date().toISOString() })
+          .eq('id', userId);
       }
 
       // Recargar lista
@@ -187,7 +271,7 @@ export function GestionUsuariosPanel({ userRole }: GestionUsuariosPanelProps) {
       setNuevoPassword('');
       setNuevoNombre('');
       setModalAbierto(false);
-      toast.success(`✅ ${roleNombre} ${nuevoNombre} creado exitosamente`);
+      toast.success(`✅ ${roleNombre} ${cleanNombre} creado exitosamente`);
     } catch (err: any) {
       if (process.env.NODE_ENV === 'development') console.error('❌ Error completo:', err);
       setError(err.message || 'Error desconocido al crear usuario');
@@ -236,22 +320,22 @@ export function GestionUsuariosPanel({ userRole }: GestionUsuariosPanelProps) {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold">Gestión de {roleNombre}es</h2>
-          <p className="text-muted-foreground">Crear y administrar credenciales de {roleNombre}es</p>
+          <h2 className="text-2xl font-bold">Gestión de Usuarios del Sistema</h2>
+          <p className="text-muted-foreground">Crear y administrar credenciales de administradores y programadores</p>
         </div>
         
         <Dialog open={modalAbierto} onOpenChange={setModalAbierto}>
           <DialogTrigger asChild>
             <Button className="bg-primary hover:bg-primary/90">
               <UserPlus className="w-4 h-4 mr-2" />
-              Crear {roleNombre}
+              Crear Usuario
             </Button>
           </DialogTrigger>
           <DialogContent className="bg-[#1a1a24] border-primary/30 shadow-2xl">
             <DialogHeader>
-              <DialogTitle className="text-white">Crear Nuevo {roleNombre}</DialogTitle>
+              <DialogTitle className="text-white">Crear Nuevo Usuario del Sistema</DialogTitle>
               <DialogDescription className="text-muted-foreground">
-                Ingresa los datos del nuevo {roleNombre.toLowerCase()}
+                Ingresa los datos y selecciona el rol para el nuevo acceso
               </DialogDescription>
             </DialogHeader>
             
@@ -261,6 +345,30 @@ export function GestionUsuariosPanel({ userRole }: GestionUsuariosPanelProps) {
                   {error}
                 </div>
               )}
+
+              <div className="space-y-2">
+                <Label>Rol del Usuario</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    type="button"
+                    variant={roleACrear === 'administrador' ? 'default' : 'outline'}
+                    className={roleACrear === 'administrador' ? 'bg-primary text-white font-medium' : 'border-border/60 text-muted-foreground'}
+                    onClick={() => setRoleACrear('administrador')}
+                    disabled={creando}
+                  >
+                    Administrador
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={roleACrear === 'programador' ? 'default' : 'outline'}
+                    className={roleACrear === 'programador' ? 'bg-primary text-white font-medium' : 'border-border/60 text-muted-foreground'}
+                    onClick={() => setRoleACrear('programador')}
+                    disabled={creando}
+                  >
+                    Programador
+                  </Button>
+                </div>
+              </div>
 
               <div className="space-y-2">
                 <Label htmlFor="nombre">Nombre Completo</Label>
@@ -322,7 +430,7 @@ export function GestionUsuariosPanel({ userRole }: GestionUsuariosPanelProps) {
                       Creando...
                     </>
                   ) : (
-                    'Crear Usuario'
+                    `Crear ${roleNombre}`
                   )}
                 </Button>
               </div>
@@ -338,10 +446,10 @@ export function GestionUsuariosPanel({ userRole }: GestionUsuariosPanelProps) {
             <CardContent className="flex flex-col items-center justify-center py-12">
               <User className="w-12 h-12 text-muted-foreground mb-4" />
               <p className="text-muted-foreground text-center">
-                No hay {roleNombre.toLowerCase()}es registrados
+                No hay usuarios registrados
               </p>
               <p className="text-sm text-muted-foreground/60 text-center mt-2">
-                Crea el primer {roleNombre.toLowerCase()} para comenzar
+                Crea el primer administrador o programador para comenzar
               </p>
             </CardContent>
           </Card>
@@ -351,7 +459,16 @@ export function GestionUsuariosPanel({ userRole }: GestionUsuariosPanelProps) {
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="space-y-1">
-                    <CardTitle className="text-lg">{usuario.nombre}</CardTitle>
+                    <div className="flex items-center gap-2">
+                      <CardTitle className="text-lg">{usuario.nombre}</CardTitle>
+                      <span className={`px-2 py-0.5 text-xs rounded-full font-semibold ${
+                        usuario.role === 'administrador'
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                          : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                      }`}>
+                        {usuario.role === 'administrador' ? 'Administrador' : 'Programador'}
+                      </span>
+                    </div>
                     <CardDescription className="flex items-center gap-2">
                       <Mail className="w-4 h-4" />
                       {usuario.email}

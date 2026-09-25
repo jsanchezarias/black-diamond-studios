@@ -10,6 +10,7 @@ import { supabase } from '../utils/supabase/info'; // ✅ Corregido: ruta correc
 import { useModelos } from '../app/components/ModelosContext';
 import { toast } from 'sonner';
 import { CredencialesModal } from './CredencialesModal';
+import { CacheSystem } from '../utils/cache';
 
 interface CrearModeloModalProps {
   open: boolean;
@@ -245,15 +246,19 @@ export function CrearModeloModal({ open, onClose }: CrearModeloModalProps) {
     try {
       // ✅ NUEVO FLUJO: Crear usuario directamente con Supabase (sin servidor)
       
-      // Paso 0: Verificar que el email no esté registrado
+      // Paso 0: Normalizar y verificar que el email no esté registrado
+      const cleanEmail = email.trim().toLowerCase();
+      const cleanNombre = nombre.trim();
+      const cleanNombreArtistico = (nombreArtistico || nombre).trim();
+
       const { data: existingUser } = await supabase
         .from('usuarios')
         .select('email, role')
-        .eq('email', email)
+        .ilike('email', cleanEmail)
         .maybeSingle();
 
       if (existingUser) {
-        toast.error(`El email ${email} ya está registrado como ${existingUser.role}`);
+        toast.error(`El email ${cleanEmail} ya está registrado como ${existingUser.role}`);
         setLoading(false);
         return;
       }
@@ -271,7 +276,7 @@ export function CrearModeloModal({ open, onClose }: CrearModeloModalProps) {
       // Subir foto de perfil
       if (archivoFoto) {
         try {
-          const fileName = `${email.split('@')[0]}/perfil-${Date.now()}.${archivoFoto.name.split('.').pop()}`;
+          const fileName = `${cleanEmail.split('@')[0]}/perfil-${Date.now()}.${archivoFoto.name.split('.').pop()}`;
           const { error: uploadError } = await supabase.storage
             .from(bucketName)
             .upload(fileName, archivoFoto, {
@@ -298,7 +303,7 @@ export function CrearModeloModal({ open, onClose }: CrearModeloModalProps) {
         for (let i = 0; i < archivosFotosAdicionales.length; i++) {
           const archivo = archivosFotosAdicionales[i];
           try {
-            const fileName = `${email.split('@')[0]}/adicional-${i + 1}-${Date.now()}.${archivo.name.split('.').pop()}`;
+            const fileName = `${cleanEmail.split('@')[0]}/adicional-${i + 1}-${Date.now()}.${archivo.name.split('.').pop()}`;
             const { error: uploadError } = await supabase.storage
               .from(bucketName)
               .upload(fileName, archivo, {
@@ -324,7 +329,7 @@ export function CrearModeloModal({ open, onClose }: CrearModeloModalProps) {
       // Subir documento de identidad (frente)
       if (archivoDocumentoFrente) {
         try {
-          const fileName = `${email.split('@')[0]}/doc-frente-${Date.now()}.${archivoDocumentoFrente.name.split('.').pop()}`;
+          const fileName = `${cleanEmail.split('@')[0]}/doc-frente-${Date.now()}.${archivoDocumentoFrente.name.split('.').pop()}`;
           const { error: uploadError } = await supabase.storage
             .from(bucketName)
             .upload(fileName, archivoDocumentoFrente, {
@@ -348,7 +353,7 @@ export function CrearModeloModal({ open, onClose }: CrearModeloModalProps) {
       // Subir documento de identidad (reverso)
       if (archivoDocumentoReverso) {
         try {
-          const fileName = `${email.split('@')[0]}/doc-reverso-${Date.now()}.${archivoDocumentoReverso.name.split('.').pop()}`;
+          const fileName = `${cleanEmail.split('@')[0]}/doc-reverso-${Date.now()}.${archivoDocumentoReverso.name.split('.').pop()}`;
           const { error: uploadError } = await supabase.storage
             .from(bucketName)
             .upload(fileName, archivoDocumentoReverso, {
@@ -369,76 +374,101 @@ export function CrearModeloModal({ open, onClose }: CrearModeloModalProps) {
         }
       }
 
-      // Paso 2: Crear usuario vía Edge Function (fetch directo sin headers custom que bloquea CORS)
-      // Usamos fetch directo a la URL completa para evitar que el gateway de Supabase
-      // bloquee el header x-invoke-path en el preflight CORS.
+      // Paso 2: Crear usuario vía Edge Function (con fallback doble: direct fetch + functions.invoke)
       const { data: { session: currentSession } } = await supabase.auth.getSession();
       const authToken = currentSession?.access_token || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt6ZGpyYXZ3Y2p1bW1lZ3h4cmtkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3NzY4ODIsImV4cCI6MjA4MzM1Mjg4Mn0.xC2QDsAzhYRRg8yakyRTChzHL_bleIT-u9mtKlNeBpc';
+      const anonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt6ZGpyYXZ3Y2p1bW1lZ3h4cmtkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3NzY4ODIsImV4cCI6MjA4MzM1Mjg4Mn0.xC2QDsAzhYRRg8yakyRTChzHL_bleIT-u9mtKlNeBpc';
 
-      const fnResponse = await fetch(
-        'https://kzdjravwcjummegxxrkd.supabase.co/functions/v1/bd-api',
-        {
+      const payload = {
+        email: cleanEmail,
+        password: password,
+        nombre: cleanNombre,
+        nombreArtistico: cleanNombreArtistico,
+        telefono: telefono ? telefono.trim() : null,
+        cedula: cedula ? cedula.trim() : null,
+        edad: parseInt(edad) || 21,
+        direccion: direccion ? direccion.trim() : null,
+        fotoPerfil: fotoPerfilUrl,
+        fotosAdicionales: fotosAdicionalesUrls,
+        descripcion: descripcion ? descripcion.trim() : null,
+        altura: altura || null,
+        medidas: medidas || null,
+        sede: sede || null,
+        activa: activa,
+        disponible: disponible,
+        domicilio: domicilio,
+        politicaTarifa: politicaTarifa,
+        documentoFrente: documentoFrenteUrl,
+        documentoReverso: documentoReversoUrl,
+        role: 'modelo',
+      };
+
+      let fnData: any = null;
+      let detalleError: string | null = null;
+
+      // Intento 1: Fetch directo al endpoint completo en la Edge Function
+      try {
+        const directUrl = 'https://kzdjravwcjummegxxrkd.supabase.co/functions/v1/bd-api/make-server-9dadc017/administrador/crear-modelo';
+        const fnResponse = await fetch(directUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${authToken}`,
-            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt6ZGpyYXZ3Y2p1bW1lZ3h4cmtkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3NzY4ODIsImV4cCI6MjA4MzM1Mjg4Mn0.xC2QDsAzhYRRg8yakyRTChzHL_bleIT-u9mtKlNeBpc',
+            'apikey': anonKey,
             'x-invoke-path': '/make-server-9dadc017/administrador/crear-modelo',
           },
-          body: JSON.stringify({
-            email: email,
-            password: password,
-            nombre: nombre,
-            nombreArtistico: nombreArtistico || nombre,
-            telefono: telefono || null,
-            cedula: cedula || null,
-            edad: parseInt(edad),
-            direccion: direccion || null,
-            fotoPerfil: fotoPerfilUrl,
-            fotosAdicionales: fotosAdicionalesUrls,
-            descripcion: descripcion || null,
-            altura: altura || null,
-            medidas: medidas || null,
-            sede: sede || null,
-            activa: activa,
-            disponible: disponible,
-            domicilio: domicilio,
-            politicaTarifa: politicaTarifa,
-            documentoFrente: documentoFrenteUrl,
-            documentoReverso: documentoReversoUrl,
-            role: 'modelo',
-          })
+          body: JSON.stringify(payload)
+        });
+        const resJson = await fnResponse.json().catch(() => null);
+        if (fnResponse.ok && resJson && !resJson.error) {
+          fnData = resJson;
+        } else {
+          detalleError = resJson?.error || `Error HTTP ${fnResponse.status}`;
         }
-      );
-
-      const fnData = await fnResponse.json();
-
-      if (!fnResponse.ok || fnData?.error) {
-        const detalle = fnData?.error || `Error HTTP ${fnResponse.status}`;
-        console.error('❌ Error de la Edge Function:', fnResponse.status, fnData);
-        throw new Error(detalle);
+      } catch (errFetch: any) {
+        detalleError = errFetch?.message || 'Error de conexión con el servidor';
       }
 
-      // Paso 3: Opcional - Reforzar actualización si es necesario (ya lo hace la Edge Function)
+      // Intento 2: Fallback vía supabase.functions.invoke si el fetch directo falló
+      if (!fnData) {
+        try {
+          const { data: invData, error: invErr } = await supabase.functions.invoke(
+            'bd-api/make-server-9dadc017/administrador/crear-modelo',
+            {
+              method: 'POST',
+              body: payload
+            }
+          );
+          if (!invErr && invData && !invData.error) {
+            fnData = invData;
+            detalleError = null;
+          } else {
+            detalleError = invData?.error || invErr?.message || detalleError;
+          }
+        } catch (errInv: any) {
+          detalleError = errInv?.message || detalleError;
+        }
+      }
+
+      if (!fnData) {
+        console.error('❌ Error creando modelo:', detalleError);
+        throw new Error(detalleError || 'No se pudo crear la modelo en el servidor');
+      }
+
+      // Paso 3: Sincronizar campos complementarios
       const userId = fnData?.userId || fnData?.user?.id;
       if (userId) {
         await supabase
           .from('usuarios')
           .update({
-            nombre_artistico: nombreArtistico || nombre,
+            nombre_artistico: cleanNombreArtistico,
             foto_url: fotoPerfilUrl,
-            // Sin esto, "estado" queda vacío y la modelo no aparece en la página pública
-            // (aunque sí se vea en los dashboards), hasta que alguien la archive y restaure.
             estado: 'activo',
+            disponible: disponible,
             updated_at: new Date().toISOString()
           })
           .eq('id', userId);
 
-        // Indexar las fotos en modelo_fotos desde la creación — antes solo quedaban
-        // guardadas en las columnas fotoPerfil/fotosAdicionales de usuarios, y la
-        // página pública (y otras vistas) leen de esta tabla. Sin esto, una modelo
-        // podía quedar "sin fotos" hasta que alguien las volviera a subir manualmente
-        // desde la pestaña Galería.
         const fotosParaIndexar = [
           ...(fotoPerfilUrl ? [{ url: fotoPerfilUrl, es_principal: true, orden: 0 }] : []),
           ...(fotosAdicionalesUrls || []).map((url: string, i: number) => ({ url, es_principal: false, orden: i + 1 })),
@@ -447,7 +477,7 @@ export function CrearModeloModal({ open, onClose }: CrearModeloModalProps) {
           await supabase.from('modelo_fotos').insert(
             fotosParaIndexar.map(f => ({
               modelo_id: userId,
-              modelo_email: email,
+              modelo_email: cleanEmail,
               url: f.url,
               orden: f.orden,
               es_principal: f.es_principal,
@@ -456,14 +486,15 @@ export function CrearModeloModal({ open, onClose }: CrearModeloModalProps) {
         }
       }
 
-      // Paso 4: Recargar lista de modelos
+      // Paso 4: Limpiar caché y recargar lista de modelos para que aparezca de inmediato
+      CacheSystem.clear('modelos_v3');
       await recargarModelos();
 
       // Mostrar credenciales
-      toast.success(`✅ Modelo ${nombre} creada exitosamente`);
+      toast.success(`✅ Modelo ${cleanNombre} creada exitosamente`);
       setCredencialesCreadas({
-        nombre: nombre,
-        email: email,
+        nombre: cleanNombre,
+        email: cleanEmail,
         password: password
       });
       setMostrarCredenciales(true);
